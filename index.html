@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="MH Analytics Phase 2C ist ein cleanes Premium-Finanzprodukt fuer Research, Screener, Ratings, Alerts, ETF, Portfolio, Insider, Makro, Reports und TradingView-Analyse.">
+    <title>MH Analytics | Premium Market Research</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="#home" aria-label="MH Analytics Startseite">
+          <span class="brand-mark">MH</span>
+          <span>
+            <strong>MH Analytics</strong>
+            <small>Research-driven market intelligence</small>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Hauptnavigation">
+          <button class="nav-link active" data-route="home" type="button">Start</button>
+          <button class="nav-link" data-route="asset" type="button">Aktie</button>
+          <button class="nav-link" data-route="screener" type="button">Screener</button>
+          <button class="nav-link" data-route="macro" type="button">Makro</button>
+          <button class="nav-link" data-route="etf" type="button">ETF</button>
+          <button class="nav-link" data-route="events" type="button">Events</button>
+          <button class="nav-link" data-route="research" type="button">Research</button>
+          <button class="nav-link" data-route="portfolio" type="button">Watchlist</button>
+          <button class="nav-link" data-route="alerts" type="button">Alerts</button>
+          <button class="nav-link" data-route="settings" type="button">API Keys</button>
+        </nav>
+
+        <div class="header-actions">
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Dark oder Light Mode wechseln">
+            <span class="theme-dot"></span>
+            <span id="themeLabel">Dark</span>
+          </button>
+        </div>
+      </header>
+
+      <main id="app" class="page"></main>
+
+      <footer class="site-footer">
+        <div>
+          <strong>MH Analytics</strong>
+          <p>Premium Research Dashboard fuer Marktueberblick, echte Datenquellen, Analyse, Sentiment und Watchlists.</p>
+        </div>
+        <div>
+          <span>Disclaimer</span>
+          <p>Keine Anlageberatung. Alle Daten, Scores und Signale dienen nur der Information und koennen unvollstaendig, verzoegert oder simuliert sein.</p>
+        </div>
+        <div>
+          <span>Datenquellen</span>
+          <p>Provider Registry mit Finnhub, FRED, CoinGecko, Alpha Vantage, FMP, News-, FX-, Social-, CRM- und Storage-Slots.</p>
+        </div>
+      </footer>
+    </div>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
