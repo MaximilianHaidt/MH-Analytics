@@ -1,8 +1,8 @@
 # MH Analytics
 
-MH Analytics ist eine statische Premium-Finanzwebsite fuer Research, Watchlist, Screener, Ratings, Alerts, ETF, Portfolio, Insider-/Institutionellen-Daten, Makro, Reports und TradingView-Analyse.
+MH Analytics ist eine statische Premium-Finanzwebsite für Research, Live-Daten, Watchlist, Screener, Ratings, Alerts, ETF, Portfolio, Insider-/Institutionellen-Daten, Makro, Geldmengen, Reports und TradingView-Analyse.
 
-Die Website bleibt bewusst einfach startbar:
+Die Website bleibt bewusst einfach:
 
 - kein Node.js
 - kein npm
@@ -11,142 +11,130 @@ Die Website bleibt bewusst einfach startbar:
 - lokal per Doppelklick nutzbar
 - online als statische Website deploybar
 
-## Schnellstart fuer Anfaenger
+## Schnellstart für Anfänger
 
-1. Diesen Projektordner oeffnen.
+1. Diesen Projektordner öffnen.
 2. `index.html` doppelklicken.
 3. Die Website startet direkt im Browser.
 
-Die Seite funktioniert sofort mit lokalen Fallback-Daten. Fuer Live-Daten brauchst du Internet und optional API Keys im Bereich `API Keys`.
+Die Seite funktioniert sofort mit lokalen Fallback-Daten. Für Live-Daten brauchst du Internet und optional API Keys im Bereich `API Keys`.
 
-## Die vier Hauptdateien
+## Was in Phase 2E verbessert wurde
 
-Diese vier Dateien sind die Source of Truth der App:
+- API-Key Center mit Anfänger-Reihenfolge für die wichtigsten Provider
+- sichtbarer Key-, Test- und Live-Zugriffsstatus pro Provider
+- neues `Data Health` Dashboard für Provider, Module, Fehlerstatus, Fallback-Nutzung und letzte erfolgreiche Abrufe
+- Finnhub, FRED, FMP, Alpha Vantage und CoinGecko klarer als priorisierte Datenquellen markiert
+- Events/Earnings mit Finnhub- und FMP-Live-Pfaden vorbereitet und Fallback-Kalender stabil gehalten
+- Asset-Seiten mit Datenlage-Leiste für Preis, Profil, Fundamentals, News und Events
+- Screener als Hybrid-Modell: Live-Quote, falls vorhanden; lokaler Research-Score bleibt nutzbar
+- README mit klarer Live/Fallback/Vorbereitet-Einordnung aktualisiert
 
-- `index.html` enthaelt Grundgeruest, Navigation, Footer und bindet CSS/JS relativ ein.
-- `styles.css` enthaelt das Premium-Design, Dark/Light Mode, Mobile Layout und Print/Report Styles.
-- `app.js` enthaelt die statische App-Logik: Routing, Provider Registry, API Layer, Fallback-Daten, Screener, Ratings, Top Picks, Alerts, Asset-Seiten, ETF, Portfolio, Makro, Insider, Reports und Personalisierung.
-- `README.md` erklaert Projekt, Nutzung, Datenlogik und Deployment.
+## Welche API Keys zuerst sinnvoll sind
 
-Zusaetzliche Dateien wie `DEPLOYMENT.md`, `.gitignore` oder `vercel.json` sind nur Projekt- und Deployment-Hilfen. Die eigentliche Website bleibt in den vier Hauptdateien.
+1. **Finnhub**: wichtigster Key für Aktienkurse, Profile, Company News, Basic Financials und vorbereiteten Earnings Calendar.
+2. **FRED**: wichtigster Key für Makro-Daten wie Fed Funds, CPI, Arbeitslosenquote und 10Y Yield.
+3. **Financial Modeling Prep**: sinnvoll für Profile, Fundamentaldaten und vorbereitete Earnings-Daten.
+4. **Alpha Vantage**: optionaler Kurs-Fallback, wenn Finnhub nicht reicht.
+5. **CoinGecko**: Krypto-Preise laufen als Public/Demo-Quelle; produktionsnah später besser mit Key oder Proxy.
 
-## Projektstruktur
+## Die wichtigsten Dateien
 
-```text
-mh-analytics/
-  index.html       # Startdatei der Website
-  styles.css       # Designsystem und responsive Oberflaeche
-  app.js           # komplette statische App-Logik
-  README.md        # diese Hauptanleitung
-  DEPLOYMENT.md    # einfache GitHub- und Vercel-Anleitung
-  vercel.json      # optionale Vercel-Konfiguration fuer statisches Hosting
-  .gitignore       # lokale System-/Editor-Dateien aus Git heraushalten
-```
+- `index.html` enthält Grundgerüst, Navigation, Footer und bindet CSS/JS relativ ein.
+- `styles.css` enthält Premium-Design, Dark/Light Mode, Mobile Layout und Print/Report Styles.
+- `app.js` enthält die statische App-Logik: Routing, Provider Registry, API Layer, Fallback-Daten, Data Health, Screener, Ratings, Top Picks, Alerts, Asset-Seiten, ETF, Portfolio, Makro, Geldmengen, Insider, Reports und Personalisierung.
+- `README.md` erklärt Projekt, Nutzung, Datenlogik und Deployment.
+- `DEPLOYMENT.md` erklärt GitHub und Vercel Schritt für Schritt.
+- `vercel.json` ist eine kleine optionale Vercel-Konfiguration für statisches Hosting.
 
-## Warum app.js aktuell nicht aufgeteilt wurde
+## Aktiv genutzte Provider
 
-`app.js` ist gross, aber die Module teilen sich gemeinsamen State, gemeinsame Fallback-Daten und gemeinsame Hilfsfunktionen. Ein radikales Aufteilen ohne Build-System waere aktuell ein groesseres Risiko als ein Nutzen.
+Diese Provider werden in der App aktiv genutzt, sobald ein Key oder eine öffentliche Demo-Quelle verfügbar ist:
 
-Deshalb bleibt Phase 2C konservativ:
+- Finnhub: Quotes, Profile, Company News, Basic Financials, Earnings Calendar vorbereitet/aktiv bei Key
+- Finnhub News: Company News und News-Status in Asset-Seiten
+- Alpha Vantage: optionaler Quote-Fallback
+- Financial Modeling Prep: Profile, Fundamentals und Earnings Calendar vorbereitet/aktiv bei Key
+- FRED: Makrodaten wie Fed Funds, CPI, Arbeitslosenquote und 10Y Yield
+- CoinGecko: Public/Demo-Krypto-Preise für BTC, ETH und SOL
 
-- bestehende Features bleiben erhalten
-- keine neue Toolchain
-- keine neue Abhaengigkeit
-- interne Modul-Grenzen sind im Kopf von `app.js` dokumentiert
-- spaeteres Aufteilen ist vorbereitet, aber nicht erzwungen
+## Vorbereitete Provider
 
-## Wichtige Funktionen
+Diese Slots sind professionell vorbereitet, aber noch nicht vollständig live verdrahtet:
 
-- Premium-Design in Schwarz, Anthrazit, Off-White und Gold
-- Dark/Light Mode
-- responsive Mobile-first Darstellung
-- globale Suche mit Asset-Auswahl
-- Asset-Seiten mit TradingView-Integration und Fallback-Link
-- Screener mit lokalen Fallback-Daten
-- Technical Rating Engine
-- Top Picks auf Basis transparenter Heuristiken
-- lokale Alerts mit localStorage
-- Provider Registry / API-Key Center
-- Makro-Dashboard mit FRED-Anbindung und Fallbacks
-- ETF-Modul mit Kostenrechner und Overlap Checker
-- Portfolio-System mit mehreren lokalen Portfolios
-- Insider- und Institutionellen-Tab auf Asset-Seiten
-- Report-/Print-Export fuer Browser-PDF
-- Personalisierung mit Dashboard-Modi, Favoriten und zuletzt gesehenen Assets
-
-## Daten und API Keys
-
-MH Analytics nutzt eine Provider Registry. Jeder Provider ist markiert als:
-
-- aktiv genutzt
-- vorbereitet
-- optional
-- besser spaeter serverseitig
-
-Aktiv oder vorbereitet sind unter anderem:
-
-- Finnhub
-- Alpha Vantage
 - Twelve Data
-- Financial Modeling Prep
 - EODHD
-- FRED
 - ECB
-- NewsAPI
 - GNews
-- CoinGecko
 - CoinCap
 - ExchangeRate-API
 - Open Exchange Rates
+- Metals-API
+- Supabase
+
+## Backend-only oder besser serverseitig
+
+Diese Anbieter sollten für eine öffentliche Plattform später über Backend, Proxy oder Edge Functions laufen:
+
+- NewsAPI
+- Marketaux
 - Reddit
 - Brevo
-- Supabase
-- Metals-API
-- Marketaux
+- sensible Market-Data-Keys
+- Supabase Service Role Keys
 
-API Keys werden in dieser statischen Version im Browser per localStorage gespeichert. Das ist fuer private lokale Tests praktisch. Fuer eine echte oeffentliche App sollten geheime Keys spaeter ueber ein Backend, einen Proxy oder Edge Functions geschuetzt werden.
+## Live, Fallback oder vorbereitet
 
-## Fallback-Daten
+- Start-Ticker: live mit Finnhub/Alpha Vantage/CoinGecko, sonst Fallback
+- Asset-Kurse: live mit Finnhub/Alpha Vantage/CoinGecko, sonst Fallback
+- Company News: live mit Finnhub, sonst Fallback
+- Fundamentals: live mit FMP/Finnhub, sonst lokaler Fallback
+- Makro: live mit FRED, sonst Fallback
+- Geldmengen/Liquidität: vorbereitet mit FRED/ECB, aktuell überwiegend Fallback
+- Events/Earnings: Finnhub/FMP live vorbereitet, EODHD vorbereitet, lokaler Kalender bleibt aktiv
+- Screener: Hybrid aus Live-Quotes und lokalem Research-Universum
+- ETF: lokale strukturierte Datenbasis
+- Portfolio/Watchlist/Alerts: lokal im Browser gespeichert
+- Reports: Browser-Print/PDF-Fallback ohne Backend
 
-Wenn kein Key vorhanden ist, ein Anbieter blockiert, CORS greift oder ein Rate Limit erreicht wird, bleibt die Seite nutzbar. Dann werden strukturierte lokale Fallback-Daten angezeigt.
+## Data Health
 
-Jede wichtige Datenkarte zeigt:
+Der Bereich `Data Health` zeigt:
 
-- Quelle
-- Timestamp
-- Status: live, fallback oder veraltet
+- aktive Provider
+- vorbereitete Provider
+- letzter erfolgreicher Abruf
+- Fehlerstatus
+- Fallback-Nutzung
+- welche Module welchen Provider nutzen
 
-Fallback-basiert sind aktuell vor allem:
+So siehst du schneller, ob ein Key fehlt, ein Provider funktioniert oder ein Modul gerade bewusst mit Fallback-Daten arbeitet.
 
-- Insider Trades
-- Institutionelle Holdings
-- ETF-Daten
-- Portfolio-Exposure
-- Teile des Makro-Ausbaus wie DXY, ECB, M1/M3/M4, Realzins und Yield Curve
-- Social/Sentiment
-- Reports
+## API Keys und Sicherheit
+
+API Keys werden in dieser statischen Version im Browser per localStorage gespeichert. Das ist für private lokale Tests praktisch.
+
+Für eine echte öffentliche App sollten geheime Keys später geschützt werden:
+
+- Backend-Proxy
+- Edge Functions
+- Supabase oder anderer Backend-Dienst
+- Public/Private-Key-Trennung
 
 ## Deployment
 
-Eine einfache Schritt-fuer-Schritt-Anleitung fuer GitHub und Vercel steht in `DEPLOYMENT.md`.
+Eine einfache Anleitung steht in `DEPLOYMENT.md`.
 
 Kurzfassung:
 
 1. Projektordner bei GitHub hochladen.
 2. Vercel mit GitHub verbinden.
 3. Repository importieren.
-4. Build Command leer lassen.
-5. Output Directory leer lassen.
-6. Deploy klicken.
-
-## Was spaeter sinnvoll waere
-
-- `app.js` schrittweise in kleinere statische JS-Dateien aufteilen
-- API Keys ueber Backend/Proxy schuetzen
-- echte Live-Provider fuer ETF, Insider, Institutionelle und Events anbinden
-- Supabase oder ein anderes Backend fuer Login, Cloud-Sync und User-Daten nutzen
-- Tests und Monitoring erst einfuehren, wenn die statische Basis stabil online steht
+4. Framework: `Other`.
+5. Build Command leer lassen.
+6. Output Directory leer lassen.
+7. Deploy klicken.
 
 ## Disclaimer
 
-MH Analytics ist keine Anlageberatung. Daten, Scores, Top Picks, Ratings, Reports und Signale dienen nur zur Information und koennen simuliert, verzoegert, unvollstaendig oder falsch sein.
+MH Analytics ist keine Anlageberatung. Daten, Scores, Top Picks, Ratings, Reports und Signale dienen nur zur Information und können simuliert, verzögert, unvollständig oder falsch sein.

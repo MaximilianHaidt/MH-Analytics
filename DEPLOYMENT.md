@@ -1,14 +1,14 @@
 # MH Analytics online stellen
 
-Diese Anleitung ist bewusst einfach gehalten. MH Analytics bleibt eine statische Website: kein Node.js, kein npm, kein Build-Prozess und kein eigener Server.
+Diese Anleitung ist für Anfänger gedacht. MH Analytics bleibt eine statische Website: kein Node.js, kein npm, kein Build-Prozess und kein eigener Server.
 
-## Lokal testen
+## Lokal öffnen
 
-1. Projektordner oeffnen.
+1. Projektordner öffnen.
 2. `index.html` doppelklicken.
 3. Die Website startet im Browser.
 
-Wenn Live-Daten nicht geladen werden, ist das normal, solange keine API Keys eingetragen sind. Die App nutzt dann Fallback-Daten.
+Wenn Live-Daten nicht laden, ist das normal, solange keine API Keys eingetragen sind. Die App nutzt dann Fallback-Daten.
 
 ## Auf GitHub hochladen
 
@@ -26,38 +26,40 @@ Wenn Live-Daten nicht geladen werden, ist das normal, solange keine API Keys ein
 ## Mit Vercel deployen
 
 1. Bei Vercel anmelden.
-2. `Add New Project` waehlen.
-3. Dein GitHub-Repository auswaehlen.
-4. Bei den Einstellungen:
+2. `Add New Project` wählen.
+3. Dein GitHub-Repository auswählen.
+4. Einstellungen:
    - Framework Preset: `Other`
    - Build Command: leer lassen
    - Output Directory: leer lassen
 5. `Deploy` klicken.
 
-Vercel erkennt dann `index.html` als statische Startdatei.
+Vercel erkennt `index.html` als statische Startdatei.
 
 ## API Keys nach dem Deployment
 
-API Keys werden aktuell lokal im Browser gespeichert. Das bedeutet:
+API Keys werden aktuell lokal im Browser gespeichert.
+
+Das bedeutet:
 
 - Jeder Browser hat seine eigenen Keys.
-- Keys werden nicht automatisch auf andere Geraete uebertragen.
-- Fuer private Nutzung ist das okay.
-- Fuer eine oeffentliche Plattform sollten sensible Keys spaeter nicht im Browser liegen.
+- Keys werden nicht automatisch auf andere Geräte übertragen.
+- Für private Nutzung ist das okay.
+- Für eine öffentliche Plattform sollten sensible Keys später nicht im Browser liegen.
 
-Spaeter sinnvoll:
+Später sinnvoll:
 
 - Backend-Proxy
 - Edge Functions
-- Supabase fuer User-Daten
+- Supabase für User-Daten
 - getrennte Public-/Private-Key-Strategie
 
-## Wenn etwas nicht laedt
+## Wenn etwas nicht lädt
 
-Pruefe zuerst:
+Prüfe zuerst:
 
 1. Sind `index.html`, `styles.css` und `app.js` im selben Ordner?
-2. Wurde `app.js` wirklich mit hochgeladen?
+2. Wurde `app.js` wirklich hochgeladen?
 3. Blockiert ein Browser-Plugin externe Widgets wie TradingView?
 4. Sind API Keys korrekt eingetragen?
 5. Zeigt die App einen Fallback-Status an?
