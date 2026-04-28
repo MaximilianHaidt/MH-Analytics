@@ -19,24 +19,111 @@ Die Website bleibt bewusst einfach:
 
 Die Seite funktioniert sofort mit lokalen Fallback-Daten. Für Live-Daten brauchst du Internet und optional API Keys im Bereich `API Keys`.
 
-## Was in Phase 2E verbessert wurde
+## Was in dieser API-Runde bereinigt wurde
 
-- API-Key Center mit Anfänger-Reihenfolge für die wichtigsten Provider
-- sichtbarer Key-, Test- und Live-Zugriffsstatus pro Provider
-- neues `Data Health` Dashboard für Provider, Module, Fehlerstatus, Fallback-Nutzung und letzte erfolgreiche Abrufe
-- Finnhub, FRED, FMP, Alpha Vantage und CoinGecko klarer als priorisierte Datenquellen markiert
-- Events/Earnings mit Finnhub- und FMP-Live-Pfaden vorbereitet und Fallback-Kalender stabil gehalten
-- Asset-Seiten mit Datenlage-Leiste für Preis, Profil, Fundamentals, News und Events
-- Screener als Hybrid-Modell: Live-Quote, falls vorhanden; lokaler Research-Score bleibt nutzbar
-- README mit klarer Live/Fallback/Vorbereitet-Einordnung aktualisiert
+- Die aktive Provider-Seite zeigt nur noch den öffentlichen Kernstack.
+- “Live genutzt” wird nicht mehr durch einen bloßen Key-Test erzeugt.
+- Provider zeigen getrennt: Key-Status, Teststatus, Datenlayer-Status, Nutzungsstatus und Einsatzart.
+- FRED wurde auf einen JSON-Test mit `file_type=json` umgestellt.
+- Financial Modeling Prep, Twelve Data, NewsAPI, GNews, CoinCap und weitere alte Slots wurden aus der aktiven öffentlichen API-Key-Seite entfernt.
+- Events/Earnings sind klar Finnhub und Alpha Vantage zugeordnet; Dividenden/Splits bleiben lokal abgesichert.
+- README und Footer beschreiben den neuen Provider-Stack ehrlich.
 
-## Welche API Keys zuerst sinnvoll sind
+## Was in der Prioritätsrunde ergänzt wurde
 
-1. **Finnhub**: wichtigster Key für Aktienkurse, Profile, Company News, Basic Financials und vorbereiteten Earnings Calendar.
-2. **FRED**: wichtigster Key für Makro-Daten wie Fed Funds, CPI, Arbeitslosenquote und 10Y Yield.
-3. **Financial Modeling Prep**: sinnvoll für Profile, Fundamentaldaten und vorbereitete Earnings-Daten.
-4. **Alpha Vantage**: optionaler Kurs-Fallback, wenn Finnhub nicht reicht.
-5. **CoinGecko**: Krypto-Preise laufen als Public/Demo-Quelle; produktionsnah später besser mit Key oder Proxy.
+- Startseite mit neuem Bereich **“Was ist heute wichtig?”** für Marktbewegungen, Events, Earnings, auffällige Assets und Risk-on/Risk-off-Einordnung.
+- Asset-Seiten mit stärkerer 5-Minuten-Research-Zusammenfassung, Chancen/Risiken, Triggern und eigenem **Thesis / Journal** Tab.
+- Liquidität und Geldmengen bleiben als eigener Bereich sichtbar und wurden auf der Startseite stärker mit Markt-Wirkung erklärt.
+- Screener zeigt das erweiterte lokale Universum mit aktuell knapp 80 Assets und bleibt hybrid aus Live-Quotes und Fallback-Research-Score.
+- Watchlist zeigt zusätzliche Watchlist-News und Event-Hinweise.
+- Alerts unterstützen jetzt Preis-, Watchlist-, Sentiment- und Earnings-/Event-Reminder.
+- Portfolio-Bereich erklärt Risiko, Exposure, Klumpenrisiko und Rebalancing klarer.
+- ETF-Overlap Checker enthält eine verständliche Einordnung der Überschneidung.
+- Research/Report wurde um eine 5-Minuten-Aktienanalyse und mehr Thesis-/Risiko-Logik erweitert.
+- Journal-/Psychologie-Basis speichert These, Trigger, Emotion und Regel-Check lokal im Browser.
+
+## Was in dieser Vertiefungsrunde verbessert wurde
+
+- Makro und Liquidität haben jetzt eine klarere Kernaussage mit Liquiditätsampel, Score und verständlicher Wirkung auf Aktien, Gold, Krypto und Anleihen.
+- M1, M2, M3 und M4 sind im Liquiditätsbereich stärker gruppiert und werden nicht mehr nur als lose Zahlen gezeigt.
+- Realzins, Yield Curve und Zentralbank-Bilanz werden deutlicher als Zins- und Liquiditätsrisiken eingeordnet.
+- Die Startseite verbindet den Tagesüberblick stärker mit dem Makro-/Liquiditätsbild.
+- ETF-Karten erklären jetzt Einsatz, Ausschüttungstyp, Top-5-Konzentration, Regionen, Währungsrisiko und Struktur klarer.
+- Der ETF-Kostenrechner zeigt grobe Kosten pro Jahr, pro Monat und über den gewählten Zeitraum.
+- Der ETF-Overlap-Checker bewertet nicht nur Top-Holdings, sondern auch regionale Überschneidung und TER-Differenz.
+- Portfolio, Journal, Watchlist und Reports wurden sprachlich und logisch weiter geschärft, ohne neue technische Infrastruktur einzuführen.
+
+## Öffentlicher Kernstack
+
+Diese elf Quellen bilden ab jetzt den sichtbaren Provider-Kern:
+
+1. **Finnhub**: Aktien-Quotes, Unternehmensprofile, Company News, Earnings Calendar.
+2. **Alpha Vantage**: FX, Rohstoffe, technische Indikatoren, IPO-/Earnings-Zusatz, Quote-Fallback.
+3. **FRED**: US-Makro, Geldmengen, Zinsserien und Spreads.
+4. **ECB**: Eurozone, EZB-Daten, EUR-bezogene Makrodaten.
+5. **BLS**: CPI, Inflation und US-Arbeitsmarkt.
+6. **U.S. Treasury Fiscal Data**: Yield Curve, Treasury Rates und Zinsstruktur.
+7. **SEC / EDGAR**: Filings, Submissions, XBRL und offizielle Fundamentaldatenbasis.
+8. **EIA**: Energie, Öl, Gas und Energiedaten.
+9. **World Bank**: globale Länderprofile und Makrodaten.
+10. **IMF DataMapper**: internationale Makroergänzung.
+11. **OECD Data Explorer**: OECD-Vergleiche und Wirtschaftsstruktur.
+
+## Welche Keys zuerst sinnvoll sind
+
+1. **Finnhub**: wichtigster Key für Aktienkurse, Profile, Company News und Earnings.
+2. **FRED**: wichtigster Key für US-Makro, Geldmengen und Zinsdaten.
+3. **Alpha Vantage**: sinnvoll für FX, Rohstoffe, technische Indikatoren und Quote-Fallback.
+4. **EIA**: sinnvoll, wenn Energie-/Rohstoffdaten live genutzt werden sollen.
+
+ECB, BLS, Treasury, SEC, World Bank, IMF und OECD brauchen in dieser Startphase kein Key-Feld. Sie sind Open-Data-Quellen oder browserkritische offizielle Quellen und werden entsprechend gekennzeichnet.
+
+## Bewusst entfernte öffentliche Provider-Slots
+
+Diese Anbieter werden nicht mehr in der aktiven öffentlichen API-Key-Seite beworben:
+
+- Financial Modeling Prep
+- Twelve Data
+- NewsAPI
+- GNews
+- CoinCap
+- EODHD
+- Marketaux
+- ExchangeRate-API
+- Open Exchange Rates
+- Metals-API
+- Reddit
+- Brevo
+- Supabase
+
+CoinGecko bleibt nur als optionaler interner Krypto-Prototyp für BTC/ETH-Fallbacks erhalten und ist kein Kernprovider für den öffentlichen Start.
+
+## Live, Fallback oder zugeordnet
+
+- Start-Ticker: live mit Finnhub oder Alpha Vantage, sonst Fallback. Krypto nutzt optional CoinGecko-Prototyp/Fallback.
+- Asset-Kurse: Finnhub primär, Alpha Vantage als Fallback, sonst lokaler Fallback.
+- Company News: Finnhub, sonst lokaler News-Fallback.
+- Fundamentals: Finnhub Basic Financials, später SEC/XBRL sauber ausbauen, sonst lokaler Fallback.
+- Makro: FRED live bei Key, sonst Fallback; ECB/BLS/Treasury/World Bank/IMF/OECD sind klar zugeordnet.
+- Geldmengen/Liquidität: FRED und ECB zugeordnet, lokale Fallbacks bleiben aktiv.
+- Events/Earnings: Finnhub live bei Key, Alpha Vantage als Zusatzpfad zugeordnet, lokaler Kalender bleibt aktiv.
+- Screener: Hybrid aus Live-Quotes und lokalem Research-Universum.
+- ETF: lokale strukturierte Datenbasis.
+- Portfolio/Watchlist/Alerts: lokal im Browser gespeichert.
+- Reports: Browser-Print/PDF-Fallback ohne Backend.
+
+## Data Health
+
+Der Bereich `Data Health` zeigt:
+
+- Key vorhanden oder Key fehlt
+- Test verfügbar oder nicht sinnvoll
+- Test erfolgreich oder fehlgeschlagen
+- aktuell live genutzt, Fallback aktiv oder aktuell nicht genutzt
+- browsergeeignet, browserkritisch oder später serverseitig sinnvoll
+- welche Module welchen Provider verwenden
+
+Wichtig: Ein erfolgreicher API-Test bedeutet nur “Test erfolgreich”. Erst ein erfolgreicher Datenabruf durch ein Modul zählt als “aktuell live genutzt”.
 
 ## Die wichtigsten Dateien
 
@@ -46,69 +133,6 @@ Die Seite funktioniert sofort mit lokalen Fallback-Daten. Für Live-Daten brauch
 - `README.md` erklärt Projekt, Nutzung, Datenlogik und Deployment.
 - `DEPLOYMENT.md` erklärt GitHub und Vercel Schritt für Schritt.
 - `vercel.json` ist eine kleine optionale Vercel-Konfiguration für statisches Hosting.
-
-## Aktiv genutzte Provider
-
-Diese Provider werden in der App aktiv genutzt, sobald ein Key oder eine öffentliche Demo-Quelle verfügbar ist:
-
-- Finnhub: Quotes, Profile, Company News, Basic Financials, Earnings Calendar vorbereitet/aktiv bei Key
-- Finnhub News: Company News und News-Status in Asset-Seiten
-- Alpha Vantage: optionaler Quote-Fallback
-- Financial Modeling Prep: Profile, Fundamentals und Earnings Calendar vorbereitet/aktiv bei Key
-- FRED: Makrodaten wie Fed Funds, CPI, Arbeitslosenquote und 10Y Yield
-- CoinGecko: Public/Demo-Krypto-Preise für BTC, ETH und SOL
-
-## Vorbereitete Provider
-
-Diese Slots sind professionell vorbereitet, aber noch nicht vollständig live verdrahtet:
-
-- Twelve Data
-- EODHD
-- ECB
-- GNews
-- CoinCap
-- ExchangeRate-API
-- Open Exchange Rates
-- Metals-API
-- Supabase
-
-## Backend-only oder besser serverseitig
-
-Diese Anbieter sollten für eine öffentliche Plattform später über Backend, Proxy oder Edge Functions laufen:
-
-- NewsAPI
-- Marketaux
-- Reddit
-- Brevo
-- sensible Market-Data-Keys
-- Supabase Service Role Keys
-
-## Live, Fallback oder vorbereitet
-
-- Start-Ticker: live mit Finnhub/Alpha Vantage/CoinGecko, sonst Fallback
-- Asset-Kurse: live mit Finnhub/Alpha Vantage/CoinGecko, sonst Fallback
-- Company News: live mit Finnhub, sonst Fallback
-- Fundamentals: live mit FMP/Finnhub, sonst lokaler Fallback
-- Makro: live mit FRED, sonst Fallback
-- Geldmengen/Liquidität: vorbereitet mit FRED/ECB, aktuell überwiegend Fallback
-- Events/Earnings: Finnhub/FMP live vorbereitet, EODHD vorbereitet, lokaler Kalender bleibt aktiv
-- Screener: Hybrid aus Live-Quotes und lokalem Research-Universum
-- ETF: lokale strukturierte Datenbasis
-- Portfolio/Watchlist/Alerts: lokal im Browser gespeichert
-- Reports: Browser-Print/PDF-Fallback ohne Backend
-
-## Data Health
-
-Der Bereich `Data Health` zeigt:
-
-- aktive Provider
-- vorbereitete Provider
-- letzter erfolgreicher Abruf
-- Fehlerstatus
-- Fallback-Nutzung
-- welche Module welchen Provider nutzen
-
-So siehst du schneller, ob ein Key fehlt, ein Provider funktioniert oder ein Modul gerade bewusst mit Fallback-Daten arbeitet.
 
 ## API Keys und Sicherheit
 

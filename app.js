@@ -30,6 +30,7 @@
     dashboardPrefs: "mh.dashboardPrefs.v1",
     alerts: "mh.alerts.v2",
     alertInbox: "mh.alertInbox.v2",
+    journal: "mh.journal.v1",
     recents: "mh.recents.v2",
     activeSymbol: "mh.activeSymbol.v2",
     cache: "mh.apiCache.v2"
@@ -46,16 +47,14 @@
   };
 
   const PROVIDER_GROUPS = [
-    { id: "market", label: "Market Data" },
-    { id: "fundamentals", label: "Fundamentals" },
-    { id: "macro", label: "Macro" },
-    { id: "news", label: "News" },
-    { id: "crypto", label: "Crypto" },
-    { id: "fxCommodities", label: "Forex / Commodities" },
-    { id: "events", label: "Events / Earnings" },
-    { id: "social", label: "Social / Sentiment" },
-    { id: "crm", label: "Newsletter / CRM" },
-    { id: "storage", label: "Storage / Backend-ready" }
+    { id: "market", label: "Markt / Aktien / Unternehmen" },
+    { id: "alpha", label: "FX / Rohstoffe / Indikatoren" },
+    { id: "usMacro", label: "Makro USA" },
+    { id: "euroMacro", label: "Makro Europa" },
+    { id: "rates", label: "Zinsen / Yield Curve" },
+    { id: "filings", label: "Filings / Fundamentals" },
+    { id: "energy", label: "Energie / Rohstoffe" },
+    { id: "globalMacro", label: "Globale Länderdaten" }
   ];
 
   const PROVIDERS = [
@@ -67,34 +66,36 @@
       status: "active",
       keyMode: "required",
       security: "backend-recommended",
-      description: "Aktien-Quotes, Firmenprofile, Company News, Basic Financials und später Earnings/Events.",
-      usage: "Live genutzt für Quotes, Profile, Company News und Basic Financials.",
+      description: "Aktien-Quotes, Firmenprofile, Company News, Basic Financials und Earnings/Events.",
+      usage: "Primärquelle im Datenlayer für Aktien, News und Earnings. Live-Status entsteht erst nach erfolgreichem Abruf.",
       testHint: "Testet AAPL Quote über Finnhub.",
-      testUrl: (key) => `https://finnhub.io/api/v1/quote?symbol=AAPL&token=${encodeURIComponent(key)}`
+      testRequest: (key) => ({ url: `https://finnhub.io/api/v1/quote?symbol=AAPL&token=${encodeURIComponent(key)}`, responseType: "json" }),
+      validateTest: validateFinnhubQuote
     },
     {
       id: "alphaVantage",
       name: "Alpha Vantage",
-      group: "market",
-      categories: ["Market Data"],
+      group: "alpha",
+      categories: ["FX", "Rohstoffe", "Indikatoren", "Fallback"],
       status: "active",
       keyMode: "required",
       security: "backend-recommended",
-      description: "Optionaler Aktienkurs-Fallback für globale Quotes.",
-      usage: "Live genutzt als Quote-Fallback nach Finnhub.",
+      description: "FX, Rohstoffe, technische Indikatoren, IPO-/Earnings-Zusatz und optionaler Aktienkurs-Fallback.",
+      usage: "Eigener Zuständigkeitsbereich für FX/Rohstoffe/Indikatoren; bei Aktien als Fallback nach Finnhub.",
       testHint: "Testet GLOBAL_QUOTE für AAPL.",
-      testUrl: (key) => `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${encodeURIComponent(key)}`
+      testRequest: (key) => ({ url: `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${encodeURIComponent(key)}`, responseType: "json" }),
+      validateTest: validateAlphaVantageQuote
     },
     {
       id: "twelveData",
       name: "Twelve Data",
       group: "market",
       categories: ["Market Data", "Forex / Commodities"],
-      status: "prepared",
+      status: "disabled",
       keyMode: "required",
       security: "backend-recommended",
       description: "Vorbereiteter Slot für Realtime/Delayed Quotes, Indikatoren, Forex und Rohstoffe.",
-      usage: "Noch nicht aktiv im Datenlayer.",
+      usage: "Aus der aktiven öffentlichen Provider-Seite entfernt; nicht im Public-Start-Kernstack.",
       testHint: "Slot vorbereitet; Integration später."
     },
     {
@@ -102,50 +103,52 @@
       name: "Financial Modeling Prep",
       group: "fundamentals",
       categories: ["Fundamentals", "Market Data", "Events / Earnings"],
-      status: "active",
+      status: "disabled",
       keyMode: "required",
       security: "backend-recommended",
       description: "Profile, Fundamentaldaten, Kennzahlen und später Earnings-Kalender.",
-      usage: "Live genutzt für Profile/Fundamentals, wenn Key vorhanden.",
-      testHint: "Testet Profil für AAPL.",
-      testUrl: (key) => `https://financialmodelingprep.com/api/v3/profile/AAPL?apikey=${encodeURIComponent(key)}`
+      usage: "Aus der aktiven öffentlichen Provider-Seite entfernt; keine Live-Pfade im Public-Start-Kernstack.",
+      testHint: "Aus der öffentlichen API-Key-Seite entfernt; kein Browser-Test im Public Start."
     },
     {
       id: "eodhd",
       name: "EODHD",
       group: "fundamentals",
       categories: ["Market Data", "Fundamentals", "Events / Earnings"],
-      status: "prepared",
+      status: "disabled",
       keyMode: "required",
       security: "backend-recommended",
       description: "Vorbereiteter Slot für EOD-Kurse, Fundamentaldaten, Dividenden und Earnings.",
-      usage: "Noch nicht aktiv im Datenlayer.",
+      usage: "Aus der aktiven öffentlichen Provider-Seite entfernt.",
       testHint: "Slot vorbereitet; Integration später."
     },
     {
       id: "fred",
       name: "FRED",
-      group: "macro",
-      categories: ["Macro"],
+      group: "usMacro",
+      categories: ["US-Makro", "Geldmengen", "Zinsen"],
       status: "active",
       keyMode: "required",
       security: "browser-ok-private",
-      description: "US-Makrodaten wie Fed Funds, CPI, Arbeitslosenquote und 10Y Yield.",
-      usage: "Live genutzt für Makro-Schnellblick.",
+      description: "US-Makrodaten wie Fed Funds, CPI, Arbeitslosenquote, Geldmengen, Zinsserien und Spreads.",
+      usage: "Zuständig für US-Makro und Geldmengen. Der Test erzwingt JSON, weil FRED sonst XML liefert.",
       testHint: "Testet Fed Funds Serie.",
-      testUrl: (key) => `https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${encodeURIComponent(key)}&file_type=json&sort_order=desc&limit=1`
+      testRequest: (key) => ({ url: `https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${encodeURIComponent(key)}&file_type=json&sort_order=desc&limit=1`, responseType: "json" }),
+      validateTest: validateFredObservations
     },
     {
       id: "ecb",
       name: "ECB",
-      group: "macro",
-      categories: ["Macro", "Forex / Commodities"],
-      status: "prepared",
+      group: "euroMacro",
+      categories: ["Euro-Makro", "EZB", "EUR-FX"],
+      status: "mapped",
       keyMode: "none",
       security: "browser-ok-public",
       description: "Vorbereiteter Slot für EZB-Zinsen, FX-Referenzkurse und europäische Makrodaten.",
-      usage: "Noch nicht aktiv im Datenlayer.",
-      testHint: "Öffentliche Quelle, kein Key-Feld nötig."
+      usage: "Open-Data-Quelle für Eurozone/EZB. Zugeordnet, aber erst nach echtem Abruf als live markiert.",
+      testHint: "Open-Data-Test: ECB Dataflow-Verzeichnis.",
+      testRequest: () => ({ url: "https://data-api.ecb.europa.eu/service/dataflow/ECB/all/latest?detail=allstubs", responseType: "text" }),
+      validateTest: validateNonEmptyText("ECB Data API")
     },
     {
       id: "newsApi",
@@ -164,17 +167,12 @@
       name: "Finnhub News",
       group: "news",
       categories: ["News", "Events / Earnings"],
-      status: "active",
+      status: "disabled",
       keyMode: "required",
       security: "backend-recommended",
       description: "Company News und Earnings Calendar. Nutzt in der App denselben Finnhub-Key wie Market Data.",
-      usage: "Live genutzt für Company News; Earnings Calendar ist als nächster Datenpfad vorbereitet.",
-      testHint: "Testet Finnhub Company News für AAPL.",
-      testUrl: (key) => {
-        const to = toIsoDate(new Date());
-        const from = toIsoDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-        return `https://finnhub.io/api/v1/company-news?symbol=AAPL&from=${from}&to=${to}&token=${encodeURIComponent(key)}`;
-      }
+      usage: "Nicht mehr als separater Provider sichtbar; Finnhub bündelt Quotes, News und Earnings.",
+      testHint: "Kein separater Test: Finnhub News nutzt den Hauptprovider Finnhub."
     },
     {
       id: "gnews",
@@ -205,11 +203,11 @@
       name: "CoinGecko",
       group: "crypto",
       categories: ["Crypto"],
-      status: "active",
+      status: "optional",
       keyMode: "optional",
       security: "proxy-recommended",
       description: "Krypto-Preise für BTC/ETH. Public/Demo nutzbar; produktionsnah besser mit Key oder Proxy.",
-      usage: "Live genutzt für BTC/ETH Simple Price, mit lokalem Fallback.",
+      usage: "Optionaler Krypto-Prototyp, nicht Kernbestandteil des öffentlichen Provider-Stacks.",
       testHint: "Testet Public/Demo Simple Price für Bitcoin.",
       testUrl: () => "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
     },
@@ -296,74 +294,162 @@
       description: "Vorbereiteter Slot für User-Daten, Watchlists, Kommentare, Auth und Edge Functions.",
       usage: "Noch nicht aktiv. In Phase statisch bleibt localStorage primär.",
       testHint: "Anon Key kann später genutzt werden; Service Role niemals im Browser speichern."
+    },
+    {
+      id: "bls",
+      name: "BLS",
+      group: "usMacro",
+      categories: ["CPI", "Arbeitsmarkt", "US-Labor"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-ok-public",
+      description: "Offizielle Open-Data-Quelle für US-Arbeitsmarkt, CPI und Labor-Daten.",
+      usage: "Kein Key nötig. Für CPI und Arbeitsmarkt zugeordnet; aktuelle Module nutzen noch FRED/Fallback, bis BLS-Reihen live geschaltet werden.",
+      testHint: "Open-Data-Test: Latest CPI-Serie.",
+      testRequest: () => ({ url: "https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0?latest=true", responseType: "json" }),
+      validateTest: validateBlsSeries
+    },
+    {
+      id: "treasury",
+      name: "U.S. Treasury Fiscal Data",
+      group: "rates",
+      categories: ["Yield Curve", "Treasury Rates", "Zinsstruktur"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-ok-public",
+      description: "Offizielle Open-Data-Quelle für Treasury-Rates, Yield Curve und Zinsstruktur.",
+      usage: "Kein Key nötig. Für Yield-Curve- und Zinsmodule zugeordnet; aktuelle App nutzt noch lokale Fallback-Werte, bis Reihen live verdrahtet sind.",
+      testHint: "Open-Data-Test: Treasury Average Interest Rates.",
+      testRequest: () => ({ url: "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/avg_interest_rates?sort=-record_date&page[size]=1", responseType: "json" }),
+      validateTest: validateFiscalData
+    },
+    {
+      id: "sec",
+      name: "SEC / EDGAR",
+      group: "filings",
+      categories: ["Filings", "Submissions", "XBRL"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-critical",
+      description: "Offizielle Open-Data-Quelle für EDGAR Submissions, XBRL und spätere Fundamentaldatenbasis.",
+      usage: "Kein Key nötig. data.sec.gov ist offiziell, aber im Browser CORS-kritisch; daher aktuell zugeordnet, nicht als Frontend-Livequelle beworben.",
+      testHint: "Kein Browser-Test: SEC data.sec.gov unterstützt CORS nicht zuverlässig für öffentliche Frontends."
+    },
+    {
+      id: "eia",
+      name: "EIA",
+      group: "energy",
+      categories: ["Energie", "Öl", "Gas"],
+      status: "mapped",
+      keyMode: "required",
+      security: "browser-ok-private",
+      description: "Offizielle Energiequelle für Öl, Gas, Strom und Energiemarktdaten.",
+      usage: "Key nötig. Für Energie-/Rohstoffmodule zugeordnet; nicht als live markiert, bis ein EIA-Abruf erfolgreich war.",
+      testHint: "Browser-Test: EIA APIv2 Root-Metadaten mit API-Key.",
+      testRequest: (key) => ({ url: `https://api.eia.gov/v2/?api_key=${encodeURIComponent(key)}`, responseType: "json" }),
+      validateTest: validateEiaResponse
+    },
+    {
+      id: "worldBank",
+      name: "World Bank",
+      group: "globalMacro",
+      categories: ["Länderprofile", "Globale Makro"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-ok-public",
+      description: "Open-Data-Quelle für globale Länder-, Entwicklungs- und Strukturdaten.",
+      usage: "Kein Key nötig. Für globale Makro- und Länderprofile zugeordnet; konkrete Module nutzen aktuell noch Fallbacks.",
+      testHint: "Open-Data-Test: US GDP-Indikator im JSON-Format.",
+      testRequest: () => ({ url: "https://api.worldbank.org/v2/country/US/indicator/NY.GDP.MKTP.CD?format=json&per_page=1", responseType: "json" }),
+      validateTest: validateWorldBankResponse
+    },
+    {
+      id: "imf",
+      name: "IMF DataMapper",
+      group: "globalMacro",
+      categories: ["Internationale Makro", "Länder"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-ok-public",
+      description: "Offizielle internationale Makroergänzung über IMF DataMapper und IMF APIs.",
+      usage: "Kein Key nötig für DataMapper. Für internationale Makrovergleiche zugeordnet; noch nicht als aktueller Live-Modulprovider markiert.",
+      testHint: "Open-Data-Test: IMF DataMapper Real GDP Growth USA.",
+      testRequest: () => ({ url: "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/USA", responseType: "json" }),
+      validateTest: validateImfResponse
+    },
+    {
+      id: "oecd",
+      name: "OECD Data Explorer",
+      group: "globalMacro",
+      categories: ["OECD-Vergleiche", "Wirtschaftsstruktur"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-critical",
+      description: "OECD Open Data über SDMX-APIs für Länder- und Wirtschaftsvergleiche.",
+      usage: "Kein Key nötig. Wegen SDMX-Komplexität und Browser-/Rate-Limit-Fragen zugeordnet, aber nicht als Live-Frontendquelle markiert.",
+      testHint: "Kein Browser-Test in dieser statischen Startphase. Später besser über kontrollierten Datenadapter."
     }
   ];
 
   const DEFAULT_WATCHLIST = ["NVDA", "MSFT", "AAPL", "SPY", "BTC"];
   const HOME_TICKER = ["SPY", "QQQ", "DAX", "NVDA", "MSFT", "AAPL", "BTC", "ETH", "GOLD"];
-  const PRIORITY_PROVIDER_IDS = ["finnhub", "fred", "fmp", "alphaVantage", "coingecko"];
+  const PUBLIC_PROVIDER_IDS = ["finnhub", "alphaVantage", "fred", "ecb", "bls", "treasury", "sec", "eia", "worldBank", "imf", "oecd"];
+  const REMOVED_PUBLIC_PROVIDER_IDS = ["newsApi", "gnews", "fmp", "twelveData", "coincap", "eodhd", "marketaux", "exchangeRateApi", "openExchangeRates", "metalsApi", "reddit", "brevo", "supabase", "finnhubNews"];
+  const OPTIONAL_INTERNAL_PROVIDER_IDS = ["coingecko"];
+  const PRIORITY_PROVIDER_IDS = ["finnhub", "alphaVantage", "fred", "ecb", "bls", "treasury", "sec", "eia", "worldBank", "imf", "oecd"];
   const DATA_HEALTH_PROVIDER_IDS = [
     "finnhub",
-    "finnhubNews",
-    "fred",
-    "fmp",
     "alphaVantage",
-    "coingecko",
-    "twelveData",
-    "eodhd",
+    "fred",
     "ecb",
-    "newsApi",
-    "gnews",
-    "reddit"
+    "bls",
+    "treasury",
+    "sec",
+    "eia",
+    "worldBank",
+    "imf",
+    "oecd"
   ];
 
   const PROVIDER_MODULE_USAGE = {
-    finnhub: ["Start-Ticker", "Watchlist", "Asset-Preis", "Profil", "Basic Financials"],
-    finnhubNews: ["Asset-News", "Events/Earnings vorbereitet"],
-    fred: ["Makro-Schnellblick", "Liquidität vorbereitet"],
-    fmp: ["Fundamentals", "Profil", "Events/Earnings vorbereitet"],
-    alphaVantage: ["Quote-Fallback", "Screener-Hybrid"],
-    coingecko: ["Krypto-Preise", "Start-Ticker", "Watchlist"],
-    twelveData: ["Marktdaten vorbereitet", "Forex/Rohstoffe vorbereitet"],
-    eodhd: ["Dividenden/Splits vorbereitet", "Earnings vorbereitet"],
-    ecb: ["EZB/Makro vorbereitet", "FX vorbereitet"],
-    newsApi: ["News-Aggregation später serverseitig"],
-    gnews: ["News-Aggregation vorbereitet"],
-    marketaux: ["Finanz-News/Sentiment vorbereitet"],
-    coincap: ["Krypto-Fallback vorbereitet"],
-    exchangeRateApi: ["Währungen vorbereitet"],
-    openExchangeRates: ["Währungen vorbereitet"],
-    metalsApi: ["Gold/Silber vorbereitet"],
-    reddit: ["Social Sentiment später serverseitig"],
-    brevo: ["Newsletter später serverseitig"],
-    supabase: ["Auth/Datenbank später"]
+    finnhub: ["Aktien-Quotes", "Unternehmensprofile", "Company News", "Earnings Calendar", "Asset-Seiten"],
+    alphaVantage: ["Quote-Fallback", "FX", "Rohstoffe", "technische Indikatoren", "IPO/Earnings-Zusatz"],
+    fred: ["US-Makro", "Fed Funds", "CPI/Inflation", "Arbeitslosenquote", "Geldmengen/Zinsen"],
+    ecb: ["Eurozone", "EZB-Zinsen", "EUR-FX", "Euro-Makro"],
+    bls: ["CPI", "Arbeitsmarkt", "US-Labor"],
+    treasury: ["Yield Curve", "Treasury Rates", "Zinsstruktur"],
+    sec: ["Filings", "Submissions", "XBRL", "Fundamentaldatenbasis"],
+    eia: ["Energie", "Öl", "Gas", "Rohstoffdaten"],
+    worldBank: ["Länderprofile", "globale Makrodaten", "Strukturdaten"],
+    imf: ["internationale Makroergänzung", "Ländervergleiche"],
+    oecd: ["OECD-Vergleiche", "Wirtschaftsstruktur"]
   };
 
   const API_ONBOARDING_GUIDE = [
     {
       providerId: "finnhub",
       title: "1. Finnhub zuerst",
-      text: "Verbessert Aktienkurse, Profile, Company News und Basic Financials. Das ist der wichtigste Key für Aktienseiten und Watchlist."
-    },
-    {
-      providerId: "fred",
-      title: "2. FRED für Makro",
-      text: "Liefert Fed Funds, CPI, Arbeitslosenquote und 10Y Yield. Wichtig für Makro und Liquidität."
-    },
-    {
-      providerId: "fmp",
-      title: "3. FMP für Fundamentals",
-      text: "Ergänzt Profile, Kennzahlen und später Earnings. Sinnvoll, wenn Fundamentaldaten wichtiger werden."
+      text: "Primärquelle für Aktien-Quotes, Profile, Company News und Earnings. Das ist der wichtigste Key für den öffentlichen Start."
     },
     {
       providerId: "alphaVantage",
-      title: "4. Alpha Vantage als Fallback",
-      text: "Optionaler zweiter Kursanbieter, falls Finnhub leer läuft oder Rate Limits erreicht."
+      title: "2. Alpha Vantage als Zusatz",
+      text: "Quote-Fallback, FX, Rohstoffe, technische Indikatoren sowie IPO-/Earnings-Zusatz. Nicht Primärprovider für Aktien."
     },
     {
-      providerId: "coingecko",
-      title: "5. CoinGecko für Krypto",
-      text: "Public/Demo funktioniert oft ohne Key. Für produktionsnahe Nutzung besser später Key oder Proxy nutzen."
+      providerId: "fred",
+      title: "3. FRED für US-Makro",
+      text: "Fed Funds, CPI, Arbeitslosenquote, Geldmengen, Zinsserien und Spreads. Der Test erzwingt JSON."
+    },
+    {
+      providerId: "eia",
+      title: "4. EIA für Energie",
+      text: "Offizielle Quelle für Öl, Gas und Energiedaten. Key nötig, aber klar auf Energie begrenzt."
+    },
+    {
+      providerId: "worldBank",
+      title: "5. Open Data Quellen",
+      text: "ECB, BLS, Treasury, SEC, World Bank, IMF und OECD brauchen keine API-Key-Felder. Sie werden nach Aufgaben zugeordnet."
     }
   ];
 
@@ -1151,6 +1237,162 @@
       sentiment: 58
     },
     {
+      symbol: "NOVO",
+      name: "Novo Nordisk",
+      type: "Stock",
+      sector: "Healthcare",
+      tv: "OMXCOP:NOVO_B",
+      currency: "DKK",
+      fallback: { price: 890.00, changePct: 0.42, marketCap: 520000000000, pe: 37.6, eps: 23.4, revenue: 232000000000 },
+      thesis: "GLP-1-Marktführer mit starkem Wachstum und hoher Preissetzungsmacht.",
+      risks: "Kapazität, Wettbewerb, regulatorischer Preisdruck.",
+      sentiment: 72
+    },
+    {
+      symbol: "TM",
+      name: "Toyota Motor",
+      type: "Stock",
+      sector: "Consumer Discretionary",
+      tv: "NYSE:TM",
+      currency: "USD",
+      fallback: { price: 221.40, changePct: 0.24, marketCap: 300000000000, pe: 10.8, eps: 20.5, revenue: 305000000000 },
+      thesis: "Globaler Auto-Qualitätswert mit Hybrid-Stärke, Produktionsskala und Japan-Exposure.",
+      risks: "Währung, EV-Wettbewerb, zyklische Autonachfrage.",
+      sentiment: 56
+    },
+    {
+      symbol: "SHEL",
+      name: "Shell",
+      type: "Stock",
+      sector: "Energy",
+      tv: "NYSE:SHEL",
+      currency: "USD",
+      fallback: { price: 72.80, changePct: 0.44, marketCap: 230000000000, pe: 12.2, eps: 5.9, revenue: 316000000000 },
+      thesis: "Energie-Major mit LNG-Hebel, Dividendenprofil und Öl-/Gas-Cashflow.",
+      risks: "Energiepreise, Regulierung, Energiewende.",
+      sentiment: 57
+    },
+    {
+      symbol: "BP",
+      name: "BP plc",
+      type: "Stock",
+      sector: "Energy",
+      tv: "NYSE:BP",
+      currency: "USD",
+      fallback: { price: 38.20, changePct: 0.18, marketCap: 105000000000, pe: 8.9, eps: 4.3, revenue: 213000000000 },
+      thesis: "Value-lastiger Energie-Titel mit hohem Rohstoffhebel und Restrukturierungspotenzial.",
+      risks: "Ölpreis, Bilanz, Strategieunsicherheit.",
+      sentiment: 50
+    },
+    {
+      symbol: "RIO",
+      name: "Rio Tinto",
+      type: "Stock",
+      sector: "Materials",
+      tv: "NYSE:RIO",
+      currency: "USD",
+      fallback: { price: 68.70, changePct: -0.22, marketCap: 112000000000, pe: 10.7, eps: 6.4, revenue: 54000000000 },
+      thesis: "Rohstoff-Exposure auf Eisenerz, Kupfer und Industrienachfrage.",
+      risks: "China-Zyklus, Rohstoffpreise, politische Risiken.",
+      sentiment: 49
+    },
+    {
+      symbol: "TSM",
+      name: "Taiwan Semiconductor",
+      type: "Stock",
+      sector: "Semiconductors",
+      tv: "NYSE:TSM",
+      currency: "USD",
+      fallback: { price: 145.20, changePct: 1.02, marketCap: 760000000000, pe: 27.9, eps: 5.2, revenue: 69300000000 },
+      thesis: "Foundry-Marktführer und zentrale Infrastruktur für AI-, Apple- und Chipzyklen.",
+      risks: "Geopolitik, Taiwan-Risiko, Capex-Zyklus.",
+      sentiment: 73
+    },
+    {
+      symbol: "BABA",
+      name: "Alibaba",
+      type: "Stock",
+      sector: "Consumer Discretionary",
+      tv: "NYSE:BABA",
+      currency: "USD",
+      fallback: { price: 76.10, changePct: -0.48, marketCap: 185000000000, pe: 10.4, eps: 7.3, revenue: 130000000000 },
+      thesis: "China-Internet-Value mit Cloud-, Commerce- und Rückkaufhebel.",
+      risks: "China-Regulierung, Konsum, geopolitische Risiken.",
+      sentiment: 45
+    },
+    {
+      symbol: "SHOP",
+      name: "Shopify",
+      type: "Stock",
+      sector: "Software",
+      tv: "NYSE:SHOP",
+      currency: "USD",
+      fallback: { price: 74.80, changePct: 1.34, marketCap: 96000000000, pe: 58.0, eps: 1.3, revenue: 7100000000 },
+      thesis: "Commerce-Software mit Händlernetzwerk, Payments und Operating-Leverage-Potenzial.",
+      risks: "Bewertung, Konsumzyklus, Wettbewerb.",
+      sentiment: 64
+    },
+    {
+      symbol: "UBER",
+      name: "Uber Technologies",
+      type: "Stock",
+      sector: "Consumer Discretionary",
+      tv: "NYSE:UBER",
+      currency: "USD",
+      fallback: { price: 69.60, changePct: 0.88, marketCap: 145000000000, pe: 46.5, eps: 1.5, revenue: 37200000000 },
+      thesis: "Plattform mit Mobilität, Delivery und wachsendem Free-Cashflow-Profil.",
+      risks: "Regulierung, Fahrer-Kosten, Wettbewerb.",
+      sentiment: 63
+    },
+    {
+      symbol: "ABNB",
+      name: "Airbnb",
+      type: "Stock",
+      sector: "Consumer Discretionary",
+      tv: "NASDAQ:ABNB",
+      currency: "USD",
+      fallback: { price: 150.40, changePct: -0.12, marketCap: 96000000000, pe: 34.8, eps: 4.3, revenue: 9900000000 },
+      thesis: "Reiseplattform mit Asset-light-Modell, Marke und globalem Netzwerk.",
+      risks: "Regulierung, Reisezyklus, Nachfrageabschwächung.",
+      sentiment: 55
+    },
+    {
+      symbol: "PANW",
+      name: "Palo Alto Networks",
+      type: "Stock",
+      sector: "Software",
+      tv: "NASDAQ:PANW",
+      currency: "USD",
+      fallback: { price: 303.80, changePct: 1.12, marketCap: 98000000000, pe: 48.0, eps: 6.3, revenue: 8000000000 },
+      thesis: "Cybersecurity-Plattform mit Konsolidierungsthese und Enterprise-Budget-Priorität.",
+      risks: "Bewertung, Plattform-Umstellung, Wettbewerb.",
+      sentiment: 68
+    },
+    {
+      symbol: "SNOW",
+      name: "Snowflake",
+      type: "Stock",
+      sector: "Software",
+      tv: "NYSE:SNOW",
+      currency: "USD",
+      fallback: { price: 148.20, changePct: -0.76, marketCap: 50000000000, pe: null, eps: -0.4, revenue: 2800000000 },
+      thesis: "Datenplattform mit AI-Daten-Narrativ und hohem Netto-Retention-Potenzial.",
+      risks: "Wachstumsverlangsamung, Bewertung, Margenpfad.",
+      sentiment: 52
+    },
+    {
+      symbol: "MELI",
+      name: "MercadoLibre",
+      type: "Stock",
+      sector: "Consumer Discretionary",
+      tv: "NASDAQ:MELI",
+      currency: "USD",
+      fallback: { price: 1620.00, changePct: 0.69, marketCap: 82000000000, pe: 55.0, eps: 29.4, revenue: 14500000000 },
+      thesis: "Lateinamerika-Commerce- und Fintech-Plattform mit strukturellem Wachstum.",
+      risks: "Währungsrisiko, politische Risiken, Bewertung.",
+      sentiment: 66
+    },
+    {
       symbol: "SOL",
       name: "Solana",
       type: "Crypto",
@@ -1229,7 +1471,10 @@
       region: [["USA", 96], ["Europa", 2], ["Sonstige", 2]],
       holdings: [["MSFT", 7.1], ["AAPL", 6.4], ["NVDA", 5.8], ["AMZN", 3.7], ["META", 2.5]],
       risk: "Breiter US-Markt, aber Mega-Cap-Konzentration.",
-      fxRisk: "USD-Risiko für EUR-Anleger"
+      fxRisk: "USD-Risiko für EUR-Anleger",
+      useCase: "US-Kernbaustein für breite Large-Cap-Exposure.",
+      structure: "Physisch replizierend, sehr liquide, stark USA-lastig.",
+      dataNote: "Lokales ETF-Modell mit TER, Holdings und Regionen."
     },
     {
       symbol: "QQQ",
@@ -1240,7 +1485,10 @@
       region: [["USA", 97], ["Global", 3]],
       holdings: [["MSFT", 8.7], ["NVDA", 7.9], ["AAPL", 7.4], ["AMZN", 5.1], ["META", 4.8]],
       risk: "Tech- und Growth-Konzentration.",
-      fxRisk: "USD-Risiko, hohe Zins-Sensitivität"
+      fxRisk: "USD-Risiko, hohe Zins-Sensitivität",
+      useCase: "Satellit für Nasdaq-, AI- und Growth-Exposure.",
+      structure: "Sehr liquide, aber stärker konzentriert als ein Welt-ETF.",
+      dataNote: "Lokales ETF-Modell, keine Live-Holdings."
     },
     {
       symbol: "VTI",
@@ -1251,7 +1499,10 @@
       region: [["USA", 99], ["Sonstige", 1]],
       holdings: [["MSFT", 6.2], ["AAPL", 5.6], ["NVDA", 5.0], ["AMZN", 3.2], ["META", 2.1]],
       risk: "US-Gesamtmarkt mit Small-/Mid-Cap-Anteil.",
-      fxRisk: "USD-Risiko für EUR-Anleger"
+      fxRisk: "USD-Risiko für EUR-Anleger",
+      useCase: "Sehr günstiger US-Gesamtmarkt-Baustein.",
+      structure: "Breiter als SPY, aber weiterhin fast vollständig USA.",
+      dataNote: "Lokale TER-/Regionen-/Holding-Basis."
     },
     {
       symbol: "VWCE",
@@ -1262,18 +1513,21 @@
       region: [["USA", 61], ["Europa", 16], ["Asien", 17], ["Sonstige", 6]],
       holdings: [["MSFT", 4.2], ["AAPL", 3.8], ["NVDA", 3.4], ["AMZN", 2.4], ["META", 1.6]],
       risk: "Globaler Aktienmarkt, USA trotzdem dominierend.",
-      fxRisk: "Mehrwährungs-Exposure im Fonds"
+      fxRisk: "Mehrwährungs-Exposure im Fonds",
+      useCase: "Ein-Fonds-Weltportfolio für langfristige Kernanlage.",
+      structure: "UCITS, thesaurierend, global diversifiziert.",
+      dataNote: "Lokales UCITS-ETF-Modell."
     }
   ];
 
   const MACRO_EXTENSIONS = [
-    { id: "ECB", label: "EZB / ECB Policy Rate", display: "4.00%", trend: "Restriktiv, Zinspfad wird datenabhängig", why: "Relevant für EUR, DAX, Banken und Bewertungsmultiples.", meaning: "Fallende Zinsen entlasten Finanzierungskosten; steigende Zinsen drücken Risikoassets.", source: "ECB Placeholder", status: "fallback" },
-    { id: "M1", label: "Geldmenge M1", display: "-4.2% YoY", trend: "Rückläufige enge Liquidität", why: "M1 zeigt sehr liquide Geldbestände.", meaning: "Rückgang kann auf restriktivere Liquidität hindeuten.", source: "FRED/ECB vorbereitet", status: "fallback" },
-    { id: "M2", label: "Geldmenge M2", display: "+1.8% YoY", trend: "Liquidität stabilisiert sich", why: "M2 ist ein wichtiger Liquiditätsproxy für Risikoassets.", meaning: "Steigendes M2 kann Risk-on unterstützen; fallendes M2 wirkt bremsend.", source: "Lokaler M2-Fallback", status: "fallback" },
-    { id: "M3", label: "Geldmenge M3", display: "vorbereitet", trend: "EU/ECB-Struktur vorbereitet", why: "M3 ist für Europa besonders relevant.", meaning: "Breites Geldwachstum zeigt Kredit- und Liquiditätsbedingungen.", source: "ECB Slot vorbereitet", status: "fallback" },
-    { id: "M4", label: "Geldmenge M4", display: "vorbereitet", trend: "UK/Global-Slot vorbereitet", why: "M4 kann für UK/Global-Liquidität genutzt werden.", meaning: "Breitere Geldmengen helfen beim Liquiditätsbild.", source: "Provider Slot vorbereitet", status: "fallback" },
-    { id: "REALYIELD", label: "Realzins", display: "1.25%", trend: "Nominalzins minus Inflation", why: "Realzinsen beeinflussen Gold, Growth-Aktien und Bewertungen.", meaning: "Steigende Realzinsen belasten Gold/Growth; fallende Realzinsen helfen oft.", source: "Lokales Makro-Modell", status: "fallback" },
-    { id: "YCURVE", label: "Yield Curve 2Y-10Y", display: "-0.38%", trend: "Inversion bleibt Rezessionssignal", why: "Die Kurve ist ein klassischer Konjunkturindikator.", meaning: "Starke Inversion signalisiert Stress; Re-Steepening kann Wendepunkt anzeigen.", source: "Lokaler Spread-Fallback", status: "fallback" }
+    { id: "ECB", label: "EZB / ECB Policy Rate", display: "4.00%", trend: "Restriktiv, Zinspfad wird datenabhängig", why: "Relevant für EUR, DAX, Banken und Bewertungsmultiples.", meaning: "Fallende Zinsen entlasten Finanzierungskosten; steigende Zinsen drücken Risikoassets.", source: "ECB Open-Data-Struktur", status: "fallback", bucket: "Zinsen", pressure: -1 },
+    { id: "M1", label: "Geldmenge M1", display: "-4.2% YoY", trend: "Enge Liquidität bleibt rückläufig", why: "M1 zeigt sofort verfügbare Geldbestände wie Bargeld und Sichteinlagen.", meaning: "Schrumpfendes M1 kann kurzfristigen Risikoappetit und Kreditimpulse dämpfen.", source: "FRED/ECB Liquiditätsmodell", status: "fallback", bucket: "Geldmengen", pressure: -1 },
+    { id: "M2", label: "Geldmenge M2", display: "+1.8% YoY", trend: "Breitere Liquidität stabilisiert sich", why: "M2 ist ein zentraler Liquiditätsproxy für Risikoassets, Kreditbedingungen und Cash im System.", meaning: "Steigendes M2 kann Risk-on unterstützen; fallendes M2 wirkt bremsend.", source: "FRED M2 + lokaler Fallback", status: "fallback", bucket: "Geldmengen", pressure: 1 },
+    { id: "M3", label: "Geldmenge M3", display: "+0.9% YoY", trend: "Euro-Liquidität wächst nur moderat", why: "M3 ist für Europa besonders relevant, weil es Einlagen, Geldmarktfonds und breitere Geldbestände abbildet.", meaning: "Schwaches M3-Wachstum spricht für vorsichtige Kredit- und Liquiditätsbedingungen.", source: "ECB M3-Struktur + Fallback", status: "fallback", bucket: "Geldmengen", pressure: 0 },
+    { id: "M4", label: "Geldmenge M4", display: "+1.1% YoY", trend: "Breite globale Liquidität bleibt verhalten", why: "M4 hilft als breiteres Liquiditätsbild für UK/Global-Kontext und institutionelle Geldbestände.", meaning: "Kräftiges M4-Wachstum kann Risikoassets stützen; schwaches Wachstum macht Selektion wichtiger.", source: "Globaler M4-Fallback", status: "fallback", bucket: "Geldmengen", pressure: 0 },
+    { id: "REALYIELD", label: "Realzins", display: "1.25%", trend: "Positiver Realzins bleibt Bewertungsbremse", why: "Realzinsen beeinflussen Gold, Growth-Aktien, Krypto und Bewertungsmultiples.", meaning: "Steigende Realzinsen belasten Gold/Growth; fallende Realzinsen helfen oft.", source: "Treasury/FRED Realzins-Modell", status: "fallback", bucket: "Zinsen", pressure: -1 },
+    { id: "YCURVE", label: "Yield Curve 2Y-10Y", display: "-0.38%", trend: "Inversion bleibt, aber weniger extrem", why: "Die 2Y-10Y-Kurve ist ein klassischer Konjunktur- und Rezessionsindikator.", meaning: "Starke Inversion signalisiert Stress; Re-Steepening kann Wendepunkt oder Rezessionsnähe anzeigen.", source: "Treasury/FRED Spread-Fallback", status: "fallback", bucket: "Zinsen", pressure: -1 }
   ];
 
   const LIQUIDITY_DATA = [
@@ -1281,12 +1535,41 @@
     {
       id: "CBBS",
       label: "Zentralbank-Bilanz",
-      display: "vorbereitet",
-      trend: "Fed/EZB-Bilanz als Liquiditätsquelle vorbereitet",
+      display: "-2.4% YoY",
+      trend: "Bilanzliquidität bleibt restriktiv",
       why: "Zentralbank-Bilanzen zeigen, ob dem System Liquidität zugeführt oder entzogen wird.",
       meaning: "Ausweitung kann Risikoassets unterstützen; Schrumpfung kann Liquidität verknappen.",
-      source: "FRED/ECB Provider vorbereitet",
-      status: "fallback"
+      source: "FRED/ECB Bilanz-Fallback",
+      status: "fallback",
+      bucket: "Liquidität",
+      pressure: -1
+    }
+  ];
+
+  const LIQUIDITY_IMPACT_MAP = [
+    {
+      asset: "Aktien",
+      signal: "Selektiv",
+      text: "Stabile M2-Daten helfen, aber positive Realzinsen und eine inverse Kurve bremsen Bewertungsmultiples. Qualität und Cashflow zählen stärker als Hype.",
+      watch: "M2-Wachstum, 10Y-Rendite, Earnings-Revisionen"
+    },
+    {
+      asset: "Gold",
+      signal: "Sensibel für Realzins",
+      text: "Gold profitiert eher von fallenden Realzinsen oder Stresssignalen. Hohe reale Renditen bleiben ein Gegenwind.",
+      watch: "Realzins, DXY, Zentralbanknachfrage"
+    },
+    {
+      asset: "Krypto",
+      signal: "Liquiditätshebel",
+      text: "Krypto reagiert oft stark auf globale Liquidität und Risk-on-Phasen. Sinkende Liquidität erhöht Rückschlagsrisiko.",
+      watch: "M2, Stablecoin-/Retail-Flow, Risikoappetit"
+    },
+    {
+      asset: "Anleihen",
+      signal: "Kurvenrisiko",
+      text: "Eine inverse Kurve zeigt Stress im Zinszyklus. Re-Steepening kann Chancen bringen, aber auch eine Wachstumsabkühlung anzeigen.",
+      watch: "2Y-10Y Spread, Fed Funds, Treasury-Kurve"
     }
   ];
 
@@ -1295,22 +1578,25 @@
       name: "Finnhub Earnings Calendar",
       provider: "Finnhub",
       status: "active",
-      coverage: "Company News aktiv, Earnings Calendar vorbereitet",
+      providerId: "finnhub",
+      coverage: "Earnings Calendar, Company News und Asset-Termine über denselben Finnhub-Key",
       source: "Finnhub API Slot"
     },
     {
-      name: "FMP Earnings Calendar",
-      provider: "Financial Modeling Prep",
-      status: "prepared",
-      coverage: "Earnings, Estimates und Fundamentals können später aus FMP kommen",
-      source: "FMP API Slot"
+      name: "Alpha Vantage Zusatzkalender",
+      provider: "Alpha Vantage",
+      status: "mapped",
+      providerId: "alphaVantage",
+      coverage: "IPO Calendar, Earnings-Zusatz und Marktzeitreihen als klarer Zusatzpfad",
+      source: "Alpha Vantage API Slot"
     },
     {
-      name: "EODHD Corporate Actions",
-      provider: "EODHD",
-      status: "prepared",
-      coverage: "Dividenden, Splits, Earnings und Kapitalmaßnahmen vorbereitet",
-      source: "EODHD API Slot"
+      name: "SEC / EDGAR Filings",
+      provider: "SEC / EDGAR",
+      status: "mapped",
+      providerId: "sec",
+      coverage: "Offizielle Filings, Submissions und XBRL als spätere Ereignis- und Fundamentaldatenbasis",
+      source: "SEC Open Data"
     },
     {
       name: "Lokaler Event-Fallback",
@@ -1367,7 +1653,7 @@
     { title: "EZB Zinsentscheid", dateOffset: 34, type: "Makro", symbol: "DAX", detail: "Wichtig für DAX, EUR/USD und europäische Bewertungsmultiples." },
     { title: "Bitcoin Network / ETF Flow Check", dateOffset: 15, type: "Krypto", symbol: "BTC", detail: "ETF-Flows und Liquidität bleiben kurzfristige Kurstreiber." },
     { title: "SPY Ex-Dividend Reminder", dateOffset: 42, type: "Dividende", symbol: "SPY", detail: "ETF-spezifischer Dividenden-Termin als lokaler Placeholder." },
-    { title: "Apple Dividend Window", dateOffset: 52, type: "Dividende", symbol: "AAPL", detail: "Lokaler Dividenden-Fallback; Live-Daten später über FMP/EODHD." },
+    { title: "Apple Dividend Window", dateOffset: 52, type: "Dividende", symbol: "AAPL", detail: "Lokaler Dividenden-Fallback; spätere Live-Daten über offiziellen Corporate-Action-Adapter." },
     { title: "Amazon Split Monitor", dateOffset: 65, type: "Split", symbol: "AMZN", detail: "Corporate-Action-Slot für Aktiensplits und Reverse Splits vorbereitet." },
     { title: "DAX Dividend Season Check", dateOffset: 74, type: "Dividende", symbol: "DAX", detail: "Europäische Ausschüttungssaison als strukturierter Fallback-Termin." }
   ];
@@ -1529,13 +1815,14 @@
     theme: storageGet(STORAGE_KEYS.theme, "dark"),
     apiKeys: storageGet(STORAGE_KEYS.apiKeys, {}),
     providerTests: storageGet(STORAGE_KEYS.providerTests, {}),
-    providerHealth: storageGet(STORAGE_KEYS.providerHealth, {}),
+    providerHealth: sanitizeProviderHealth(storageGet(STORAGE_KEYS.providerHealth, {})),
     watchlist: storageGet(STORAGE_KEYS.watchlist, DEFAULT_WATCHLIST),
     portfolios: storageGet(STORAGE_KEYS.portfolios, DEFAULT_PORTFOLIOS),
     activePortfolioId: storageGet(STORAGE_KEYS.activePortfolioId, "core"),
     dashboardPrefs: storageGet(STORAGE_KEYS.dashboardPrefs, { mode: "standard", favorites: ["NVDA", "MSFT"], modules: DASHBOARD_MODES.standard }),
     alerts: storageGet(STORAGE_KEYS.alerts, []),
     alertInbox: storageGet(STORAGE_KEYS.alertInbox, []),
+    journal: storageGet(STORAGE_KEYS.journal, []),
     recents: storageGet(STORAGE_KEYS.recents, ["NVDA", "MSFT", "AAPL", "BTC"]),
     assetTab: "overview",
     screener: {
@@ -1844,6 +2131,12 @@
     if (event.target.matches("[data-portfolio-notes-form]")) {
       event.preventDefault();
       savePortfolioNotes(event.target);
+      return;
+    }
+
+    if (event.target.matches("[data-journal-form]")) {
+      event.preventDefault();
+      saveJournalEntryFromForm(event.target);
     }
   }
 
@@ -1923,11 +2216,12 @@
 
   function renderHomePage() {
     ensureHomeData();
+    ensureEventData();
 
     app.innerHTML = `
       <section class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">MH Analytics Phase 2E</p>
+          <p class="eyebrow">MH Analytics</p>
           <h1>Premium Research für klare Marktentscheidungen.</h1>
           <p class="hero-text">Ein cleanes Finanz-Cockpit für Makro, Aktien, Krypto, Screener, Ratings, Alerts, Watchlist, Sentiment und transparente Datenquellen.</p>
           <div class="hero-actions">
@@ -1955,7 +2249,7 @@
           <div>
             <p class="eyebrow">Globale Suche</p>
             <h2>Asset, ETF, Krypto oder Index</h2>
-            <p>Enter oder Vorschlag anklicken. Phase 2E verbindet Asset-Seiten, Live-Daten, Screener, Ratings, Alerts, ETF, Portfolio und Reports.</p>
+            <p>Enter oder Vorschlag anklicken. MH Analytics verbindet Asset-Seiten, Live-Daten, Screener, Ratings, Alerts, ETF, Portfolio und Reports.</p>
           </div>
           ${renderSearchBox("home-search", "z. B. NVDA, Apple, BTC, DAX")}
           <div>
@@ -1972,6 +2266,7 @@
       </section>
 
       ${renderTicker()}
+      ${renderDailyBriefingSection()}
       ${renderPersonalDashboardPanel()}
       ${renderPersonalModuleStrip()}
       ${renderMacroSection()}
@@ -1979,6 +2274,7 @@
 
       <section class="section">
         <div class="grid two">
+          ${renderLiquidityImpactCard()}
           ${renderHeatmapCard()}
           ${renderWatchlistCard()}
         </div>
@@ -2015,6 +2311,81 @@
     `;
   }
 
+  function renderDailyBriefingSection() {
+    const briefing = dailyBriefingForView();
+    const liquidity = briefing.liquidity;
+    return `
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Tagesüberblick</p>
+            <h2>Was ist heute wichtig?</h2>
+            <p>Ein kompakter Blick auf Marktbewegungen, Termine, Earnings und auffällige Assets. Funktioniert auch mit lokalem Fallback.</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="events">Alle Events</button>
+            <button class="ghost-button" type="button" data-route="screener">Auffällige Assets</button>
+          </div>
+        </div>
+        <div class="daily-brief-grid">
+          <article class="card daily-regime-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Marktphase heute</span>
+                <h3>${esc(briefing.regime.label)}</h3>
+              </div>
+              ${renderStatusBadge(briefing.status)}
+            </div>
+            <p>${esc(briefing.regime.text)}</p>
+            <div class="metric-grid">
+              ${renderMiniMetric("Ø Bewegung", formatPercent(briefing.avgMove))}
+              ${renderMiniMetric("Live Quotes", String(countLiveQuotes()))}
+              ${renderMiniMetric("Events 7T", String(briefing.upcomingEvents.length))}
+              ${renderMiniMetric("Liquidität", `${formatNumber(liquidity.score)} / 100`)}
+            </div>
+            <div class="insight-row">
+              <span class="pill">Makro-Kontext</span>
+              <p>${esc(liquidity.summary)}</p>
+            </div>
+          </article>
+          <article class="card">
+            <span class="card-label">Wichtigste Marktbewegungen</span>
+            <div class="stack-list">
+              ${briefing.marketMoves.map((item) => `
+                <button class="brief-row" type="button" data-symbol="${escAttr(item.symbol)}">
+                  <span><strong>${esc(item.symbol)}</strong><small>${esc(item.name)}</small></span>
+                  <span class="${toneClass(item.changePct)}">${formatPercent(item.changePct)}</span>
+                </button>
+              `).join("")}
+            </div>
+          </article>
+          <article class="card">
+            <span class="card-label">Termine & Earnings</span>
+            <div class="stack-list">
+              ${briefing.upcomingEvents.map((eventItem) => `
+                <button class="brief-event-row" type="button" ${assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : ""}>
+                  <span class="pill">${esc(eventItem.type)}</span>
+                  <span><strong>${esc(eventItem.title)}</strong><small>${eventItem.date.toLocaleDateString("de-DE")} | ${esc(eventItem.symbol)}</small></span>
+                </button>
+              `).join("") || renderEmptyState("Keine Termine im 7-Tage-Fenster.")}
+            </div>
+          </article>
+          <article class="card">
+            <span class="card-label">Auffällige Assets</span>
+            <div class="stack-list">
+              ${briefing.unusualAssets.map((row) => `
+                <button class="brief-row" type="button" data-symbol="${escAttr(row.symbol)}">
+                  <span><strong>${esc(row.symbol)}</strong><small>${esc(row.rating.rating)} | ${esc(row.pickReason)}</small></span>
+                  <span class="score-pill ${row.rating.tone}">${row.score}%</span>
+                </button>
+              `).join("")}
+            </div>
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
   function renderPersonalDashboardPanel() {
     const prefs = dashboardPrefs();
     return `
@@ -2032,6 +2403,10 @@
             ${Object.keys(DASHBOARD_MODES).map((mode) => `
               <button class="chip ${prefs.mode === mode ? "active" : ""}" type="button" data-dashboard-mode="${escAttr(mode)}">${esc(capitalize(mode))}</button>
             `).join("")}
+          </div>
+          <div class="continue-row">
+            <button class="ghost-button" type="button" data-symbol="${escAttr(state.activeSymbol)}">Weiter mit ${esc(state.activeSymbol)}</button>
+            ${state.recents.slice(0, 3).map((symbol) => `<button class="chip" type="button" data-symbol="${escAttr(symbol)}">${esc(symbol)}</button>`).join("")}
           </div>
           <div class="chip-row">
             ${ASSETS.slice(0, 8).map((asset) => `
@@ -2069,6 +2444,7 @@
 
   function renderMacroSection() {
     const macro = macroForView();
+    const liquidity = liquidityNarrativeForView();
     return `
       <section class="section">
         <div class="section-head">
@@ -2088,7 +2464,48 @@
             </article>
           `).join("")}
         </div>
+        <article class="card macro-context-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Makro → Markt</span>
+              <h3>${esc(liquidity.label)}</h3>
+              <p>${esc(liquidity.summary)}</p>
+            </div>
+            <span class="score-pill ${liquidity.tone}">${formatNumber(liquidity.score)} / 100</span>
+          </div>
+          <div class="grid four">
+            ${liquidityImpactForView().map((item) => `
+              <div class="insight-row">
+                <span class="pill">${esc(item.asset)}</span>
+                <p><strong>${esc(item.signal)}:</strong> ${esc(item.text)}</p>
+              </div>
+            `).join("")}
+          </div>
+        </article>
       </section>
+    `;
+  }
+
+  function renderLiquidityImpactCard() {
+    const liquidity = liquidityForView();
+    const realYield = liquidity.find((item) => item.id === "REALYIELD");
+    const curve = liquidity.find((item) => item.id === "YCURVE");
+    const narrative = liquidityNarrativeForView();
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Liquidität & Zinsen</span>
+            <h3>Was bedeutet das für Märkte?</h3>
+          </div>
+          <span class="score-pill ${narrative.tone}">${formatNumber(narrative.score)} / 100</span>
+        </div>
+        <p>${esc(narrative.summary)}</p>
+        <div class="insight-row"><span class="pill">Realzins</span><p>${esc(realYield ? realYield.meaning : "Steigende Realzinsen drücken oft auf Gold, Growth und Krypto.")}</p></div>
+        <div class="insight-row"><span class="pill">Yield Curve</span><p>${esc(curve ? curve.meaning : "Eine inverse Kurve bleibt ein Stress- und Rezessionssignal.")}</p></div>
+        <div class="insight-row"><span class="pill">Liquidität</span><p>Mehr Liquidität kann Risikoassets unterstützen; weniger Liquidität erhöht Bewertungsdruck und macht Fallback-/Cash-Planung wichtiger.</p></div>
+        <button class="ghost-button" type="button" data-route="liquidity">Liquidität öffnen</button>
+      </article>
     `;
   }
 
@@ -2203,6 +2620,7 @@
   }
 
   function renderWatchlistCard() {
+    const watchNews = watchlistNewsForView();
     const rows = state.watchlist.map((symbol) => {
       const asset = getAsset(symbol);
       const quote = quoteFor(symbol);
@@ -2233,6 +2651,16 @@
         </div>
         <div class="stack-list">
           ${rows || renderEmptyState("Noch keine Watchlist. Füge ein Asset hinzu.")}
+        </div>
+        <div class="watchlist-news-box">
+          <span class="card-label">Watchlist-News & Events</span>
+          <p class="small">Bewegungen, Termine und Reminder für deine gespeicherten Assets. Live-Quotes werden bevorzugt, sonst bleibt der lokale Fallback aktiv.</p>
+          ${watchNews.map((item) => `
+            <button class="brief-event-row" type="button" data-symbol="${escAttr(item.symbol)}">
+              <span class="pill">${esc(item.kind)}</span>
+              <span><strong>${esc(item.symbol)}</strong><small>${esc(item.text)}</small></span>
+            </button>
+          `).join("") || renderEmptyState("Keine Watchlist-Hinweise im aktuellen Fenster.")}
         </div>
       </article>
     `;
@@ -2300,7 +2728,7 @@
           <div>
             <p class="eyebrow">Screener V1</p>
             <h1>Rankings statt Bauchgefühl.</h1>
-            <p>Filtere das Phase-2E-Universum nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener arbeitet hybrid: Live-Quotes werden genutzt, der Research-Score bleibt mit Fallback-Daten stabil.</p>
+            <p>Filtere ein erweitertes Universum mit ${ASSETS.length} Assets nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener arbeitet hybrid: Live-Quotes werden genutzt, der Research-Score bleibt mit Fallback-Daten stabil.</p>
           </div>
           <button class="ghost-button" type="button" data-screener-reset>Filter zurücksetzen</button>
         </div>
@@ -2387,7 +2815,7 @@
           <div>
             <p class="eyebrow">Events V1</p>
             <h1>Earnings, Dividenden und Makro-Termine.</h1>
-            <p>Events sind jetzt als Datenarchitektur sichtbar aufgebaut: Finnhub, FMP und EODHD sind vorbereitet, lokale Fallback-Daten halten Earnings, Dividenden, Splits und Makrotermine stabil nutzbar.</p>
+            <p>Events sind klar zugeordnet: Finnhub liefert Earnings, Alpha Vantage ergänzt IPO-/Earnings-Pfade, SEC/EDGAR bleibt die offizielle Filings-Basis. Dividenden, Splits und Makrotermine bleiben lokal transparent abgesichert.</p>
           </div>
         </div>
         ${renderEventProviderPanel()}
@@ -2439,7 +2867,7 @@
               <span class="card-label">${esc(slot.provider)}</span>
               <strong>${esc(slot.name)}</strong>
               <p>${esc(slot.coverage)}</p>
-              ${slot.provider === "Finnhub" ? renderProviderLiveBadge(providerHealthFor("finnhub")) : slot.provider === "FMP" ? renderProviderLiveBadge(providerHealthFor("fmp")) : slot.provider === "EODHD" ? renderProviderLiveBadge(providerHealthFor("eodhd")) : renderStatusBadge("fallback")}
+              ${slot.providerId ? renderProviderLiveBadge(providerHealthFor(slot.providerId)) : renderStatusBadge("fallback")}
             </div>
           `).join("")}
         </div>
@@ -2450,16 +2878,36 @@
   function renderMacroPage() {
     ensureHomeData();
     const macro = macroEnhancedForView();
+    const liquidity = liquidityNarrativeForView();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Makro Dashboard 2C</p>
+            <p class="eyebrow">Makro Dashboard</p>
             <h1>Liquidität, Zinsen und Risiko in einem Blick.</h1>
-            <p>FRED-Daten werden genutzt, wenn ein Key vorhanden ist. ECB, DXY, M1/M3/M4, Realzins und Yield Curve sind als saubere Fallback-/Prepared-Struktur markiert.</p>
+            <p>FRED-Daten werden genutzt, wenn ein Key vorhanden ist. ECB, BLS, Treasury und lokale Fallbacks ergänzen das Bild für Zinsen, Geldmengen, Realzins und Yield Curve.</p>
           </div>
           <button class="ghost-button" type="button" data-route="settings">Provider prüfen</button>
         </div>
+        <article class="card macro-context-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Kernaussage</span>
+              <h3>${esc(liquidity.label)}</h3>
+              <p>${esc(liquidity.summary)}</p>
+            </div>
+            <span class="score-pill ${liquidity.tone}">${formatNumber(liquidity.score)} / 100</span>
+          </div>
+          <div class="grid four">
+            ${liquidityImpactForView().map((item) => `
+              <div class="snapshot-tile">
+                <span>${esc(item.asset)}</span>
+                <strong>${esc(item.signal)}</strong>
+                <p>${esc(item.text)}</p>
+              </div>
+            `).join("")}
+          </div>
+        </article>
         <div class="grid four macro-deep-grid">
           ${macro.map((item) => renderMacroDeepCard(item)).join("")}
         </div>
@@ -2469,6 +2917,8 @@
 
   function renderLiquidityPage() {
     const liquidity = liquidityForView();
+    const narrative = liquidityNarrativeForView();
+    const buckets = liquidityBucketsForView();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
@@ -2479,6 +2929,25 @@
           </div>
           <button class="ghost-button" type="button" data-route="settings">Makro-Provider prüfen</button>
         </div>
+        <article class="card macro-context-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Liquiditätsampel</span>
+              <h3>${esc(narrative.label)}</h3>
+              <p>${esc(narrative.summary)}</p>
+            </div>
+            <span class="score-pill ${narrative.tone}">${formatNumber(narrative.score)} / 100</span>
+          </div>
+          <div class="grid four">
+            ${liquidityImpactForView().map((item) => `
+              <div class="snapshot-tile">
+                <span>${esc(item.asset)}</span>
+                <strong>${esc(item.signal)}</strong>
+                <p>${esc(item.watch)}</p>
+              </div>
+            `).join("")}
+          </div>
+        </article>
         <div class="grid three liquidity-overview">
           <article class="card">
             <span class="card-label">Warum relevant?</span>
@@ -2495,6 +2964,24 @@
             <h3>Live vorbereitet, Fallback aktiv</h3>
             <p>FRED und ECB sind vorbereitet. Wo kein Live-Pfad aktiv ist, nutzt MH Analytics strukturierte lokale Fallback-Daten.</p>
           </article>
+        </div>
+      </section>
+      <section class="section compact-section">
+        <div class="grid three">
+          ${buckets.map((bucket) => `
+            <article class="card liquidity-bucket-card">
+              <span class="card-label">${esc(bucket.label)}</span>
+              <h3>${esc(bucket.items.map((item) => item.id).join(" / "))}</h3>
+              <div class="stack-list">
+                ${bucket.items.map((item) => `
+                  <div class="compact-row">
+                    <span><strong>${esc(item.label)}</strong><small>${esc(item.trend)}</small></span>
+                    <span class="right-cell"><strong>${esc(item.display)}</strong>${renderTinyStatus(item.meta.status)}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </article>
+          `).join("")}
         </div>
       </section>
       <section class="section">
@@ -2535,11 +3022,28 @@
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">ETF System 2C</p>
-            <h1>ETF-Kosten, Holdings und Overlap.</h1>
-            <p>Lokale strukturierte ETF-Datenbasis mit TER, Regionen, Holdings, Ausschüttungstyp, Basisrisiko und Währungsrisiko. Live-ETF-Provider sind vorbereitet.</p>
+            <p class="eyebrow">ETF System</p>
+            <h1>ETF-Kosten, Holdings, Regionen und Überschneidung.</h1>
+            <p>Lokale strukturierte ETF-Datenbasis mit TER, Regionen, Top Holdings, Ausschüttungstyp, Basisrisiko und Währungsrisiko. Wo Live-Holdings fehlen, bleibt der Status klar als Fallback markiert.</p>
           </div>
           ${renderDataMeta(makeMeta("Lokale ETF-Datenbasis", "fallback", BOOT_TIME), true)}
+        </div>
+        <div class="grid three etf-guide-grid">
+          <article class="card">
+            <span class="card-label">Worauf achten?</span>
+            <h3>Kosten, Konzentration, Währung</h3>
+            <p>TER ist nur ein Teil der Kosten. Wichtig sind außerdem Klumpen in Top-Holdings, USD-Exposure und ob ein ETF als Kern oder Satellit gedacht ist.</p>
+          </article>
+          <article class="card">
+            <span class="card-label">Ausschüttend vs. thesaurierend</span>
+            <h3>Cashflow oder Wiederanlage</h3>
+            <p>Ausschüttende ETFs liefern laufende Zahlungen. Thesaurierende ETFs reinvestieren Erträge automatisch und sind oft bequemer für langfristigen Vermögensaufbau.</p>
+          </article>
+          <article class="card">
+            <span class="card-label">Datenstatus</span>
+            <h3>Fallback statt leerer Tabelle</h3>
+            <p>TER, Regionen und Holdings sind lokal modelliert. Live-ETF-Holdings werden später über geeignete Provider ergänzt, ohne das Modul zu blockieren.</p>
+          </article>
         </div>
         <div class="grid two">
           ${ETF_DATA.map(renderEtfCard).join("")}
@@ -2555,6 +3059,7 @@
   }
 
   function renderEtfCard(etf) {
+    const concentration = etfHoldingConcentration(etf);
     return `
       <article class="card etf-card">
         <div class="card-topline">
@@ -2568,6 +3073,11 @@
           ${renderMiniMetric("TER", `${formatNumber(etf.ter)}%`)}
           ${renderMiniMetric("Typ", etf.distribution)}
           ${renderMiniMetric("Währung", etf.currency)}
+          ${renderMiniMetric("Top-5 Anteil", `${formatNumber(concentration)}%`)}
+        </div>
+        <div class="grid two">
+          <div class="insight-row"><span class="pill">Einsatz</span><p>${esc(etf.useCase || "ETF-Baustein für Portfolio-Exposure.")}</p></div>
+          <div class="insight-row"><span class="pill">Ausschüttung</span><p>${esc(distributionExplanation(etf))}</p></div>
         </div>
         <h4>Top Holdings</h4>
         <div class="mini-bars">
@@ -2579,6 +3089,7 @@
         </div>
         <p><strong>Basis-Risiko:</strong> ${esc(etf.risk)}</p>
         <p><strong>Währungsrisiko:</strong> ${esc(etf.fxRisk)}</p>
+        <p><strong>Struktur:</strong> ${esc(etf.structure || etf.dataNote || "Lokales ETF-Modell.")}</p>
         ${renderDataMeta(makeMeta("Lokale ETF-Datenbasis", "fallback", BOOT_TIME))}
       </article>
     `;
@@ -2589,12 +3100,14 @@
     const years = Number(state.etf.years || 0);
     const selected = ETF_DATA.find((etf) => etf.symbol === state.etf.left) || ETF_DATA[0];
     const cost = amount * (selected.ter / 100) * years;
+    const yearlyCost = amount * (selected.ter / 100);
+    const monthlyCost = yearlyCost / 12;
     return `
       <article class="card">
         <div class="card-topline">
           <div>
             <span class="card-label">ETF Kosten Rechner</span>
-            <h3>TER über Zeit</h3>
+            <h3>Was kostet der ETF grob?</h3>
           </div>
           ${renderStatusBadge("fallback")}
         </div>
@@ -2612,8 +3125,12 @@
             <input data-etf-control name="years" type="number" value="${escAttr(years)}">
           </label>
         </div>
-        <strong class="value">${formatMoney(cost, selected.currency)}</strong>
-        <p>Grobe TER-Kosten ohne Rendite-/Tracking-Error-Effekt.</p>
+        <div class="metric-grid">
+          ${renderMiniMetric("pro Jahr", formatMoney(yearlyCost, selected.currency))}
+          ${renderMiniMetric("pro Monat", formatMoney(monthlyCost, selected.currency))}
+          ${renderMiniMetric(`${years} Jahre`, formatMoney(cost, selected.currency))}
+        </div>
+        <p>Grobe TER-Näherung ohne Rendite, Tracking Difference, Spreads und Steuereffekte. Für die erste Einschätzung reicht das, für echte Entscheidungen später Live-/Emittentendaten prüfen.</p>
         ${renderDataMeta(makeMeta("Lokaler ETF-Kostenrechner", "fallback", BOOT_TIME))}
       </article>
     `;
@@ -2623,6 +3140,7 @@
     const left = ETF_DATA.find((etf) => etf.symbol === state.etf.left) || ETF_DATA[0];
     const right = ETF_DATA.find((etf) => etf.symbol === state.etf.right) || ETF_DATA[1];
     const overlap = etfOverlap(left, right);
+    const overlapText = etfOverlapText(overlap);
     return `
       <article class="card">
         <div class="card-topline">
@@ -2642,8 +3160,13 @@
             <select data-etf-control name="right">${ETF_DATA.map((etf) => `<option value="${escAttr(etf.symbol)}" ${state.etf.right === etf.symbol ? "selected" : ""}>${esc(etf.symbol)}</option>`).join("")}</select>
           </label>
         </div>
-        <strong class="value">${formatNumber(overlap.score)}%</strong>
-        <p>Geschätzte Top-Holdings-Überschneidung: ${esc(overlap.names.join(", ") || "keine Top-Overlap-Holdings")}.</p>
+        <div class="metric-grid">
+          ${renderMiniMetric("Holdings", `${formatNumber(overlap.score)}%`)}
+          ${renderMiniMetric("Regionen", `${formatNumber(overlap.regionScore)}%`)}
+          ${renderMiniMetric("TER-Differenz", `${formatNumber(Math.abs(left.ter - right.ter))}%`)}
+        </div>
+        <p>Top-Holdings-Überschneidung: ${esc(overlap.names.join(", ") || "keine Top-Overlap-Holdings")}. Regionale Überschneidung: ${esc(overlap.regionNames.join(", ") || "keine erkennbare regionale Dopplung")}.</p>
+        <div class="insight-row"><span class="pill">Einordnung</span><p>${esc(overlapText)}</p></div>
         ${renderDataMeta(makeMeta("Lokaler ETF-Overlap-Fallback", "fallback", BOOT_TIME))}
       </article>
     `;
@@ -2678,6 +3201,7 @@
                   <option value="price">Preis-Alert</option>
                   <option value="watchlist">Watchlist-Alert</option>
                   <option value="sentiment">News-/Sentiment-Hinweis</option>
+                  <option value="earnings">Earnings-/Event-Reminder</option>
                 </select>
               </label>
               <label class="field">
@@ -2694,6 +3218,7 @@
               </label>
               <button class="primary-button" type="submit">Alert speichern</button>
             </form>
+            <p class="small">Preis-Alerts prüfen Kurslevel. Watchlist-, Sentiment- und Event-Hinweise nutzen lokal verfügbare Kurs-, News- und Kalenderdaten.</p>
           </article>
           <article class="card">
             <div class="card-topline">
@@ -2710,6 +3235,11 @@
                   <span class="small">${esc(item.message)} | ${formatTimestamp(item.timestamp)}</span>
                 </div>
               `).join("") || renderEmptyState("Noch keine Hinweise. Alerts prüfen sich lokal anhand der verfügbaren Daten.")}
+            </div>
+            <div class="metric-grid">
+              ${renderMiniMetric("Preis", String(state.alerts.filter((alert) => alert.type === "price").length))}
+              ${renderMiniMetric("Watchlist", String(state.alerts.filter((alert) => alert.type === "watchlist").length))}
+              ${renderMiniMetric("Events", String(state.alerts.filter((alert) => alert.type === "earnings").length))}
             </div>
           </article>
         </div>
@@ -2741,7 +3271,7 @@
     const sentiment = sentimentFor(symbol, quote, news);
     const technical = technicalFor(symbol, quote);
     const events = eventsForSymbol(symbol);
-    const activeTab = ["overview", "technical", "fundamental", "news", "events", "insider"].includes(state.assetTab) ? state.assetTab : "overview";
+    const activeTab = ["overview", "technical", "fundamental", "news", "events", "insider", "journal"].includes(state.assetTab) ? state.assetTab : "overview";
 
     ensureAssetData(symbol);
     ensureEventData();
@@ -2785,6 +3315,7 @@
           ${renderAssetTab("news", "News", activeTab)}
           ${renderAssetTab("events", "Events", activeTab)}
           ${renderAssetTab("insider", "Insider / Institutionelle", activeTab)}
+          ${renderAssetTab("journal", "Thesis / Journal", activeTab)}
         </div>
       </section>
 
@@ -2864,7 +3395,17 @@
         </section>
       `;
     }
+    if (tab === "journal") {
+      return `
+        <section class="section">
+          ${renderThesisJournalCard(symbol)}
+        </section>
+      `;
+    }
     return `
+      <section class="section">
+        ${renderAssetResearchSnapshot(context)}
+      </section>
       <section class="section chart-card">
         <div class="chart-topbar">
           <div>
@@ -2906,6 +3447,104 @@
           ${renderSentimentDetail(sentiment)}
         </div>
       </section>
+    `;
+  }
+
+  function renderAssetResearchSnapshot(context) {
+    const { symbol, asset, quote, fundamentals, news, sentiment, technical, events } = context;
+    const fundamental = fundamentalInterpretation(asset, fundamentals);
+    const nextEvent = events[0];
+    return `
+      <article class="card asset-research-snapshot">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">5-Minuten-Analyse</span>
+            <h3>${esc(symbol)} Mini-Research-Seite</h3>
+            <p>Preis, Chart, Technik, Fundamentales, News, Events, Chancen und Risiken in einem Ablauf.</p>
+          </div>
+          ${renderDataMeta(makeMeta("Lokale Research-Zusammenfassung", quote.meta.status, Date.now()), true)}
+        </div>
+        <div class="grid four">
+          <div class="snapshot-tile">
+            <span>Technisch</span>
+            <strong class="${technical.tone}">${esc(technical.rating)} ${technical.probability}%</strong>
+            <p>${esc(technical.reason)}</p>
+          </div>
+          <div class="snapshot-tile">
+            <span>Fundamental</span>
+            <strong>${esc(fundamental.label)}</strong>
+            <p>${esc(fundamental.text)}</p>
+          </div>
+          <div class="snapshot-tile">
+            <span>News / Sentiment</span>
+            <strong>${esc(sentiment.label)} ${sentiment.score}</strong>
+            <p>${esc(news.items[0]?.headline || "Keine aktuelle Meldung im Feed.")}</p>
+          </div>
+          <div class="snapshot-tile">
+            <span>Nächster Trigger</span>
+            <strong>${esc(nextEvent ? nextEvent.type : "Watchlist")}</strong>
+            <p>${esc(nextEvent ? `${nextEvent.title} am ${nextEvent.date.toLocaleDateString("de-DE")}` : "Kein Event im lokalen Kalender.")}</p>
+          </div>
+        </div>
+        <div class="grid two">
+          <div class="insight-row"><span class="pill">Chance</span><p>${esc(asset.thesis)}</p></div>
+          <div class="insight-row"><span class="pill">Risiko</span><p>${esc(asset.risks)}</p></div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderThesisJournalCard(symbol) {
+    const entries = journalEntriesFor(symbol);
+    const latest = entries[0];
+    const quality = journalQualityHint(latest);
+    return `
+      <article class="card thesis-journal-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Thesis Tracker / Journal</span>
+            <h3>Warum beobachtest du ${esc(symbol)}?</h3>
+            <p>Speichere These, Trigger, Regel-Check und ob die Idee emotional getrieben war. Alles bleibt lokal im Browser.</p>
+          </div>
+          ${renderDataMeta(makeMeta("Lokales Journal", "live", Date.now()), true)}
+        </div>
+        <div class="grid three">
+          <div class="snapshot-tile">
+            <span>Einträge</span>
+            <strong>${entries.length}</strong>
+            <p>${entries.length ? "Lokale Historie für diese Aktie vorhanden." : "Noch keine gespeicherte These."}</p>
+          </div>
+          <div class="snapshot-tile">
+            <span>Disziplin-Hinweis</span>
+            <strong>${esc(quality.label)}</strong>
+            <p>${esc(quality.text)}</p>
+          </div>
+          <div class="snapshot-tile">
+            <span>Letzter Trigger</span>
+            <strong>${esc(latest ? latest.ruleCheck : "offen")}</strong>
+            <p>${esc(latest ? latest.trigger : "Definiere einen Auslöser, damit die These später überprüfbar ist.")}</p>
+          </div>
+        </div>
+        <form class="journal-form" data-journal-form>
+          <input type="hidden" name="symbol" value="${escAttr(symbol)}">
+          <label class="field"><span>These / Warum gekauft oder beobachtet?</span><textarea name="thesis" placeholder="z. B. AI-Umsatz, Margen, Breakout, Bewertung..."></textarea></label>
+          <label class="field"><span>Trigger / Was muss passieren?</span><input name="trigger" placeholder="z. B. Earnings Beat, Support hält, FRED-Daten entspannen sich"></label>
+          <div class="form-grid">
+            <label class="field"><span>Emotion</span><select name="emotion"><option value="rational">Rational</option><option value="unsicher">Unsicher</option><option value="fomo">FOMO</option><option value="stress">Stress</option></select></label>
+            <label class="field"><span>Regel-Check</span><select name="ruleCheck"><option value="ok">Plan passt</option><option value="risk">Risiko zu hoch</option><option value="wait">Abwarten</option></select></label>
+          </div>
+          <button class="primary-button" type="submit">Journal-Eintrag speichern</button>
+        </form>
+        <div class="stack-list journal-list">
+          ${entries.map((entry) => `
+            <div class="journal-row">
+              <strong>${esc(entry.thesis)}</strong>
+              <span class="small">${formatTimestamp(entry.timestamp)} | ${esc(entry.emotion)} | ${esc(entry.ruleCheck)}</span>
+              <p>${esc(entry.trigger)}</p>
+            </div>
+          `).join("") || renderEmptyState("Noch keine These gespeichert.")}
+        </div>
+      </article>
     `;
   }
 
@@ -2957,7 +3596,7 @@
           <div class="stack-list">${data.buys.map((row) => renderDataRow(row)).join("")}</div>
           <h4>Insider Verkäufe</h4>
           <div class="stack-list">${data.sells.map((row) => renderDataRow(row)).join("")}</div>
-          ${renderDataMeta(makeMeta("Lokale Insider-Fallback-Datenbank / FMP-Finnhub-EODHD vorbereitet", "fallback", BOOT_TIME))}
+          ${renderDataMeta(makeMeta("Lokale Insider-Fallback-Datenbank / SEC-Finnhub-Zuordnung", "fallback", BOOT_TIME))}
         </article>
         <article class="card">
           <div class="card-topline">
@@ -2973,7 +3612,7 @@
           <div class="stack-list">${data.holdings.map((row) => renderDataRow(row)).join("")}</div>
           <h4>Positionsveränderungen</h4>
           <div class="stack-list">${data.changes.map((row) => renderDataRow(row)).join("")}</div>
-          ${renderDataMeta(makeMeta("Lokale Institutionals-Fallback-Datenbank / FMP-Finnhub-EODHD vorbereitet", "fallback", BOOT_TIME))}
+          ${renderDataMeta(makeMeta("Lokale Institutionals-Fallback-Datenbank / SEC-Finnhub-Zuordnung", "fallback", BOOT_TIME))}
         </article>
       </div>
     `;
@@ -3123,6 +3762,9 @@
         </div>
       </section>
       <section class="section">
+        ${renderResearchWorkflowCard()}
+      </section>
+      <section class="section">
         <article class="card newsletter-card">
           <div>
             <span class="card-label">Newsletter</span>
@@ -3139,6 +3781,33 @@
           ${renderDataMeta(makeMeta("Brevo Placeholder", "fallback", BOOT_TIME, "Newsletter-Backend ist in der statischen Version nicht aktiv."))}
         </article>
       </section>
+    `;
+  }
+
+  function renderResearchWorkflowCard() {
+    const symbol = state.activeSymbol || "NVDA";
+    const asset = getAsset(symbol);
+    const quote = quoteFor(symbol);
+    const technical = technicalFor(symbol, quote);
+    const fundamentals = fundamentalsFor(symbol);
+    const fundamental = fundamentalInterpretation(asset, fundamentals);
+    return `
+      <article class="card research-workflow-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">5-Minuten-Aktienanalyse</span>
+            <h3>${esc(symbol)} Research-Template</h3>
+            <p>Eine kurze Struktur für These, Chancen, Risiken und Trigger. Für detaillierte Notizen nutze den Thesis-/Journal-Tab der Asset-Seite.</p>
+          </div>
+          <button class="ghost-button" type="button" data-report="asset" data-symbol="${escAttr(symbol)}">PDF-Report</button>
+        </div>
+        <div class="grid four">
+          <div class="snapshot-tile"><span>These</span><strong>${esc(asset.symbol)}</strong><p>${esc(asset.thesis)}</p></div>
+          <div class="snapshot-tile"><span>Technisch</span><strong class="${technical.tone}">${esc(technical.rating)}</strong><p>${esc(technical.reason)}</p></div>
+          <div class="snapshot-tile"><span>Fundamental</span><strong>${esc(fundamental.label)}</strong><p>${esc(fundamental.text)}</p></div>
+          <div class="snapshot-tile"><span>Risiko</span><strong>Prüfen</strong><p>${esc(asset.risks)}</p></div>
+        </div>
+      </article>
     `;
   }
 
@@ -3181,7 +3850,9 @@
               ${renderMiniMetric("Performance", `${formatMoney(analysis.performanceAbs, "USD")} / ${formatPercent(analysis.performancePct)}`)}
               ${renderMiniMetric("Cash", `${formatMoney(portfolio.cash, "USD")} (${formatNumber(analysis.cashPct)}%)`)}
               ${renderMiniMetric("Positionen", String(portfolio.positions.length))}
+              ${renderMiniMetric("Risiko-Score", `${formatNumber(analysis.riskScore)} / 100`)}
             </div>
+            <div class="insight-row"><span class="pill">Klarblick</span><p>${esc(analysis.priorityHint)}</p></div>
             <div class="portfolio-positions">
               ${portfolio.positions.map((position) => renderPortfolioPosition(position)).join("") || renderEmptyState("Noch kein Portfolio angelegt oder keine Positionen vorhanden.")}
             </div>
@@ -3194,6 +3865,7 @@
             <div class="insight-row"><span class="pill">Klumpenrisiko</span><p>${esc(analysis.concentrationHint)}</p></div>
             <div class="insight-row"><span class="pill">Diversifikation</span><p>${esc(analysis.diversificationHint)}</p></div>
             <div class="insight-row"><span class="pill">Rebalancing</span><p>${esc(analysis.rebalanceHint)}</p></div>
+            <div class="insight-row"><span class="pill">Priorität</span><p>${esc(analysis.priorityHint)}</p></div>
             ${renderDataMeta(makeMeta("Lokale Portfolio Engine", "live", Date.now()))}
           </article>
         </div>
@@ -3284,13 +3956,17 @@
 
   function renderSettingsPage() {
     const keys = { ...state.apiKeys };
+    const publicProviders = visibleProviders();
+    const keyBasedCount = publicProviders.filter((provider) => provider.keyMode !== "none").length;
+    const openDataCount = publicProviders.filter((provider) => provider.keyMode === "none").length;
+    const browserCriticalCount = publicProviders.filter((provider) => provider.security === "browser-critical").length;
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
             <p class="eyebrow">Data Providers / API Keys</p>
-            <h1>Provider Registry für MH Analytics.</h1>
-            <p>Zentrale Verwaltung für Market Data, Fundamentals, Makro, News, Krypto, Forex, Events, Social, Newsletter und Storage. Keys bleiben in dieser statischen Phase lokal im Browser.</p>
+            <h1>Öffentlicher Kernstack für MH Analytics.</h1>
+            <p>Die aktive Provider-Seite zeigt nur noch die elf sinnvollen Kernquellen für den öffentlichen Start. Alte Free-Plan- oder Backend-only-Slots werden hier nicht mehr als Pflichtanbieter beworben.</p>
           </div>
           <div class="row-actions">
             <button class="ghost-button" type="button" data-test-all-providers>Konfigurierte testen</button>
@@ -3299,10 +3975,10 @@
           </div>
         </div>
         <div class="provider-summary-grid">
-          ${renderProviderSummary("Live genutzt", providersByStatus("active").length, "Aktive Provider im Datenlayer")}
-          ${renderProviderSummary("Vorbereitet", providersByStatus("prepared").length, "Slots für spätere Module")}
-          ${renderProviderSummary("Optional", providersByStatus("optional").length, "Erweiterbare Anbieter")}
-          ${renderProviderSummary("Backend-only", providersBySecurity("backend-only").length, "Später serverseitig schützen")}
+          ${renderProviderSummary("Kernquellen", publicProviders.length, "Aktive öffentliche Providerliste")}
+          ${renderProviderSummary("Key-basiert", keyBasedCount, "Finnhub, Alpha Vantage, FRED, EIA")}
+          ${renderProviderSummary("Open Data", openDataCount, "Kein Key-Feld nötig")}
+          ${renderProviderSummary("Browserkritisch", browserCriticalCount, "Nicht als Live-Frontendquelle versprechen")}
         </div>
         ${renderApiOnboardingGuide()}
         ${renderProviderHealthPreview()}
@@ -3324,9 +4000,9 @@
               <span class="card-label">Provider-Konfiguration</span>
               <h3>Alle API Keys speichern</h3>
             </div>
-            ${renderStatusBadge(getConfiguredProviderCount() ? "live" : "fallback")}
+            ${renderStatusBadge(getConfiguredProviderCount() ? "fallback" : "missing")}
           </div>
-          <p>Du kannst mehrere Provider vorbereiten und später schrittweise aktivieren. Bereits aktive Module nutzen automatisch Finnhub, Alpha Vantage, FMP, FRED und CoinGecko, sobald Daten verfügbar sind.</p>
+          <p>Die aktiven Key-Felder sind bewusst begrenzt: Finnhub, Alpha Vantage, FRED und EIA. Open-Data-Quellen erhalten kein sinnloses Key-Feld und werden erst nach echtem Abruf als live markiert.</p>
           <div class="card-actions settings-actions">
             <button class="primary-button" type="button" data-save-api-keys>Alle API Keys speichern</button>
             <button class="ghost-button" type="button" data-test-all-providers>Konfigurierte Provider testen</button>
@@ -3426,7 +4102,7 @@
             <span class="card-label">API-Key Einstieg</span>
             <h3>Welche Keys lohnen sich zuerst?</h3>
           </div>
-          ${renderStatusBadge(getConfiguredProviderCount() ? "live" : "missing")}
+          ${renderStatusBadge(getConfiguredProviderCount() ? "fallback" : "missing")}
         </div>
         <p>MH Analytics funktioniert ohne Keys mit Fallback-Daten. Diese Reihenfolge hilft Anfängern, schnell sichtbare Verbesserungen zu bekommen.</p>
         <div class="onboarding-steps">
@@ -3473,16 +4149,16 @@
   }
 
   function renderProviderGroup(group, keys) {
-    const providers = PROVIDERS.filter((provider) => (
-      provider.group === group.id ||
-      (group.id === "events" && provider.categories.includes("Events / Earnings"))
-    ));
+    const providers = visibleProviders().filter((provider) => provider.group === group.id);
+    if (!providers.length) {
+      return "";
+    }
     return `
       <div class="provider-group">
         <div class="section-head compact-section-head">
           <div>
             <h2>${esc(group.label)}</h2>
-            <p>${providers.length} Provider-Slots vorbereitet.</p>
+            <p>${providers.length} klar zugeordnete Kernquelle${providers.length === 1 ? "" : "n"}.</p>
           </div>
         </div>
         <div class="provider-grid">
@@ -3543,7 +4219,7 @@
       return `
         <div class="keyless-provider">
           <span class="pill">Kein Key nötig</span>
-          <span class="small">Öffentliche oder später serverseitig angebundene Quelle.</span>
+          <span class="small">Offizielle Open-Data-Quelle. Kein API-Key-Feld erforderlich.</span>
         </div>
       `;
     }
@@ -3557,15 +4233,21 @@
   }
 
   function providersByStatus(status) {
-    return PROVIDERS.filter((provider) => provider.status === status);
+    return visibleProviders().filter((provider) => provider.status === status);
   }
 
   function providersBySecurity(security) {
-    return PROVIDERS.filter((provider) => provider.security === security);
+    return visibleProviders().filter((provider) => provider.security === security);
   }
 
   function getConfiguredProviderCount() {
-    return Object.values(state.apiKeys).filter((value) => cleanKey(value)).length;
+    return visibleProviders().filter((provider) => provider.keyMode !== "none" && cleanKey(providerKeyValue(provider.id))).length;
+  }
+
+  function visibleProviders() {
+    return PUBLIC_PROVIDER_IDS
+      .map(providerById)
+      .filter(Boolean);
   }
 
   function providerById(id) {
@@ -3625,7 +4307,7 @@
       present: "Key vorhanden",
       missing: "Key fehlt"
     };
-    const status = stateName === "present" || stateName === "none" ? "live" : "missing";
+    const status = stateName === "present" || stateName === "none" ? "fallback" : "missing";
     return `<span class="status-badge status-${status}">${esc(labels[stateName] || "Key unklar")}</span>`;
   }
 
@@ -3635,35 +4317,44 @@
   }
 
   function renderProviderLiveBadge(health) {
-    const status = health.status || "prepared";
+    const status = health.status || "notUsed";
     const labels = {
-      live: "Live-Zugriff erfolgreich",
+      live: "Aktuell live genutzt",
       stale: "Cache veraltet",
-      fallback: "Fallback genutzt",
-      prepared: "Vorbereitet",
+      fallback: "Fallback aktiv",
+      prepared: "Zugeordnet",
+      mapped: "Zugeordnet",
+      notUsed: "Aktuell nicht genutzt",
       missing: "Key fehlt",
-      error: "Live-Test fehlgeschlagen"
+      error: "Live-Abruf fehlgeschlagen",
+      disabled: "Nicht öffentlich aktiv"
     };
-    const badgeStatus = status === "live" ? "live" : status === "stale" || status === "fallback" || status === "prepared" ? "fallback" : "missing";
+    const badgeStatus = status === "live" ? "live" : status === "stale" || status === "fallback" || status === "prepared" || status === "mapped" || status === "notUsed" ? "fallback" : "missing";
     return `<span class="status-badge status-${badgeStatus}">${esc(labels[status] || status)}</span>`;
   }
 
   function providerHealthFor(providerId) {
     const provider = providerById(providerId);
+    if (!provider) {
+      return { status: "missing", timestamp: BOOT_TIME, message: "Provider nicht gefunden." };
+    }
+    if (provider.keyMode !== "none" && !cleanKey(providerKeyValue(providerId)) && provider.keyMode !== "optional") {
+      return { status: "missing", timestamp: BOOT_TIME, message: "Noch kein Key hinterlegt." };
+    }
     const health = state.providerHealth[providerId];
     if (health) {
       return health;
     }
-    if (!provider) {
-      return { status: "missing", timestamp: BOOT_TIME, message: "Provider nicht gefunden." };
+    if (provider.status === "active") {
+      return { status: "fallback", timestamp: BOOT_TIME, message: "Im Datenlayer aktiv, aber in dieser Sitzung noch kein erfolgreicher Live-Abruf." };
     }
-    if (provider.status === "active" && provider.keyMode !== "none" && !cleanKey(providerKeyValue(providerId)) && provider.keyMode !== "optional") {
-      return { status: "missing", timestamp: BOOT_TIME, message: "Noch kein Key hinterlegt." };
+    if (provider.status === "mapped") {
+      return { status: "notUsed", timestamp: BOOT_TIME, message: "Klar zugeordnet, aber noch nicht als Live-Modul verdrahtet." };
     }
-    if (provider.status === "active" && provider.keyMode === "optional") {
-      return { status: "prepared", timestamp: BOOT_TIME, message: "Public/Demo oder optionaler Key vorbereitet." };
+    if (provider.status === "disabled" || REMOVED_PUBLIC_PROVIDER_IDS.includes(providerId)) {
+      return { status: "disabled", timestamp: BOOT_TIME, message: "Aus der aktiven öffentlichen Provider-Seite entfernt." };
     }
-    return { status: provider.status === "active" ? "fallback" : "prepared", timestamp: BOOT_TIME, message: provider.usage || "Provider vorbereitet." };
+    return { status: "prepared", timestamp: BOOT_TIME, message: provider.usage || "Provider zugeordnet." };
   }
 
   function recordProviderHealth(providerId, status, message, timestamp = Date.now()) {
@@ -3690,7 +4381,7 @@
       if (health.status === "live" || health.status === "stale") {
         sum.live += health.status === "live" ? 1 : 0;
         sum.stale += health.status === "stale" ? 1 : 0;
-      } else if (health.status === "fallback" || health.status === "prepared") {
+      } else if (["fallback", "prepared", "mapped", "notUsed"].includes(health.status)) {
         sum.fallback += 1;
       } else if (health.status === "missing") {
         sum.missing += 1;
@@ -3703,12 +4394,14 @@
 
   function renderProviderStatusBadge(status) {
     const labels = {
-      active: "Live genutzt",
-      prepared: "Vorbereitet",
+      active: "Im Datenlayer aktiv",
+      mapped: "Zugeordnet",
+      prepared: "Nur vorbereitet",
       optional: "Optional",
-      backendOnly: "Backend-only"
+      backendOnly: "Backend-only",
+      disabled: "Deaktiviert"
     };
-    const className = status === "active" ? "status-live" : status === "optional" ? "status-fallback" : "status-stale";
+    const className = status === "active" || status === "mapped" ? "status-fallback" : status === "optional" ? "status-fallback" : "status-stale";
     return `<span class="status-badge ${className}">${esc(labels[status] || status)}</span>`;
   }
 
@@ -3716,12 +4409,13 @@
     const labels = {
       "browser-ok-private": "Browser privat OK",
       "browser-ok-public": "Public",
+      "browser-critical": "Browserkritisch",
       "backend-recommended": "Backend empfohlen",
       "backend-only": "Backend-only",
       "proxy-recommended": "Proxy empfohlen",
       "backend-ready": "Backend-ready"
     };
-    const className = security === "backend-only" ? "status-stale" : security.includes("recommended") ? "status-fallback" : "status-live";
+    const className = security === "backend-only" || security === "browser-critical" ? "status-stale" : security.includes("recommended") ? "status-fallback" : "status-live";
     return `<span class="status-badge ${className}">${esc(labels[security] || security)}</span>`;
   }
 
@@ -3734,6 +4428,10 @@
       "browser-ok-public": {
         label: "Public / kein geheimer Key",
         text: "Dieser Slot ist für öffentliche Daten oder keylose Anbindung vorbereitet."
+      },
+      "browser-critical": {
+        label: "Browserkritisch",
+        text: "Die Quelle ist offiziell und nützlich, sollte aber nicht als garantierter Live-Abruf im öffentlichen Frontend versprochen werden."
       },
       "backend-recommended": {
         label: "Backend empfohlen",
@@ -3873,7 +4571,7 @@
       state.lastEventsRefresh = Date.now();
     } finally {
       state.loadingEvents = false;
-      if (["events", "asset", "data-health"].includes(state.route)) {
+      if (["home", "events", "asset", "data-health"].includes(state.route)) {
         render();
       }
     }
@@ -4002,32 +4700,6 @@
         recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Profil/Asset-Seite hinterlegt.");
       }
 
-      const fmpKey = cleanKey(state.apiKeys.fmp);
-      if (fmpKey) {
-        try {
-          const url = `https://financialmodelingprep.com/api/v3/profile/${encodeURIComponent(symbol)}?apikey=${encodeURIComponent(fmpKey)}`;
-          const result = await cachedJson(`fmp:profile:${symbol}`, url, CACHE_TTL.profile, "fmp");
-          const row = Array.isArray(result.data) ? result.data[0] : null;
-          if (!row) {
-            throw new Error("FMP Profil leer");
-          }
-          return {
-            symbol,
-            name: row.companyName || asset.name,
-            exchange: row.exchangeShortName || "",
-            sector: row.sector || asset.sector,
-            country: row.country || "",
-            marketCap: numberOrNull(row.mktCap) || asset.fallback.marketCap,
-            logo: row.image || "",
-            meta: makeMeta("Financial Modeling Prep Profile", result.status, result.timestamp)
-          };
-        } catch (error) {
-          logError(error);
-        }
-      } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("fmp", "missing", "Kein FMP Key für Profil/Fundamentals hinterlegt.");
-      }
-
       return base;
     },
 
@@ -4035,37 +4707,6 @@
       const asset = getAsset(symbol);
       if (!["Stock", "ETF"].includes(asset.type)) {
         return fallbackFundamentals(symbol, "Fundamentals für diesen Asset-Typ lokal gemappt.");
-      }
-
-      const fmpKey = cleanKey(state.apiKeys.fmp);
-      if (fmpKey) {
-        try {
-          const url = `https://financialmodelingprep.com/api/v3/profile/${encodeURIComponent(symbol)}?apikey=${encodeURIComponent(fmpKey)}`;
-          const result = await cachedJson(`fmp:fundamentals:${symbol}`, url, CACHE_TTL.fundamentals, "fmp");
-          const row = Array.isArray(result.data) ? result.data[0] : null;
-          if (!row) {
-            throw new Error("FMP Fundamentals leer");
-          }
-          return {
-            symbol,
-            marketCap: numberOrNull(row.mktCap) || asset.fallback.marketCap,
-            pe: numberOrNull(row.pe) || asset.fallback.pe,
-            eps: numberOrNull(row.eps) || asset.fallback.eps,
-            revenue: asset.fallback.revenue,
-            profit: analysisFor(symbol).profit,
-            margin: analysisFor(symbol).margin,
-            grossMargin: analysisFor(symbol).grossMargin,
-            cashflow: analysisFor(symbol).cashflow,
-            debt: analysisFor(symbol).debt,
-            revenueGrowth: analysisFor(symbol).revenueGrowth,
-            beta: numberOrNull(row.beta),
-            meta: makeMeta("Financial Modeling Prep Profile", result.status, result.timestamp)
-          };
-        } catch (error) {
-          logError(error);
-        }
-      } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("fmp", "missing", "Kein FMP Key für Fundamentals hinterlegt.");
       }
 
       const finnhubKey = cleanKey(state.apiKeys.finnhub);
@@ -4114,7 +4755,7 @@
           const to = toIsoDate(new Date());
           const from = toIsoDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
           const url = `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${encodeURIComponent(finnhubKey)}`;
-          const result = await cachedJson(`finnhub:news:${symbol}`, url, CACHE_TTL.news, "finnhubNews");
+          const result = await cachedJson(`finnhub:news:${symbol}`, url, CACHE_TTL.news, "finnhub");
           const rows = Array.isArray(result.data) ? result.data : [];
           if (!rows.length) {
             throw new Error("Finnhub News leer");
@@ -4135,7 +4776,7 @@
           logError(error);
         }
       } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("finnhubNews", "missing", "Kein Finnhub Key für Company News hinterlegt.");
+        recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Company News hinterlegt.");
       }
 
       return fallbackNews(symbol, "Kein Finnhub News-Key oder API-Fehler.");
@@ -4203,36 +4844,6 @@
         }
       } else {
         recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Earnings Calendar hinterlegt.");
-      }
-
-      const fmpKey = cleanKey(state.apiKeys.fmp);
-      if (fmpKey && liveEvents.length < 8) {
-        try {
-          const url = `https://financialmodelingprep.com/api/v3/earning_calendar?from=${from}&to=${to}&apikey=${encodeURIComponent(fmpKey)}`;
-          const result = await cachedJson("fmp:events:earnings", url, CACHE_TTL.events, "fmp");
-          const rows = Array.isArray(result.data) ? result.data : [];
-          rows.slice(0, 18).forEach((row) => {
-            const symbol = normalizeSymbol(row.symbol || "");
-            if (!assetMap.has(symbol) || liveEvents.some((eventItem) => eventItem.symbol === symbol && eventItem.type === "Earnings")) {
-              return;
-            }
-            liveEvents.push({
-              title: `${symbol} Earnings`,
-              type: "Earnings",
-              symbol,
-              date: parseEventDate(row.date),
-              detail: `EPS erwartet: ${row.epsEstimated ?? "--"} | Umsatz erwartet: ${row.revenueEstimated ? formatCompactMoney(Number(row.revenueEstimated), "USD") : "--"}`,
-              meta: makeMeta("Financial Modeling Prep Earnings Calendar", result.status, result.timestamp)
-            });
-          });
-        } catch (error) {
-          logError(error);
-          recordProviderHealth("fmp", "fallback", "FMP Earnings Calendar nicht erreichbar.");
-        }
-      }
-
-      if (cleanKey(state.apiKeys.eodhd)) {
-        recordProviderHealth("eodhd", "prepared", "EODHD Slot für Dividenden/Splits/Earnings vorbereitet, aber noch nicht live verdrahtet.");
       }
 
       const fallback = fallbackEvents(liveEvents.length ? "Fallback ergänzt Live-Kalender für Dividenden, Splits und Makrotermine." : "Kein Live-Event-Feed aktiv. Lokaler Kalender aktiv.");
@@ -4407,6 +5018,34 @@
       ...item,
       meta: makeMeta(item.source, item.status, BOOT_TIME)
     }));
+  }
+
+  function liquidityNarrativeForView() {
+    const items = liquidityForView();
+    const pressure = items.reduce((sum, item) => sum + Number(item.pressure || 0), 0);
+    const score = clamp(52 + pressure * 8, 0, 100);
+    const label = score >= 60 ? "Liquidität hilft Risikoassets" : score <= 42 ? "Liquidität bleibt restriktiv" : "Gemischtes Liquiditätsbild";
+    const tone = score >= 60 ? "bull" : score <= 42 ? "bear" : "neutral";
+    const summary = score >= 60
+      ? "Breitere Geldmengen wirken unterstützend. Trotzdem bleiben Realzins und Zinskurve wichtig für Timing und Risiko."
+      : score <= 42
+        ? "Das Modell zeigt eher restriktive Bedingungen. Positionen sollten stärker über Qualität, Bewertung und Risikopuffer geprüft werden."
+        : "M2 stabilisiert sich, aber Realzins, Yield Curve und Bilanzliquidität senden noch kein klares Entwarnungssignal.";
+    return { score, label, tone, summary, items };
+  }
+
+  function liquidityBucketsForView() {
+    const buckets = {};
+    liquidityForView().forEach((item) => {
+      const bucket = item.bucket || "Weitere Daten";
+      buckets[bucket] = buckets[bucket] || [];
+      buckets[bucket].push(item);
+    });
+    return Object.entries(buckets).map(([label, items]) => ({ label, items }));
+  }
+
+  function liquidityImpactForView() {
+    return LIQUIDITY_IMPACT_MAP;
   }
 
   function macroWhy(id) {
@@ -4714,6 +5353,60 @@
     return { long, risk };
   }
 
+  function dailyBriefingForView() {
+    const symbols = unique([...HOME_TICKER, ...state.watchlist, ...dashboardPrefs().favorites]).slice(0, 18);
+    const moves = symbols
+      .map((symbol) => {
+        const quote = quoteFor(symbol);
+        return {
+          symbol,
+          name: getAsset(symbol).name,
+          changePct: Number(quote.changePct || 0),
+          status: quote.meta.status
+        };
+      })
+      .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
+    const avgMove = moves.length ? moves.reduce((sum, item) => sum + item.changePct, 0) / moves.length : 0;
+    const upcomingEvents = eventsForView()
+      .filter((eventItem) => eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(7))
+      .slice(0, 5);
+    const unusualAssets = ASSETS
+      .map((asset) => snapshotFor(asset.symbol))
+      .sort((a, b) => (Math.abs(b.performance1m) + b.analysis.volume * 0.05) - (Math.abs(a.performance1m) + a.analysis.volume * 0.05))
+      .slice(0, 5);
+    return {
+      marketMoves: moves.slice(0, 5),
+      upcomingEvents,
+      unusualAssets,
+      avgMove,
+      status: moves.some((item) => item.status === "live") ? "live" : "fallback",
+      regime: marketRegimeFromMoves(avgMove, moves),
+      liquidity: liquidityNarrativeForView()
+    };
+  }
+
+  function marketRegimeFromMoves(avgMove, moves) {
+    const positive = moves.filter((item) => item.changePct > 0).length;
+    const negative = moves.filter((item) => item.changePct < 0).length;
+    if (avgMove >= 0.45 && positive >= negative) {
+      return { label: "Risk-on", text: "Breite Marktbewegungen sind überwiegend positiv. Momentum- und Growth-Setups bekommen Rückenwind, Risiko bleibt trotzdem über Positionsgröße steuerbar." };
+    }
+    if (avgMove <= -0.45 && negative > positive) {
+      return { label: "Risk-off", text: "Die beobachteten Assets zeigen Druck. Defensive Watchlist, Cash-Anteil, Stops und Liquiditätsdaten sind heute besonders wichtig." };
+    }
+    return { label: "Neutral / selektiv", text: "Kein klarer Marktmodus. Einzelaktien-Qualität, Earnings-Trigger und klare Setups zählen stärker als breite Marktmeinung." };
+  }
+
+  function startOfToday() {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  function daysFromNow(days) {
+    return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  }
+
   function eventsForView() {
     return state.events.length ? state.events : fallbackEvents("Fallback bis Event-Provider geladen sind.");
   }
@@ -4731,6 +5424,27 @@
 
   function eventsForSymbol(symbol) {
     return eventsForView().filter((eventItem) => eventItem.symbol === symbol || eventItem.symbol === "Macro").slice(0, 6);
+  }
+
+  function watchlistNewsForView() {
+    const eventItems = eventsForView()
+      .filter((eventItem) => state.watchlist.includes(eventItem.symbol))
+      .slice(0, 3)
+      .map((eventItem) => ({
+        symbol: eventItem.symbol,
+        kind: eventItem.type,
+        text: `${eventItem.title} am ${eventItem.date.toLocaleDateString("de-DE")}`
+      }));
+    const movers = state.watchlist
+      .map((symbol) => ({ symbol, quote: quoteFor(symbol) }))
+      .filter((item) => Math.abs(Number(item.quote.changePct || 0)) >= 2)
+      .slice(0, 3)
+      .map((item) => ({
+        symbol: item.symbol,
+        kind: "Move",
+        text: `Tagesbewegung ${formatPercent(item.quote.changePct)}; prüfen, ob These noch passt.`
+      }));
+    return [...movers, ...eventItems].slice(0, 5);
   }
 
   function renderEventCard(eventItem) {
@@ -4821,10 +5535,44 @@
     const overlap = right.holdings
       .filter(([name]) => leftMap.has(name))
       .map(([name, weight]) => [name, Math.min(weight, leftMap.get(name))]);
+    const region = regionOverlap(left, right);
+    return {
+      score: overlap.reduce((sum, [, weight]) => sum + weight, 0),
+      names: overlap.map(([name]) => name),
+      regionScore: region.score,
+      regionNames: region.names
+    };
+  }
+
+  function regionOverlap(left, right) {
+    const leftMap = new Map(left.region.map(([name, weight]) => [name, weight]));
+    const overlap = right.region
+      .filter(([name]) => leftMap.has(name))
+      .map(([name, weight]) => [name, Math.min(weight, leftMap.get(name))]);
     return {
       score: overlap.reduce((sum, [, weight]) => sum + weight, 0),
       names: overlap.map(([name]) => name)
     };
+  }
+
+  function etfHoldingConcentration(etf) {
+    return etf.holdings.reduce((sum, [, weight]) => sum + Number(weight || 0), 0);
+  }
+
+  function distributionExplanation(etf) {
+    return etf.distribution === "Thesaurierend"
+      ? "Erträge werden automatisch wieder angelegt. Praktisch für langfristigen Vermögensaufbau."
+      : "Erträge werden ausgeschüttet. Praktisch für Cashflow, aber Wiederanlage muss selbst passieren.";
+  }
+
+  function etfOverlapText(overlap) {
+    if (overlap.score >= 20 || overlap.regionScore >= 90) {
+      return "Hohe Überschneidung: beide ETFs können ähnliche Länder- und Mega-Cap-Risiken verdoppeln. Prüfen, ob ein ETF davon wirklich zusätzlichen Nutzen bringt.";
+    }
+    if (overlap.score >= 8 || overlap.regionScore >= 60) {
+      return "Mittlere Überschneidung: als Core/Satellit möglich, aber Gewichtung und Zweck sollten klar sein.";
+    }
+    return "Geringere Überschneidung im lokalen Modell. Trotzdem TER, Währungsrisiko und Anlageziel separat prüfen.";
   }
 
   function updateEtfState(input) {
@@ -4932,6 +5680,8 @@
     const countryExposure = exposureBy(positions, totalValue, (position) => position.country || countryFor(position.symbol));
     const currencyExposure = exposureBy(positions, totalValue, (position) => getAsset(position.symbol).currency);
     const maxSector = maxExposure(sectorExposure);
+    const maxCountry = maxExposure(countryExposure);
+    const riskScore = clamp((maxSector.value * 0.75) + (maxCountry.value * 0.2) + Math.max(0, 12 - cashPct) + (positions.length < 4 ? 12 : 0), 0, 100);
     return {
       totalValue,
       performanceAbs,
@@ -4940,9 +5690,11 @@
       sectorExposure,
       countryExposure,
       currencyExposure,
+      riskScore,
       concentrationHint: maxSector.value > 45 ? `Klumpenrisiko: ${maxSector.label} liegt bei ${formatNumber(maxSector.value)}%.` : "Kein extremes Sektor-Klumpenrisiko im lokalen Modell.",
       diversificationHint: positions.length < 4 ? "Diversifikation ist noch gering; weitere Bausteine prüfen." : "Diversifikation wirkt für ein lokales Modell solide.",
-      rebalanceHint: cashPct > (portfolio.targetCash + 8) ? "Cash liegt über Ziel: Reinvestition oder Zielquote prüfen." : cashPct < Math.max(0, portfolio.targetCash - 5) ? "Cash liegt unter Ziel: Liquiditätspuffer prüfen." : "Cash-Anteil nahe Zielallokation."
+      rebalanceHint: cashPct > (portfolio.targetCash + 8) ? "Cash liegt über Ziel: Reinvestition oder Zielquote prüfen." : cashPct < Math.max(0, portfolio.targetCash - 5) ? "Cash liegt unter Ziel: Liquiditätspuffer prüfen." : "Cash-Anteil nahe Zielallokation.",
+      priorityHint: riskScore >= 65 ? "Erste Priorität: Klumpenrisiko oder Cash-Puffer prüfen." : riskScore >= 40 ? "Portfolio wirkt nutzbar, sollte aber regelmäßig gegen Zielallokation geprüft werden." : "Risiko wirkt im lokalen Modell kontrolliert."
     };
   }
 
@@ -5006,8 +5758,17 @@
   }
 
   function countryFor(symbol) {
-    if (["DAX"].includes(symbol)) {
+    if (["DAX", "SAP"].includes(symbol)) {
       return "Deutschland";
+    }
+    if (["ASML"].includes(symbol)) {
+      return "Niederlande";
+    }
+    if (["NOVO"].includes(symbol)) {
+      return "Dänemark";
+    }
+    if (["AIR.PA"].includes(symbol)) {
+      return "Frankreich";
     }
     if (["BTC", "ETH", "GOLD"].includes(symbol)) {
       return "Global";
@@ -5054,6 +5815,63 @@
     render();
   }
 
+  function journalEntriesFor(symbol) {
+    return state.journal
+      .filter((entry) => entry.symbol === normalizeSymbol(symbol))
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 6);
+  }
+
+  function journalQualityHint(entry) {
+    if (!entry) {
+      return {
+        label: "These offen",
+        text: "Ein guter Eintrag nennt These, Trigger und Regel-Check. So wird aus Bauchgefühl später überprüfbares Lernen."
+      };
+    }
+    if (entry.emotion === "fomo" || entry.emotion === "stress" || entry.ruleCheck === "risk") {
+      return {
+        label: "Noch einmal prüfen",
+        text: "Der letzte Eintrag enthält Stress, FOMO oder erhöhtes Risiko. Vor einer Entscheidung Setup und Positionsgröße kontrollieren."
+      };
+    }
+    if (entry.ruleCheck === "wait") {
+      return {
+        label: "Abwarten",
+        text: "Der letzte Regel-Check spricht für Geduld. Erst handeln, wenn der definierte Trigger wirklich eintritt."
+      };
+    }
+    return {
+      label: "Plan wirkt sauber",
+      text: "These und Regel-Check sind nachvollziehbar dokumentiert. Später lässt sich prüfen, ob der Plan funktioniert hat."
+    };
+  }
+
+  function saveJournalEntryFromForm(form) {
+    const data = new FormData(form);
+    const symbol = normalizeSymbol(data.get("symbol"));
+    const thesis = String(data.get("thesis") || "").trim();
+    const trigger = String(data.get("trigger") || "").trim();
+    if (!assetMap.has(symbol) || !thesis) {
+      toast("Bitte mindestens eine These eintragen.");
+      return;
+    }
+    const entry = {
+      id: `journal-${Date.now()}`,
+      symbol,
+      thesis,
+      trigger: trigger || "Kein Trigger definiert.",
+      emotion: String(data.get("emotion") || "rational"),
+      ruleCheck: String(data.get("ruleCheck") || "ok"),
+      timestamp: Date.now()
+    };
+    state.journal = [entry, ...state.journal].slice(0, 120);
+    storageSet(STORAGE_KEYS.journal, state.journal);
+    form.reset();
+    toast("Journal-Eintrag gespeichert.");
+    render();
+  }
+
   function openReport(type, symbol = "") {
     closeReport();
     const html = buildReportHtml(type, symbol);
@@ -5075,7 +5893,7 @@
     return `
       <div class="report-overlay" id="reportOverlay">
         <div class="report-actions no-print">
-          <button class="ghost-button" type="button" data-close-report>Schliessen</button>
+          <button class="ghost-button" type="button" data-close-report>Schließen</button>
           <button class="primary-button" type="button" data-print-report>Als PDF speichern / Drucken</button>
         </div>
         <article class="report-page">
@@ -5087,7 +5905,7 @@
           ${body}
           <footer class="report-footer">
             <strong>Quellen / Status</strong>
-            <p>API-Daten, lokale Fallback-Daten und vorbereitete Provider-Slots sind jeweils in der App gekennzeichnet. Keine Anlageberatung.</p>
+            <p>API-Daten, lokale Fallback-Daten und Provider-Zustände sind jeweils in der App gekennzeichnet. Keine Anlageberatung.</p>
           </footer>
         </article>
       </div>
@@ -5099,6 +5917,9 @@
     const quote = quoteFor(symbol);
     const fundamentals = fundamentalsFor(symbol);
     const technical = technicalFor(symbol, quote);
+    const fundamental = fundamentalInterpretation(asset, fundamentals);
+    const events = eventsForSymbol(symbol);
+    const liquidity = liquidityNarrativeForView();
     return `
       <section class="report-section">
         <h2>${esc(asset.symbol)} - ${esc(asset.name)}</h2>
@@ -5107,9 +5928,18 @@
           ${renderMiniMetric("Tagesveränderung", formatPercent(quote.changePct))}
           ${renderMiniMetric("Rating", technical.rating)}
           ${renderMiniMetric("KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x"))}
+          ${renderMiniMetric("Liquidität", `${formatNumber(liquidity.score)} / 100`)}
         </div>
+        <h3>These</h3>
         <p>${esc(asset.thesis)}</p>
-        <p>${esc(technical.reason)}</p>
+        <h3>Chancen</h3>
+        <p>${esc(technical.reason)} Fundamental wirkt aktuell: ${esc(fundamental.label)}.</p>
+        <h3>Risiken</h3>
+        <p>${esc(asset.risks)}</p>
+        <h3>Marktumfeld</h3>
+        <p>${esc(liquidity.summary)}</p>
+        <h3>Trigger</h3>
+        <p>${esc(events[0] ? `${events[0].title} am ${events[0].date.toLocaleDateString("de-DE")}` : "Kein konkreter Event im lokalen Kalender.")}</p>
         ${renderDataMeta(quote.meta)}
       </section>
     `;
@@ -5126,8 +5956,12 @@
           ${renderMiniMetric("Performance", formatPercent(analysis.performancePct))}
           ${renderMiniMetric("Cash", `${formatNumber(analysis.cashPct)}%`)}
           ${renderMiniMetric("Positionen", String(portfolio.positions.length))}
+          ${renderMiniMetric("Risiko-Score", `${formatNumber(analysis.riskScore)} / 100`)}
         </div>
-        <p>${esc(analysis.concentrationHint)} ${esc(analysis.rebalanceHint)}</p>
+        <h3>Klarblick</h3>
+        <p>${esc(analysis.priorityHint)}</p>
+        <h3>Risiko & Rebalancing</h3>
+        <p>${esc(analysis.concentrationHint)} ${esc(analysis.diversificationHint)} ${esc(analysis.rebalanceHint)}</p>
         ${renderDataMeta(makeMeta("Lokaler Portfolio Report", "live", Date.now()))}
       </section>
     `;
@@ -5137,6 +5971,8 @@
     const picks = topPicksForView();
     return `
       <section class="report-section">
+        <h2>Methodik</h2>
+        <p>Die Picks kombinieren Technical Rating, Momentum, Value/Growth, Risiko, Sentiment und verfügbare Live-/Fallback-Daten. Das ist ein Research-Werkzeug, keine Anlageberatung.</p>
         <h2>Long Picks</h2>
         ${picks.long.map((pick) => `<p><strong>${esc(pick.symbol)} ${pick.score}%</strong> - ${esc(pick.reason)}</p>`).join("")}
         <h2>Risk Picks</h2>
@@ -5319,6 +6155,9 @@
   }
 
   function evaluateAlert(alert, quote) {
+    if (alert.type === "earnings") {
+      return eventsForSymbol(alert.symbol).some((eventItem) => eventItem.type === "Earnings" && eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(14));
+    }
     if (alert.type === "watchlist") {
       return state.watchlist.includes(alert.symbol) && Math.abs(Number(quote.changePct || 0)) >= 2;
     }
@@ -5340,6 +6179,9 @@
     }
     if (alert.type === "sentiment") {
       return "News-/Sentiment-Hinweis vorbereitet";
+    }
+    if (alert.type === "earnings") {
+      return "Earnings-/Event-Reminder in den nächsten 14 Tagen";
     }
     if (alert.condition === "below") {
       return `Preis unter ${formatMoney(alert.target, getAsset(alert.symbol).currency)}`;
@@ -5580,6 +6422,169 @@
     render();
   }
 
+  async function fetchProviderTestPayload(request) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 9000);
+    try {
+      const response = await fetch(request.url, {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: request.headers || {}
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        const error = new Error(providerHttpMessage(response, text));
+        error.kind = response.status === 429 ? "rate-limit" : "http";
+        throw error;
+      }
+      if (request.responseType === "text") {
+        return { data: text, response };
+      }
+      try {
+        return { data: text ? JSON.parse(text) : {}, response };
+      } catch (parseError) {
+        const error = new Error("Parse-Fehler: Provider lieferte keine gültige JSON-Antwort. Prüfe, ob ein JSON-Parameter nötig ist.");
+        error.kind = "parse";
+        error.cause = parseError;
+        throw error;
+      }
+    } catch (error) {
+      if (error.name === "AbortError") {
+        const timeoutError = new Error("Endpoint nicht erreichbar oder Zeitlimit überschritten.");
+        timeoutError.kind = "timeout";
+        throw timeoutError;
+      }
+      if (error instanceof TypeError) {
+        const browserError = new Error("Browserzugriff blockiert oder Netzwerk/CORS-Problem.");
+        browserError.kind = "browser";
+        browserError.cause = error;
+        throw browserError;
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  function providerHttpMessage(response, bodyText) {
+    const body = String(bodyText || "").slice(0, 220);
+    if (response.status === 401 || response.status === 403) {
+      return `HTTP ${response.status}: Key nicht akzeptiert oder Zugriff nicht erlaubt.`;
+    }
+    if (response.status === 429) {
+      return "Rate Limit erreicht. Bitte später erneut testen.";
+    }
+    return `HTTP ${response.status}: Provider antwortet mit Fehler.${body ? ` Antwort: ${body}` : ""}`;
+  }
+
+  function describeProviderTestError(error) {
+    if (!error) {
+      return "Unbekannter Fehler beim Provider-Test.";
+    }
+    if (error.kind === "parse") {
+      return error.message;
+    }
+    if (error.kind === "rate-limit") {
+      return error.message;
+    }
+    if (error.kind === "http") {
+      return error.message;
+    }
+    if (error.kind === "browser") {
+      return "Browserzugriff blockiert, CORS-Problem oder Netzwerk offline.";
+    }
+    if (error.kind === "timeout") {
+      return error.message;
+    }
+    return error.message || "Unbekannter Fehler beim Provider-Test.";
+  }
+
+  function validateFinnhubQuote(data) {
+    if (data && data.error) {
+      throw new Error(`API-Antwort ungültig: ${data.error}`);
+    }
+    if (!data || !Number.isFinite(Number(data.c)) || Number(data.c) <= 0) {
+      throw new Error("API-Antwort ungültig: Finnhub liefert keinen gültigen AAPL-Preis.");
+    }
+    return "Test erfolgreich: Finnhub Quote für AAPL gültig. Das ist noch kein Modul-Liveabruf.";
+  }
+
+  function validateAlphaVantageQuote(data) {
+    if (data && data["Error Message"]) {
+      throw new Error(`API-Antwort ungültig: ${data["Error Message"]}`);
+    }
+    if (data && (data.Note || data.Information)) {
+      throw new Error(`Alpha Vantage Hinweis: ${data.Note || data.Information}`);
+    }
+    const quote = data && data["Global Quote"];
+    if (!quote || !Number.isFinite(Number(quote["05. price"]))) {
+      throw new Error("API-Antwort ungültig: Alpha Vantage liefert keinen GLOBAL_QUOTE-Preis.");
+    }
+    return "Test erfolgreich: Alpha Vantage GLOBAL_QUOTE gültig. In Aktien bleibt Finnhub Primärquelle.";
+  }
+
+  function validateFredObservations(data) {
+    if (data && data.error_code) {
+      throw new Error(`FRED API-Fehler ${data.error_code}: ${data.error_message || "Antwort ungültig."}`);
+    }
+    const observations = data && Array.isArray(data.observations) ? data.observations : [];
+    if (!observations.length || observations.every((row) => !row.value || row.value === ".")) {
+      throw new Error("API-Antwort ungültig: FRED JSON enthält keine nutzbaren Beobachtungen.");
+    }
+    return "Test erfolgreich: FRED liefert JSON-Beobachtungen für FEDFUNDS.";
+  }
+
+  function validateBlsSeries(data) {
+    if (!data || data.status !== "REQUEST_SUCCEEDED") {
+      throw new Error(`BLS-Antwort ungültig: ${data?.status || "kein Status"}`);
+    }
+    const series = data.Results && Array.isArray(data.Results.series) ? data.Results.series : [];
+    if (!series.length || !series[0].data || !series[0].data.length) {
+      throw new Error("BLS-Antwort ungültig: keine Zeitreihendaten gefunden.");
+    }
+    return "Test erfolgreich: BLS Open Data liefert aktuelle CPI-Zeitreihe.";
+  }
+
+  function validateFiscalData(data) {
+    if (!data || !Array.isArray(data.data) || !data.data.length) {
+      throw new Error("Treasury-Antwort ungültig: keine Fiscal-Data-Zeilen gefunden.");
+    }
+    return "Test erfolgreich: Treasury Fiscal Data liefert Open-Data-Zeilen.";
+  }
+
+  function validateEiaResponse(data) {
+    if (data && data.error) {
+      throw new Error(`EIA API-Fehler: ${data.error}`);
+    }
+    if (!data || typeof data !== "object" || !data.response) {
+      throw new Error("EIA-Antwort ungültig: keine APIv2-Metadaten erhalten.");
+    }
+    return "Test erfolgreich: EIA APIv2 antwortet mit Metadaten.";
+  }
+
+  function validateWorldBankResponse(data) {
+    if (!Array.isArray(data) || !data[1] || !Array.isArray(data[1])) {
+      throw new Error("World-Bank-Antwort ungültig: erwartetes Indicator-Array fehlt.");
+    }
+    return "Test erfolgreich: World Bank Indicators API liefert JSON-Daten.";
+  }
+
+  function validateImfResponse(data) {
+    if (!data || typeof data.values !== "object") {
+      throw new Error("IMF-Antwort ungültig: DataMapper-Werte fehlen.");
+    }
+    return "Test erfolgreich: IMF DataMapper liefert JSON-Werte.";
+  }
+
+  function validateNonEmptyText(label) {
+    return (text) => {
+      if (!String(text || "").trim()) {
+        throw new Error(`${label} liefert keine verwertbare Antwort.`);
+      }
+      return `Test erfolgreich: ${label} antwortet.`;
+    };
+  }
+
   async function testProviderById(providerId) {
     const provider = providerById(providerId);
     if (!provider) {
@@ -5592,9 +6597,9 @@
     render();
 
     const key = cleanKey(providerKeyValue(providerId));
-    if (provider.security === "backend-only") {
-      setProviderTest(providerId, "warn", "Backend-only: Test im Browser bewusst nicht ausgeführt.");
-      toast(`${provider.name}: Backend-only, später serverseitig testen.`);
+    if (provider.security === "backend-only" || (provider.security === "browser-critical" && !provider.testRequest && !provider.testUrl)) {
+      setProviderTest(providerId, "warn", provider.security === "browser-critical" ? "Browser-Test bewusst nicht implementiert: Quelle ist browserkritisch." : "Backend-only: Test im Browser bewusst nicht ausgeführt.");
+      toast(`${provider.name}: Browser-Test hier nicht sinnvoll.`);
       render();
       return;
     }
@@ -5604,20 +6609,22 @@
       render();
       return;
     }
-    if (!provider.testUrl) {
-      setProviderTest(providerId, "warn", "Kein Browser-Test hinterlegt. Provider-Slot ist vorbereitet.");
-      toast(`${provider.name}: Slot vorbereitet, noch kein Live-Test.`);
+    const requestFactory = provider.testRequest || (provider.testUrl ? ((savedKey) => ({ url: provider.testUrl(savedKey), responseType: "json" })) : null);
+    if (!requestFactory) {
+      setProviderTest(providerId, "warn", "Kein Browser-Test implementiert. Quelle ist nur zugeordnet, nicht als Browser-Livetest versprochen.");
+      toast(`${provider.name}: kein Browser-Test implementiert.`);
       render();
       return;
     }
 
     try {
-      const url = provider.testUrl(key);
-      await fetchJson(url);
-      setProviderTest(providerId, "ok", "Provider hat im Browser-Test geantwortet.");
+      const request = requestFactory(key);
+      const testResult = await fetchProviderTestPayload(request);
+      const message = provider.validateTest ? provider.validateTest(testResult.data, testResult.response) : "Provider hat im Browser-Test geantwortet.";
+      setProviderTest(providerId, "ok", message || "Provider hat im Browser-Test geantwortet.");
       toast(`${provider.name}: Test erfolgreich.`);
     } catch (error) {
-      setProviderTest(providerId, "error", "Test fehlgeschlagen. Möglich: falscher Key, Rate Limit, CORS oder offline.");
+      setProviderTest(providerId, "error", describeProviderTestError(error));
       toast(`${provider.name}: Test fehlgeschlagen.`);
       logError(error);
     }
@@ -5627,20 +6634,21 @@
   async function testConfiguredProviders() {
     state.apiKeys = collectApiKeysFromInputs();
     storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
-    const testable = PROVIDERS.filter((provider) => {
-      if (provider.security === "backend-only") {
+    const testable = visibleProviders().filter((provider) => {
+      const hasTest = Boolean(provider.testRequest || provider.testUrl);
+      if (!hasTest || provider.security === "backend-only" || provider.security === "browser-critical") {
         return false;
       }
-      if (provider.testUrl && ["none", "optional"].includes(provider.keyMode)) {
+      if (["none", "optional"].includes(provider.keyMode)) {
         return true;
       }
-      return Boolean(provider.testUrl && cleanKey(providerKeyValue(provider.id)));
+      return Boolean(cleanKey(providerKeyValue(provider.id)));
     });
     if (!testable.length) {
       toast("Keine testbaren Provider konfiguriert. Public/Demo Slots oder Keys eintragen.");
       return;
     }
-    for (const provider of testable.slice(0, 6)) {
+    for (const provider of testable) {
       await testProviderById(provider.id);
     }
   }
@@ -5655,13 +6663,6 @@
       }
     };
     storageSet(STORAGE_KEYS.providerTests, state.providerTests);
-    if (status === "ok") {
-      recordProviderHealth(providerId, "live", message || "Provider-Test erfolgreich.");
-    } else if (status === "error") {
-      recordProviderHealth(providerId, "error", message || "Provider-Test fehlgeschlagen.");
-    } else if (!state.providerHealth[providerId]) {
-      recordProviderHealth(providerId, "prepared", message || "Provider vorbereitet.");
-    }
   }
 
   function exportWatchlist() {
@@ -5780,7 +6781,13 @@
       return "Fehlt";
     }
     if (status === "prepared") {
-      return "Vorbereitet";
+      return "Zugeordnet";
+    }
+    if (status === "mapped" || status === "notUsed") {
+      return "Aktuell nicht genutzt";
+    }
+    if (status === "disabled") {
+      return "Deaktiviert";
     }
     if (status === "error") {
       return "Fehler";
@@ -5816,6 +6823,26 @@
       logError(error);
       return fallback;
     }
+  }
+
+  function sanitizeProviderHealth(savedHealth) {
+    const next = {};
+    Object.entries(savedHealth || {}).forEach(([providerId, health]) => {
+      if (!PUBLIC_PROVIDER_IDS.includes(providerId) && !OPTIONAL_INTERNAL_PROVIDER_IDS.includes(providerId)) {
+        return;
+      }
+      if (!health || typeof health !== "object") {
+        return;
+      }
+      const status = health.status === "live" || health.status === "stale" ? "notUsed" : health.status;
+      next[providerId] = {
+        ...health,
+        status,
+        message: status === "notUsed" ? "Noch kein erfolgreicher Live-Abruf in dieser Sitzung." : health.message,
+        timestamp: BOOT_TIME
+      };
+    });
+    return next;
   }
 
   function storageSet(key, value) {

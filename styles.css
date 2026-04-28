@@ -722,6 +722,104 @@ body.light .chart-card {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
+.daily-brief-grid {
+  display: grid;
+  grid-template-columns: 1.15fr repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.daily-regime-card {
+  min-height: 100%;
+}
+
+.brief-row,
+.brief-event-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.brief-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.brief-event-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.brief-row:last-child,
+.brief-event-row:last-child {
+  border-bottom: 0;
+}
+
+.brief-row strong,
+.brief-row small,
+.brief-event-row strong,
+.brief-event-row small {
+  display: block;
+}
+
+.watchlist-news-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.continue-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.snapshot-tile,
+.journal-row {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.snapshot-tile span,
+.snapshot-tile strong,
+.journal-row strong,
+.journal-row span {
+  display: block;
+}
+
+.snapshot-tile span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.snapshot-tile strong {
+  margin: 5px 0;
+}
+
+.snapshot-tile p,
+.journal-row p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.asset-research-snapshot,
+.thesis-journal-card,
+.research-workflow-card,
+.portfolio-clarity-card {
+  display: grid;
+  gap: 14px;
+}
+
+.journal-form {
+  display: grid;
+  gap: 12px;
+}
+
 .right-cell {
   display: grid;
   gap: 3px;
@@ -1490,6 +1588,25 @@ body.light .asset-price-card {
   min-height: 100%;
 }
 
+.macro-context-card,
+.liquidity-bucket-card,
+.etf-guide-grid {
+  margin: 18px 0;
+}
+
+.macro-context-card .grid,
+.etf-guide-grid {
+  align-items: stretch;
+}
+
+.liquidity-bucket-card .compact-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.liquidity-bucket-card .right-cell {
+  align-items: end;
+}
+
 .personalization-panel {
   background:
     linear-gradient(135deg, rgba(216, 181, 104, 0.08), transparent 42%),
@@ -1835,6 +1952,10 @@ body.light .personalization-panel {
     grid-template-columns: 1fr;
   }
 
+  .daily-brief-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .grid.three,
   .grid.four,
   .grid.five {
@@ -1944,6 +2065,7 @@ body.light .personalization-panel {
   }
 
   .hero-meta,
+  .daily-brief-grid,
   .grid.three,
   .grid.four,
   .grid.five,
