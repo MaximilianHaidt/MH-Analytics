@@ -4728,6 +4728,8 @@
       ["Endpoint", details.endpoint],
       ["HTTP-Methode", details.method],
       ["Pfad", details.path],
+      ["Seiten-Origin", details.pageOrigin],
+      ["Browser online", details.browserOnline],
       ["api_key gesetzt", details.apiKeyParamPresent ? "ja" : "nein"],
       ["file_type", details.fileTypeJson ? "json gesetzt" : `nicht json (${details.fileType || "fehlt"})`],
       ["Key im Feld", keyShapeText(details.inputKey)],
@@ -4741,6 +4743,7 @@
       ["Content-Type", details.contentType],
       ["Response-Format", details.responseFormat],
       ["Parsing", details.parseStatus],
+      ["Browser-Fetch-Fehler", details.browserFetchError || "kein Browser-Fetch-Fehler"],
       ["FRED-Fehler", details.fredError || "kein FRED-error_message Feld"]
     ];
     return `
@@ -7933,6 +7936,8 @@
       method: request.method || "GET",
       endpoint: maskFredEndpoint(request.url, sentKey),
       path: url.pathname,
+      pageOrigin: window.location.origin || "file://",
+      browserOnline: navigator.onLine ? "ja" : "nein",
       apiKeyParamPresent: Boolean(sentKey),
       fileType,
       fileTypeJson: fileType === "json",
@@ -7971,10 +7976,24 @@
   }
 
   function maskFredEndpoint(url, key) {
+    const displayUrl = new URL(url);
     if (!key) {
-      return String(url).replace(/api_key=[^&]*/, "api_key=leer");
+      displayUrl.searchParams.set("api_key", "leer");
+      return displayUrl.toString();
     }
-    return String(url).replace(encodeURIComponent(key), encodeURIComponent(maskSecret(key)));
+    displayUrl.searchParams.set("api_key", maskSecretShort(key));
+    return displayUrl.toString().replace(/%E2%80%A6/g, "…");
+  }
+
+  function maskSecretShort(value) {
+    const text = String(value || "");
+    if (!text) {
+      return "leer";
+    }
+    if (text.length <= 6) {
+      return `${text.slice(0, 1)}…${text.slice(-1)}`;
+    }
+    return `${text.slice(0, 3)}…${text.slice(-3)}`;
   }
 
   function providerInputValue(providerId) {
@@ -8043,6 +8062,7 @@
         const browserError = new Error("Browserzugriff blockiert oder Netzwerk/CORS-Problem.");
         browserError.kind = "browser";
         browserError.cause = error;
+        browserError.browserMessage = error.message || "";
         throw browserError;
       }
       throw error;
@@ -8319,12 +8339,16 @@
         stage: error.httpStatus ? "Response erhalten" : "Fetch fehlgeschlagen",
         httpStatus: error.httpStatus || "keine HTTP-Antwort",
         contentType: error.contentType || "unbekannt",
-        responseFormat: error.parseOk === false ? "nicht JSON" : error.responseData ? "JSON" : "unbekannt",
-        parseStatus: error.parseOk === false ? "Parsing fehlgeschlagen" : error.responseData ? "Parsing erfolgreich" : "nicht ausgeführt",
-        fredError: error.apiMessage || "",
+      responseFormat: error.parseOk === false ? "nicht JSON" : error.responseData ? "JSON" : "unbekannt",
+      parseStatus: error.parseOk === false ? "Parsing fehlgeschlagen" : error.responseData ? "Parsing erfolgreich" : "nicht ausgeführt",
+      fredError: error.apiMessage || "",
+        browserFetchError: error.browserMessage || error.message || "",
         responseBody: error.responseText ? String(error.responseText).slice(0, 420) : ""
       });
-      setProviderTest("fred", "error", describeProviderTestError(error), details);
+      const message = error.kind === "browser"
+        ? "FRED Browser-Test: keine lesbare HTTP-Antwort erhalten. Keypfad OK; der Browser hat den Fetch vor dem Response blockiert oder der Netzwerkzugriff wurde lokal verhindert."
+        : describeProviderTestError(error);
+      setProviderTest("fred", "error", message, details);
       toast("FRED: Minimaltest fehlgeschlagen.");
       logError(error);
     }
