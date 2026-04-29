@@ -53,6 +53,24 @@ Die Seite funktioniert sofort mit lokalen Fallback-Daten. Für Live-Daten brauch
 - Der ETF-Overlap-Checker bewertet nicht nur Top-Holdings, sondern auch regionale Überschneidung und TER-Differenz.
 - Portfolio, Journal, Watchlist und Reports wurden sprachlich und logisch weiter geschärft, ohne neue technische Infrastruktur einzuführen.
 
+## Was in der Dateninput-Runde echter wurde
+
+- Der Screener lädt jetzt mehr echte Inputs: Finnhub für Quotes, Profile und Fundamentals; Alpha Vantage für Tageszeitreihen, Performance, Momentum und volatilitätsnahe Inputs.
+- Makro nutzt nicht mehr nur FRED/Fallback: BLS kann CPI und Arbeitsmarkt ergänzen, Treasury kann 10Y-Rendite und 2Y-10Y-Kurve liefern, FRED erweitert Geldmengen, Realzins, Broad-Dollar-Index und Zentralbank-Bilanz.
+- Events/Earnings nutzen jetzt zusätzlich Alpha Vantage Earnings Calendar und IPO Calendar. Lokale Events bleiben nur Backup für Dividenden, Splits und Makrotermine.
+- Rohstoffe werden datenstärker: Gold/Silber/WTI können über Alpha Vantage laufen; WTI kann zusätzlich über EIA APIv2 geladen werden.
+- Asset-Seiten nutzen stärkere Live-Inputs aus Finnhub und zeigen SEC/EDGAR als offiziellen Filings-Pfad transparent, ohne ihn fälschlich als Browser-Livequelle zu markieren.
+- Globale Makrovergleiche bekommen einen echten Open-Data-Pfad über World Bank und IMF DataMapper.
+- Ratings, Top Picks, Reports und Portfolio bleiben bewusst hybrid: echte Dateninputs plus eigene MH-Analytics-Heuristik.
+
+## Was in dieser Nutzwert-Runde ergänzt wurde
+
+- Der Bereich `Events` ist jetzt ein echter Event-/Earnings-Hub mit Typfilter, Zeitfilter, Watchlist-Hervorhebung, Relevanz und Quellenstatus.
+- Auf der Startseite gibt es einen Tages-Recap: “Was habe ich heute verpasst?” mit Marktbewegungen, News, Events und Watchlist-Hinweisen.
+- Quick Compare vergleicht zwei Assets direkt nebeneinander: Preis, Tagesbewegung, Market Cap, Sektor, KGV, Rating, Chancen und Risiken.
+- Alerts V2 speichert lokale Alerts mit Status `offen`, `ausgelöst` und `erledigt`, Priorität, Snooze, Inbox und Historie.
+- Data Health zeigt zusätzlich eine Quellenübersicht pro Modul: Screener, Asset-Seiten, Events, Makro, Energie, globale Daten, Portfolio und Reports.
+
 ## Öffentlicher Kernstack
 
 Diese elf Quellen bilden ab jetzt den sichtbaren Provider-Kern:
@@ -101,15 +119,15 @@ CoinGecko bleibt nur als optionaler interner Krypto-Prototyp für BTC/ETH-Fallba
 ## Live, Fallback oder zugeordnet
 
 - Start-Ticker: live mit Finnhub oder Alpha Vantage, sonst Fallback. Krypto nutzt optional CoinGecko-Prototyp/Fallback.
-- Asset-Kurse: Finnhub primär, Alpha Vantage als Fallback, sonst lokaler Fallback.
+- Asset-Kurse: Finnhub primär, Alpha Vantage als Fallback, Rohstoffe über Alpha Vantage/EIA soweit verfügbar, sonst lokaler Fallback.
 - Company News: Finnhub, sonst lokaler News-Fallback.
-- Fundamentals: Finnhub Basic Financials, später SEC/XBRL sauber ausbauen, sonst lokaler Fallback.
-- Makro: FRED live bei Key, sonst Fallback; ECB/BLS/Treasury/World Bank/IMF/OECD sind klar zugeordnet.
-- Geldmengen/Liquidität: FRED und ECB zugeordnet, lokale Fallbacks bleiben aktiv.
-- Events/Earnings: Finnhub live bei Key, Alpha Vantage als Zusatzpfad zugeordnet, lokaler Kalender bleibt aktiv.
-- Screener: Hybrid aus Live-Quotes und lokalem Research-Universum.
+- Fundamentals: Finnhub Basic Financials, SEC/EDGAR als offizieller Filings-Pfad, sonst lokaler Fallback.
+- Makro: FRED live bei Key; BLS und Treasury als Open Data; World Bank/IMF für globale Vergleiche; Fallbacks ergänzen fehlende Reihen.
+- Geldmengen/Liquidität: FRED für M1/M2, Realzins, Yield Curve, Zentralbank-Bilanz und Dollar-Index; M3/M4 bleiben sauber gekennzeichnete lokale/ECB-Struktur.
+- Events/Earnings: Finnhub live bei Key, Alpha Vantage Earnings/IPO Calendar als Zusatzpfad, lokaler Kalender bleibt Backup.
+- Screener: Hybrid aus Live-Quotes, Finnhub-Profilen/Fundamentals, Alpha-Vantage-Zeitreihen und lokalem Research-Universum.
 - ETF: lokale strukturierte Datenbasis.
-- Portfolio/Watchlist/Alerts: lokal im Browser gespeichert.
+- Portfolio/Watchlist/Alerts V2: lokal im Browser gespeichert, inklusive Snooze, Inbox und Alert-Historie.
 - Reports: Browser-Print/PDF-Fallback ohne Backend.
 
 ## Data Health
@@ -122,6 +140,7 @@ Der Bereich `Data Health` zeigt:
 - aktuell live genutzt, Fallback aktiv oder aktuell nicht genutzt
 - browsergeeignet, browserkritisch oder später serverseitig sinnvoll
 - welche Module welchen Provider verwenden
+- welche Plattformbereiche live, hybrid oder fallbackbasiert arbeiten
 
 Wichtig: Ein erfolgreicher API-Test bedeutet nur “Test erfolgreich”. Erst ein erfolgreicher Datenabruf durch ein Modul zählt als “aktuell live genutzt”.
 

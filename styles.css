@@ -826,6 +826,10 @@ body.light .chart-card {
   justify-items: end;
 }
 
+.muted {
+  color: var(--muted);
+}
+
 .mini-rank {
   width: 32px;
   height: 32px;
@@ -1285,6 +1289,56 @@ body.light .asset-price-card {
   color: var(--muted);
 }
 
+.event-card .pill {
+  justify-self: start;
+}
+
+.compare-card {
+  display: grid;
+  gap: 18px;
+}
+
+.compare-controls {
+  margin-bottom: 0;
+}
+
+.compare-grid {
+  align-items: stretch;
+}
+
+.compare-asset-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.compare-asset-panel h3 small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.compare-verdict {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid rgba(201, 181, 138, 0.24);
+  border-radius: var(--radius-sm);
+  background: rgba(201, 181, 138, 0.08);
+}
+
+.compare-verdict p {
+  margin: 0;
+  color: var(--text);
+}
+
 .alert-form {
   display: grid;
   gap: 12px;
@@ -1296,7 +1350,7 @@ body.light .asset-price-card {
 
 .alert-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(240px, 1fr) auto auto auto auto auto auto;
   gap: 12px;
   align-items: center;
   padding: 13px 0;
@@ -1316,6 +1370,56 @@ body.light .asset-price-card {
 
 .alert-inbox-row:last-child {
   border-bottom: 0;
+}
+
+.alert-filter-row {
+  margin: 12px 0 4px;
+}
+
+.tiny-button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--panel-2);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tiny-button:hover {
+  color: var(--text);
+  border-color: rgba(201, 181, 138, 0.34);
+}
+
+.source-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.source-overview-card {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.source-overview-card h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.source-overview-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.compact-topline {
+  gap: 10px;
 }
 
 .provider-summary-grid {
@@ -1454,6 +1558,47 @@ body.light .asset-price-card {
   padding: 10px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
+}
+
+.provider-debug {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.provider-debug summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.provider-debug-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.45fr) minmax(0, 1fr);
+  gap: 7px 12px;
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.provider-debug-grid span {
+  color: var(--faint);
+}
+
+.provider-debug-grid strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.provider-debug pre {
+  overflow: auto;
+  max-height: 160px;
+  margin: 12px 0 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--muted);
+  white-space: pre-wrap;
 }
 
 .provider-test-status {
@@ -2077,6 +2222,7 @@ body.light .personalization-panel {
     .provider-grid,
     .onboarding-steps,
     .report-grid,
+    .source-overview-grid,
     .form-grid {
     grid-template-columns: 1fr;
   }
@@ -2116,8 +2262,18 @@ body.light .personalization-panel {
   .screener-row > :nth-child(4),
   .screener-row > :nth-child(5),
   .screener-row > :nth-child(6),
-  .alert-row > :nth-child(2) {
+  .alert-row > :nth-child(2),
+  .alert-row > :nth-child(3),
+  .alert-row > :nth-child(4) {
     grid-column: 1 / -1;
+  }
+
+  .alert-row > .tiny-button {
+    justify-self: start;
+  }
+
+  .alert-row .right-cell {
+    justify-items: start;
   }
 
   .watch-form {

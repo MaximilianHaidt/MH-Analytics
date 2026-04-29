@@ -43,7 +43,16 @@
     fundamentals: 6 * 60 * 60 * 1000,
     news: 15 * 60 * 1000,
     macro: 6 * 60 * 60 * 1000,
-    events: 30 * 60 * 1000
+    events: 30 * 60 * 1000,
+    series: 30 * 60 * 1000,
+    openData: 6 * 60 * 60 * 1000
+  };
+
+  const SCREENER_LIVE_LIMITS = {
+    quotes: 28,
+    profiles: 12,
+    fundamentals: 8,
+    series: 8
   };
 
   const PROVIDER_GROUPS = [
@@ -132,9 +141,9 @@
       security: "browser-ok-private",
       description: "US-Makrodaten wie Fed Funds, CPI, Arbeitslosenquote, Geldmengen, Zinsserien und Spreads.",
       usage: "Zuständig für US-Makro und Geldmengen. Der Test erzwingt JSON, weil FRED sonst XML liefert.",
-      testHint: "Testet Fed Funds Serie.",
-      testRequest: (key) => ({ url: `https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${encodeURIComponent(key)}&file_type=json&sort_order=desc&limit=1`, responseType: "json" }),
-      validateTest: validateFredObservations
+      testHint: "Isolierter Minimaltest: /fred/series/updates mit file_type=json.",
+      testRequest: buildFredMinimalTestRequest,
+      validateTest: validateFredSeriesUpdates
     },
     {
       id: "ecb",
@@ -304,7 +313,7 @@
       keyMode: "none",
       security: "browser-ok-public",
       description: "Offizielle Open-Data-Quelle für US-Arbeitsmarkt, CPI und Labor-Daten.",
-      usage: "Kein Key nötig. Für CPI und Arbeitsmarkt zugeordnet; aktuelle Module nutzen noch FRED/Fallback, bis BLS-Reihen live geschaltet werden.",
+      usage: "Kein Key nötig. Wird als Open-Data-Ergänzung für CPI und Arbeitsmarkt genutzt, besonders wenn FRED fehlt oder als Plausibilitätsquelle.",
       testHint: "Open-Data-Test: Latest CPI-Serie.",
       testRequest: () => ({ url: "https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0?latest=true", responseType: "json" }),
       validateTest: validateBlsSeries
@@ -318,7 +327,7 @@
       keyMode: "none",
       security: "browser-ok-public",
       description: "Offizielle Open-Data-Quelle für Treasury-Rates, Yield Curve und Zinsstruktur.",
-      usage: "Kein Key nötig. Für Yield-Curve- und Zinsmodule zugeordnet; aktuelle App nutzt noch lokale Fallback-Werte, bis Reihen live verdrahtet sind.",
+      usage: "Kein Key nötig. Wird für 10Y-Rendite und 2Y-10Y-Zinskurve als offizielle Open-Data-Ergänzung genutzt.",
       testHint: "Open-Data-Test: Treasury Average Interest Rates.",
       testRequest: () => ({ url: "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/avg_interest_rates?sort=-record_date&page[size]=1", responseType: "json" }),
       validateTest: validateFiscalData
@@ -344,7 +353,7 @@
       keyMode: "required",
       security: "browser-ok-private",
       description: "Offizielle Energiequelle für Öl, Gas, Strom und Energiemarktdaten.",
-      usage: "Key nötig. Für Energie-/Rohstoffmodule zugeordnet; nicht als live markiert, bis ein EIA-Abruf erfolgreich war.",
+      usage: "Key nötig. Wird für Öl/Energie als offizieller Datenpfad genutzt, sobald ein erfolgreicher EIA-Abruf vorliegt.",
       testHint: "Browser-Test: EIA APIv2 Root-Metadaten mit API-Key.",
       testRequest: (key) => ({ url: `https://api.eia.gov/v2/?api_key=${encodeURIComponent(key)}`, responseType: "json" }),
       validateTest: validateEiaResponse
@@ -358,7 +367,7 @@
       keyMode: "none",
       security: "browser-ok-public",
       description: "Open-Data-Quelle für globale Länder-, Entwicklungs- und Strukturdaten.",
-      usage: "Kein Key nötig. Für globale Makro- und Länderprofile zugeordnet; konkrete Module nutzen aktuell noch Fallbacks.",
+      usage: "Kein Key nötig. Wird im Makro-Dashboard für globale BIP-/Ländervergleiche genutzt, wenn der Browserabruf erfolgreich ist.",
       testHint: "Open-Data-Test: US GDP-Indikator im JSON-Format.",
       testRequest: () => ({ url: "https://api.worldbank.org/v2/country/US/indicator/NY.GDP.MKTP.CD?format=json&per_page=1", responseType: "json" }),
       validateTest: validateWorldBankResponse
@@ -372,7 +381,7 @@
       keyMode: "none",
       security: "browser-ok-public",
       description: "Offizielle internationale Makroergänzung über IMF DataMapper und IMF APIs.",
-      usage: "Kein Key nötig für DataMapper. Für internationale Makrovergleiche zugeordnet; noch nicht als aktueller Live-Modulprovider markiert.",
+      usage: "Kein Key nötig für DataMapper. Ergänzt globale Makrovergleiche, wenn der Browserabruf erfolgreich ist; World Bank bleibt der stabilere Primärpfad.",
       testHint: "Open-Data-Test: IMF DataMapper Real GDP Growth USA.",
       testRequest: () => ({ url: "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/USA", responseType: "json" }),
       validateTest: validateImfResponse
@@ -1652,7 +1661,7 @@
     { title: "Fed Meeting / Rate Decision", dateOffset: 28, type: "Makro", symbol: "Macro", detail: "Dot Plot, Statement und Pressekonferenz bestimmen den Liquiditätsblick." },
     { title: "EZB Zinsentscheid", dateOffset: 34, type: "Makro", symbol: "DAX", detail: "Wichtig für DAX, EUR/USD und europäische Bewertungsmultiples." },
     { title: "Bitcoin Network / ETF Flow Check", dateOffset: 15, type: "Krypto", symbol: "BTC", detail: "ETF-Flows und Liquidität bleiben kurzfristige Kurstreiber." },
-    { title: "SPY Ex-Dividend Reminder", dateOffset: 42, type: "Dividende", symbol: "SPY", detail: "ETF-spezifischer Dividenden-Termin als lokaler Placeholder." },
+    { title: "SPY Ex-Dividend Reminder", dateOffset: 42, type: "Dividende", symbol: "SPY", detail: "ETF-spezifischer Dividenden-Termin als lokaler Fallback." },
     { title: "Apple Dividend Window", dateOffset: 52, type: "Dividende", symbol: "AAPL", detail: "Lokaler Dividenden-Fallback; spätere Live-Daten über offiziellen Corporate-Action-Adapter." },
     { title: "Amazon Split Monitor", dateOffset: 65, type: "Split", symbol: "AMZN", detail: "Corporate-Action-Slot für Aktiensplits und Reverse Splits vorbereitet." },
     { title: "DAX Dividend Season Check", dateOffset: 74, type: "Dividende", symbol: "DAX", detail: "Europäische Ausschüttungssaison als strukturierter Fallback-Termin." }
@@ -1748,11 +1757,46 @@
       label: "DXY Dollar Index",
       value: 104.2,
       display: "104.2",
-      trend: "Placeholder, da keine saubere Free-Quelle aktiv",
-      source: "Lokaler Placeholder",
+      trend: "Fallback, falls FRED-Dollarindex nicht geladen ist",
+      source: "Lokaler DXY-Fallback",
       status: "fallback"
     }
   ];
+
+  const FRED_MACRO_SERIES = [
+    { id: "FEDFUNDS", seriesId: "FEDFUNDS", label: "Fed Funds Rate", suffix: "%", mode: "level" },
+    { id: "CPIAUCSL", seriesId: "CPIAUCSL", label: "US CPI / Inflation", suffix: "%", mode: "inflation" },
+    { id: "UNRATE", seriesId: "UNRATE", label: "Arbeitslosenquote", suffix: "%", mode: "level" },
+    { id: "DGS10", seriesId: "DGS10", label: "US 10Y Yield", suffix: "%", mode: "level" },
+    { id: "M1", seriesId: "M1SL", label: "Geldmenge M1", suffix: "%", mode: "yoy" },
+    { id: "M2", seriesId: "M2SL", label: "Geldmenge M2", suffix: "%", mode: "yoy" },
+    { id: "REALYIELD", seriesId: "DFII10", label: "Realzins 10Y", suffix: "%", mode: "level" },
+    { id: "YCURVE", seriesId: "T10Y2Y", label: "Yield Curve 2Y-10Y", suffix: "%", mode: "level" },
+    { id: "CBBS", seriesId: "WALCL", label: "Zentralbank-Bilanz", suffix: "%", mode: "yoy" },
+    { id: "DXY", seriesId: "DTWEXBGS", label: "US Dollar Broad Index", suffix: "", mode: "level" }
+  ];
+
+  const FALLBACK_GLOBAL_MACRO = [
+    { country: "USA", indicator: "BIP-Wachstum", value: 2.5, display: "+2.5%", source: "Lokaler World-Bank-Fallback", status: "fallback" },
+    { country: "Deutschland", indicator: "BIP-Wachstum", value: 0.2, display: "+0.2%", source: "Lokaler World-Bank-Fallback", status: "fallback" },
+    { country: "China", indicator: "BIP-Wachstum", value: 4.8, display: "+4.8%", source: "Lokaler World-Bank-Fallback", status: "fallback" }
+  ];
+
+  const SEC_CIK_MAP = {
+    AAPL: "0000320193",
+    MSFT: "0000789019",
+    NVDA: "0001045810",
+    TSLA: "0001318605",
+    META: "0001326801",
+    AMZN: "0001018724",
+    GOOGL: "0001652044",
+    GOOG: "0001652044",
+    JPM: "0000019617",
+    XOM: "0000034088",
+    UNH: "0000731766",
+    COST: "0000909832",
+    WMT: "0000104169"
+  };
 
   const TOP_PICKS = [
     {
@@ -1825,6 +1869,15 @@
     journal: storageGet(STORAGE_KEYS.journal, []),
     recents: storageGet(STORAGE_KEYS.recents, ["NVDA", "MSFT", "AAPL", "BTC"]),
     assetTab: "overview",
+    compare: {
+      left: "NVDA",
+      right: "MSFT"
+    },
+    eventHub: {
+      type: "all",
+      window: "week"
+    },
+    alertFilter: "all",
     screener: {
       search: "",
       momentum: "all",
@@ -1850,6 +1903,8 @@
     fundamentals: {},
     news: {},
     macro: [],
+    globalMacro: [],
+    seriesStats: {},
     events: [],
     assetLoadedAt: {},
     lastHomeRefresh: 0,
@@ -2031,6 +2086,39 @@
       return;
     }
 
+    const alertDone = event.target.closest("[data-alert-done]");
+    if (alertDone) {
+      markAlertDone(alertDone.dataset.alertDone);
+      return;
+    }
+
+    const alertSnooze = event.target.closest("[data-alert-snooze]");
+    if (alertSnooze) {
+      snoozeAlert(alertSnooze.dataset.alertSnooze);
+      return;
+    }
+
+    const alertFilter = event.target.closest("[data-alert-filter]");
+    if (alertFilter) {
+      state.alertFilter = alertFilter.dataset.alertFilter || "all";
+      render();
+      return;
+    }
+
+    const eventFilter = event.target.closest("[data-event-filter]");
+    if (eventFilter) {
+      state.eventHub.type = eventFilter.dataset.eventFilter || "all";
+      render();
+      return;
+    }
+
+    const eventWindow = event.target.closest("[data-event-window]");
+    if (eventWindow) {
+      state.eventHub.window = eventWindow.dataset.eventWindow || "week";
+      render();
+      return;
+    }
+
     const clearInbox = event.target.closest("[data-alert-clear-inbox]");
     if (clearInbox) {
       state.alertInbox = [];
@@ -2062,6 +2150,11 @@
       updateEtfState(etfInput);
     }
 
+    const compareInput = event.target.closest("[data-compare-control]");
+    if (compareInput) {
+      updateCompareState(compareInput);
+    }
+
     const scenarioInput = event.target.closest("[data-portfolio-scenario]");
     if (scenarioInput) {
       updatePortfolioScenario(scenarioInput);
@@ -2077,6 +2170,11 @@
     const etfInput = event.target.closest("[data-etf-control]");
     if (etfInput) {
       updateEtfState(etfInput);
+    }
+
+    const compareInput = event.target.closest("[data-compare-control]");
+    if (compareInput) {
+      updateCompareState(compareInput);
     }
 
     const scenarioInput = event.target.closest("[data-portfolio-scenario]");
@@ -2267,8 +2365,10 @@
 
       ${renderTicker()}
       ${renderDailyBriefingSection()}
+      ${renderDailyRecapSection()}
       ${renderPersonalDashboardPanel()}
       ${renderPersonalModuleStrip()}
+      ${renderQuickCompareSection()}
       ${renderMacroSection()}
       ${renderTopPicksSection()}
 
@@ -2386,6 +2486,66 @@
     `;
   }
 
+  function renderDailyRecapSection() {
+    const recap = dailyRecapForView();
+    return `
+      <section class="section compact-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Tages-Recap</p>
+            <h2>Was habe ich heute verpasst?</h2>
+            <p>Ein kurzer Rückblick aus Marktbewegungen, Watchlist-Hinweisen, News und Events. Live-Daten werden genutzt, Fallbacks bleiben sichtbar.</p>
+          </div>
+          <button class="ghost-button" type="button" data-route="events">Event-Hub öffnen</button>
+        </div>
+        <div class="grid four recap-grid">
+          <article class="card">
+            <span class="card-label">Marktbewegungen</span>
+            <div class="stack-list">
+              ${recap.moves.map((item) => `
+                <button class="brief-row" type="button" data-symbol="${escAttr(item.symbol)}">
+                  <span><strong>${esc(item.symbol)}</strong><small>${esc(item.name)}</small></span>
+                  <span class="${toneClass(item.changePct)}">${formatPercent(item.changePct)}</span>
+                </button>
+              `).join("") || renderEmptyState("Keine größeren Bewegungen geladen.")}
+            </div>
+          </article>
+          <article class="card">
+            <span class="card-label">Wichtige News</span>
+            <div class="stack-list">
+              ${recap.news.map((item) => `
+                <button class="brief-event-row" type="button" data-symbol="${escAttr(item.symbol)}">
+                  <span class="pill">${esc(item.symbol)}</span>
+                  <span><strong>${esc(item.headline)}</strong><small>${esc(item.source)} | ${esc(item.sentiment)}</small></span>
+                </button>
+              `).join("") || renderEmptyState("Keine News im aktuellen Feed.")}
+            </div>
+          </article>
+          <article class="card">
+            <span class="card-label">Events</span>
+            <div class="stack-list">
+              ${recap.events.map((eventItem) => `
+                <button class="brief-event-row" type="button" ${assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : ""}>
+                  <span class="pill">${esc(eventItem.type)}</span>
+                  <span><strong>${esc(eventItem.title)}</strong><small>${eventItem.date.toLocaleDateString("de-DE")} | ${esc(eventItem.symbol)}</small></span>
+                </button>
+              `).join("") || renderEmptyState("Keine heutigen Termine.")}
+            </div>
+          </article>
+          <article class="card">
+            <span class="card-label">Watchlist</span>
+            <h3>${esc(recap.watchlistTone.label)}</h3>
+            <p>${esc(recap.watchlistTone.text)}</p>
+            <div class="metric-grid">
+              ${renderMiniMetric("Hinweise", String(recap.watchlistItems.length))}
+              ${renderMiniMetric("Alerts offen", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "open").length))}
+            </div>
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
   function renderPersonalDashboardPanel() {
     const prefs = dashboardPrefs();
     return `
@@ -2440,6 +2600,108 @@
         </div>
       </section>
     `;
+  }
+
+  function renderQuickCompareSection() {
+    const leftSymbol = assetMap.has(state.compare.left) ? state.compare.left : "NVDA";
+    const rightSymbol = assetMap.has(state.compare.right) ? state.compare.right : "MSFT";
+    ensureAssetData(leftSymbol);
+    ensureAssetData(rightSymbol);
+    return `
+      <section class="section compact-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Quick Compare</p>
+            <h2>Zwei Assets direkt vergleichen</h2>
+            <p>Preis, Tagesbewegung, Market Cap, KGV, Sektor, Rating, Chancen und Risiken nebeneinander. Für Aktien und ETFs nutzbar.</p>
+          </div>
+          ${renderDataMeta(makeMeta("Hybrid: Finnhub, Alpha Vantage, lokale Heuristik", compareStatusFor(leftSymbol, rightSymbol), Date.now()), true)}
+        </div>
+        <article class="card compare-card">
+          <div class="form-grid compare-controls">
+            <label class="field">
+              <span>Asset A</span>
+              <select data-compare-control name="left">${compareOptions(leftSymbol)}</select>
+            </label>
+            <label class="field">
+              <span>Asset B</span>
+              <select data-compare-control name="right">${compareOptions(rightSymbol)}</select>
+            </label>
+          </div>
+          <div class="grid two compare-grid">
+            ${renderCompareAssetCard(leftSymbol)}
+            ${renderCompareAssetCard(rightSymbol)}
+          </div>
+          ${renderCompareVerdict(leftSymbol, rightSymbol)}
+        </article>
+      </section>
+    `;
+  }
+
+  function compareOptions(selected) {
+    return ASSETS
+      .filter((asset) => ["Stock", "ETF", "Index", "Commodity", "Crypto"].includes(asset.type))
+      .map((asset) => `<option value="${escAttr(asset.symbol)}" ${selected === asset.symbol ? "selected" : ""}>${esc(asset.symbol)} - ${esc(asset.name)}</option>`)
+      .join("");
+  }
+
+  function renderCompareAssetCard(symbol) {
+    const asset = getAsset(symbol);
+    const quote = quoteFor(symbol);
+    const profile = profileFor(symbol);
+    const fundamentals = fundamentalsFor(symbol);
+    const technical = technicalFor(symbol, quote);
+    return `
+      <div class="compare-asset-panel">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">${esc(asset.type)}</span>
+            <h3>${esc(symbol)} <small>${esc(profile.name || asset.name)}</small></h3>
+          </div>
+          <span class="score-pill ${technical.tone}">${esc(technical.rating)}</span>
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("Preis", formatMoney(quote.price, asset.currency))}
+          ${renderMiniMetric("Heute", formatPercent(quote.changePct))}
+          ${renderMiniMetric("Market Cap", formatCompactMoney(valueOr(profile.marketCap, fundamentals.marketCap), asset.currency))}
+          ${renderMiniMetric("KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x"))}
+          ${renderMiniMetric("Sektor", profile.sector || asset.sector)}
+          ${renderMiniMetric("Rating", `${technical.probability}%`)}
+        </div>
+        <div class="grid two">
+          <div class="insight-row"><span class="pill">Chance</span><p>${esc(asset.thesis)}</p></div>
+          <div class="insight-row"><span class="pill">Risiko</span><p>${esc(asset.risks)}</p></div>
+        </div>
+        ${renderDataMeta(quote.meta)}
+      </div>
+    `;
+  }
+
+  function renderCompareVerdict(leftSymbol, rightSymbol) {
+    const left = snapshotFor(leftSymbol);
+    const right = snapshotFor(rightSymbol);
+    const winner = left.score === right.score ? null : left.score > right.score ? left : right;
+    const text = winner
+      ? `${winner.symbol} hat im aktuellen Hybrid-Score den stärkeren Mix aus Rating, Momentum, Value/Growth und Datenlage.`
+      : "Beide Assets liegen im aktuellen Hybrid-Score nahezu gleichauf. Der Zweck im Portfolio entscheidet.";
+    return `
+      <div class="compare-verdict">
+        <span class="pill">Einordnung</span>
+        <p>${esc(text)} ${esc(left.symbol)}: ${left.score} Punkte, ${esc(right.symbol)}: ${right.score} Punkte.</p>
+      </div>
+    `;
+  }
+
+  function compareStatusFor(leftSymbol, rightSymbol) {
+    const statuses = [
+      quoteFor(leftSymbol).meta.status,
+      profileFor(leftSymbol).meta.status,
+      fundamentalsFor(leftSymbol).meta.status,
+      quoteFor(rightSymbol).meta.status,
+      profileFor(rightSymbol).meta.status,
+      fundamentalsFor(rightSymbol).meta.status
+    ];
+    return bestDataStatus(statuses);
   }
 
   function renderMacroSection() {
@@ -2728,7 +2990,7 @@
           <div>
             <p class="eyebrow">Screener V1</p>
             <h1>Rankings statt Bauchgefühl.</h1>
-            <p>Filtere ein erweitertes Universum mit ${ASSETS.length} Assets nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener arbeitet hybrid: Live-Quotes werden genutzt, der Research-Score bleibt mit Fallback-Daten stabil.</p>
+            <p>Filtere ein erweitertes Universum mit ${ASSETS.length} Assets nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener nutzt Finnhub-Quotes/Profile/Fundamentals und Alpha-Vantage-Zeitreihen, sobald Keys vorhanden sind; die Heuristik bleibt stabil hybrid.</p>
           </div>
           <button class="ghost-button" type="button" data-screener-reset>Filter zurücksetzen</button>
         </div>
@@ -2749,7 +3011,7 @@
             <div>
               <span class="card-label">Ranking-Liste</span>
               <h3>Gefilterte Assets</h3>
-              <p>Jede Zeile zeigt, ob der Preis live, aus Cache oder aus dem lokalen Fallback stammt.</p>
+              <p>Jede Zeile zeigt, ob Quote, Profil, Fundamentals oder Zeitreihe live/cache-basiert sind oder lokal abgesichert bleiben.</p>
             </div>
             ${renderDataMeta(makeMeta("Lokale Screener Engine + verfügbare Quotes", getOverallDataStatus(), Date.now()), true)}
           </div>
@@ -2798,7 +3060,7 @@
             <span class="score-pill ${row.rating.tone}">${row.score}%</span>
             <span class="${toneClass(row.performance1m)}">${formatPercent(row.performance1m)} 1M</span>
             <span>${formatCompactMoney(row.marketCap, row.currency)}</span>
-            <span class="screener-source">${renderTinyStatus(row.quote.meta.status)} ${esc(statusLabel(row.quote.meta.status))}</span>
+            <span class="screener-source">${renderTinyStatus(row.dataStatus)} ${esc(statusLabel(row.dataStatus))}</span>
           </button>
         `).join("")}
       </div>
@@ -2808,44 +3070,79 @@
   function renderEventsPage() {
     ensureEventData();
     const events = eventsForView();
-    const eventStatus = events.some((eventItem) => eventItem.meta.status === "live") ? "live" : events.some((eventItem) => eventItem.meta.status === "stale") ? "stale" : "fallback";
+    const filtered = filteredEventHubEvents(events);
+    const eventStatus = bestDataStatus(events.map((eventItem) => eventItem.meta.status));
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Events V1</p>
-            <h1>Earnings, Dividenden und Makro-Termine.</h1>
-            <p>Events sind klar zugeordnet: Finnhub liefert Earnings, Alpha Vantage ergänzt IPO-/Earnings-Pfade, SEC/EDGAR bleibt die offizielle Filings-Basis. Dividenden, Splits und Makrotermine bleiben lokal transparent abgesichert.</p>
+            <p class="eyebrow">Event- / Earnings-Hub</p>
+            <h1>Termine, Earnings, IPOs und Watchlist-Ereignisse.</h1>
+            <p>Events sind klar zugeordnet: Finnhub liefert Earnings, Alpha Vantage ergänzt Earnings- und IPO-Kalender als CSV-Livepfad, SEC/EDGAR bleibt die offizielle Filings-Basis. Dividenden, Splits und Makrotermine bleiben lokal transparent abgesichert.</p>
           </div>
         </div>
         ${renderEventProviderPanel()}
+        ${renderEventHubFilters(events)}
         <div class="grid two">
           <article class="card">
             <div class="card-topline">
               <div>
-                <span class="card-label">Earnings Kalender</span>
-              <h3>Asset Events</h3>
-            </div>
+                <span class="card-label">Gefilterte Termine</span>
+                <h3>${filtered.length} Events</h3>
+              </div>
               ${renderStatusBadge(eventStatus)}
             </div>
             <div class="event-list">
-              ${events.filter((eventItem) => eventItem.type !== "Makro").map(renderEventCard).join("") || renderEmptyState("Keine Asset-Events verfügbar. Fallback-Kalender bleibt vorbereitet.")}
+              ${filtered.map(renderEventCard).join("") || renderEmptyState("Keine Termine für diesen Filter. Zeitraum oder Typ erweitern.")}
             </div>
           </article>
           <article class="card">
             <div class="card-topline">
               <div>
-                <span class="card-label">Makro Kalender</span>
-              <h3>Fed / EZB / CPI</h3>
-            </div>
+                <span class="card-label">Watchlist-Relevanz</span>
+                <h3>Was betrifft dich direkt?</h3>
+              </div>
               ${renderStatusBadge(eventStatus)}
             </div>
             <div class="event-list">
-              ${events.filter((eventItem) => eventItem.type === "Makro").map(renderEventCard).join("") || renderEmptyState("Keine Makrotermine im aktuellen Fenster.")}
+              ${events.filter(isWatchlistRelevantEvent).slice(0, 8).map(renderEventCard).join("") || renderEmptyState("Keine Watchlist-relevanten Termine im aktuellen Fenster.")}
             </div>
           </article>
         </div>
       </section>
+    `;
+  }
+
+  function renderEventHubFilters(events) {
+    const counts = eventHubCounts(events);
+    const typeFilters = [
+      ["all", "Alle", counts.all],
+      ["earnings", "Earnings", counts.earnings],
+      ["dividend", "Dividenden", counts.dividend],
+      ["macro", "Makro", counts.macro],
+      ["ipo", "IPOs", counts.ipo]
+    ];
+    const windowFilters = [
+      ["today", "Heute"],
+      ["week", "Diese Woche"],
+      ["next", "Nächste Woche"]
+    ];
+    return `
+      <article class="card event-filter-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Filter</span>
+            <h3>Typ und Zeitraum</h3>
+          </div>
+          ${renderDataMeta(makeMeta("Event-Hub Filter", bestDataStatus(events.map((eventItem) => eventItem.meta.status)), Date.now()), true)}
+        </div>
+        <div class="chip-row">
+          ${typeFilters.map(([value, label, count]) => `<button class="chip ${state.eventHub.type === value ? "active" : ""}" type="button" data-event-filter="${escAttr(value)}">${esc(label)} ${count}</button>`).join("")}
+        </div>
+        <div class="chip-row">
+          ${windowFilters.map(([value, label]) => `<button class="chip ${state.eventHub.window === value ? "active" : ""}" type="button" data-event-window="${escAttr(value)}">${esc(label)}</button>`).join("")}
+        </div>
+      </article>
     `;
   }
 
@@ -2908,10 +3205,37 @@
             `).join("")}
           </div>
         </article>
+        ${renderGlobalMacroCard()}
         <div class="grid four macro-deep-grid">
           ${macro.map((item) => renderMacroDeepCard(item)).join("")}
         </div>
       </section>
+    `;
+  }
+
+  function renderGlobalMacroCard() {
+    const rows = state.globalMacro.length ? state.globalMacro : fallbackGlobalMacro("Globale Open-Data-Fallbacks aktiv.");
+    const status = bestDataStatus(rows.map((row) => row.meta?.status || row.status));
+    return `
+      <article class="card macro-context-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Globale Makro-/Ländervergleiche</span>
+            <h3>World Bank / IMF Dateninput</h3>
+            <p>Diese Karte ersetzt allgemeine Länderstatik durch echte Open-Data-Reihen, wenn die Quellen im Browser erreichbar sind.</p>
+          </div>
+          ${renderStatusBadge(status)}
+        </div>
+        <div class="grid three">
+          ${rows.slice(0, 6).map((row) => `
+            <div class="snapshot-tile">
+              <span>${esc(row.indicator)}</span>
+              <strong>${esc(row.country)} ${esc(row.display)}</strong>
+              <p>${esc(row.source || row.meta?.source || "Open Data / Fallback")}</p>
+            </div>
+          `).join("")}
+        </div>
+      </article>
     `;
   }
 
@@ -3175,13 +3499,15 @@
   function renderAlertsPage() {
     ensureHomeData();
     checkAlerts(false);
+    const filteredAlerts = alertsForView();
+    const inbox = alertInboxForView();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Alerts V1</p>
-            <h1>Lokale Signale, ohne Backend-Zwang.</h1>
-            <p>Preis-Alerts, Watchlist-Hinweise und vorbereitete News/Sentiment-Hinweise werden im Browser gespeichert und lokal geprüft.</p>
+            <p class="eyebrow">Alerts V2</p>
+            <h1>Lokale Signale mit Priorität, Status und Snooze.</h1>
+            <p>Preis-, Watchlist-, Sentiment- und Event-Hinweise bleiben vollständig lokal im Browser. Neu: offen/ausgelöst/erledigt, Priorität, Snooze und Historie.</p>
           </div>
           <button class="ghost-button" type="button" data-alert-check>Jetzt prüfen</button>
         </div>
@@ -3201,7 +3527,8 @@
                   <option value="price">Preis-Alert</option>
                   <option value="watchlist">Watchlist-Alert</option>
                   <option value="sentiment">News-/Sentiment-Hinweis</option>
-                  <option value="earnings">Earnings-/Event-Reminder</option>
+                  <option value="earnings">Earnings-Reminder</option>
+                  <option value="event">Event-Hinweis</option>
                 </select>
               </label>
               <label class="field">
@@ -3216,6 +3543,14 @@
                 <span>Zielwert</span>
                 <input name="target" type="number" step="0.01" placeholder="z. B. 900 oder 3">
               </label>
+              <label class="field">
+                <span>Priorität</span>
+                <select name="priority">
+                  <option value="high">hoch</option>
+                  <option value="medium" selected>mittel</option>
+                  <option value="low">niedrig</option>
+                </select>
+              </label>
               <button class="primary-button" type="submit">Alert speichern</button>
             </form>
             <p class="small">Preis-Alerts prüfen Kurslevel. Watchlist-, Sentiment- und Event-Hinweise nutzen lokal verfügbare Kurs-, News- und Kalenderdaten.</p>
@@ -3224,22 +3559,25 @@
             <div class="card-topline">
               <div>
                 <span class="card-label">Alert Inbox</span>
-                <h3>${state.alertInbox.length} Hinweise</h3>
+                <h3>${inbox.length} Hinweise</h3>
               </div>
               <button class="ghost-button" type="button" data-alert-clear-inbox>Leeren</button>
             </div>
             <div class="stack-list">
-              ${state.alertInbox.slice(0, 6).map((item) => `
+              ${inbox.slice(0, 8).map((item) => `
                 <div class="alert-inbox-row">
-                  <strong>${esc(item.title)}</strong>
-                  <span class="small">${esc(item.message)} | ${formatTimestamp(item.timestamp)}</span>
+                  <div>
+                    <strong>${esc(item.title)}</strong>
+                    <span class="small">${esc(item.message)} | ${formatTimestamp(item.timestamp)}</span>
+                  </div>
+                  <span class="pill ${item.priority === "high" ? "bear" : item.priority === "low" ? "neutral" : ""}">${esc(priorityLabel(item.priority))}</span>
                 </div>
               `).join("") || renderEmptyState("Noch keine Hinweise. Alerts prüfen sich lokal anhand der verfügbaren Daten.")}
             </div>
             <div class="metric-grid">
-              ${renderMiniMetric("Preis", String(state.alerts.filter((alert) => alert.type === "price").length))}
-              ${renderMiniMetric("Watchlist", String(state.alerts.filter((alert) => alert.type === "watchlist").length))}
-              ${renderMiniMetric("Events", String(state.alerts.filter((alert) => alert.type === "earnings").length))}
+              ${renderMiniMetric("Offen", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "open").length))}
+              ${renderMiniMetric("Ausgelöst", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "triggered").length))}
+              ${renderMiniMetric("Erledigt", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "done").length))}
             </div>
           </article>
         </div>
@@ -3249,15 +3587,31 @@
           <div class="card-topline">
             <div>
               <span class="card-label">Gespeicherte Alerts</span>
-              <h3>${state.alerts.length} aktive Regeln</h3>
+              <h3>${filteredAlerts.length} Regeln im Filter</h3>
             </div>
             ${renderDataMeta(makeMeta("Lokaler Browser-Speicher", "live", Date.now()), true)}
           </div>
+          ${renderAlertFilters()}
           <div class="alert-list">
-            ${state.alerts.map(renderAlertRow).join("") || renderEmptyState("Noch keine Alerts gespeichert.")}
+            ${filteredAlerts.map(renderAlertRow).join("") || renderEmptyState("Keine Alerts in diesem Filter.")}
           </div>
         </article>
       </section>
+    `;
+  }
+
+  function renderAlertFilters() {
+    const filters = [
+      ["all", "Alle"],
+      ["price", "Preis"],
+      ["earnings", "Earnings"],
+      ["event", "Event"],
+      ["watchlist", "Watchlist"]
+    ];
+    return `
+      <div class="chip-row alert-filter-row">
+        ${filters.map(([value, label]) => `<button class="chip ${state.alertFilter === value ? "active" : ""}" type="button" data-alert-filter="${escAttr(value)}">${esc(label)}</button>`).join("")}
+      </div>
     `;
   }
 
@@ -3431,7 +3785,7 @@
         </div>
       </section>
       <section class="section">
-        <div class="grid two">
+        <div class="grid three">
           <article class="card">
             <div class="card-topline">
               <div>
@@ -3444,9 +3798,30 @@
             <p><strong>Risiko:</strong> ${esc(asset.risks)}</p>
             ${renderDataMeta(profile.meta)}
           </article>
+          ${renderSecFilingsCard(symbol)}
           ${renderSentimentDetail(sentiment)}
         </div>
       </section>
+    `;
+  }
+
+  function renderSecFilingsCard(symbol) {
+    const cik = SEC_CIK_MAP[symbol];
+    const url = cik ? `https://www.sec.gov/edgar/browse/?CIK=${encodeURIComponent(cik)}&owner=exclude` : "https://www.sec.gov/edgar/search/";
+    const meta = makeMeta("SEC / EDGAR offizieller Filings-Link", "fallback", BOOT_TIME, "Browserkritische Open-Data-Quelle: direkte SEC-JSON-Abrufe bleiben für öffentliche Frontends bewusst vorsichtig.");
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">SEC / Filings</span>
+            <h3>${cik ? `CIK ${esc(cik)}` : "Filings-Suche"}</h3>
+          </div>
+          ${renderStatusBadge("fallback")}
+        </div>
+        <p>Offizielle Filings werden über SEC/EDGAR verlinkt. JSON/XBRL bleibt im Browser bewusst nicht als grüner Live-Status markiert, weil SEC-Zugriffe in öffentlichen Frontends robust über einen späteren Datenadapter laufen sollten.</p>
+        <a class="ghost-button" href="${escAttr(url)}" target="_blank" rel="noreferrer">SEC Filings öffnen</a>
+        ${renderDataMeta(meta)}
+      </article>
     `;
   }
 
@@ -3778,7 +4153,7 @@
             </label>
             <button class="primary-button" type="button">Eintragen</button>
           </form>
-          ${renderDataMeta(makeMeta("Brevo Placeholder", "fallback", BOOT_TIME, "Newsletter-Backend ist in der statischen Version nicht aktiv."))}
+          ${renderDataMeta(makeMeta("Brevo Fallback", "fallback", BOOT_TIME, "Newsletter-Backend ist in der statischen Version nicht aktiv."))}
         </article>
       </section>
     `;
@@ -4038,6 +4413,7 @@
           ${renderProviderSummary("Veralteter Cache", summary.stale, "Cache statt frischer API")}
           ${renderProviderSummary("Fehler/fehlend", summary.error + summary.missing, "Handlungsbedarf")}
         </div>
+        ${renderDataHealthSourcesOverview()}
         <article class="card">
           <div class="card-topline">
             <div>
@@ -4052,6 +4428,133 @@
         </article>
       </section>
     `;
+  }
+
+  function renderDataHealthSourcesOverview() {
+    const rows = dataHealthModuleRows();
+    return `
+      <article class="card data-health-overview-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Quellenübersicht</span>
+            <h3>Module, Provider und Datenstatus</h3>
+          </div>
+          ${renderDataMeta(makeMeta("Lokale Quellenmatrix + Provider Health", getOverallDataStatus(), Date.now()), true)}
+        </div>
+        <p>Diese Übersicht trennt bewusst Live-Daten, Fallback-Daten und Hybrid-Logik. Ein Modul wird nur als live markiert, wenn mindestens eine zugeordnete Quelle in dieser Sitzung erfolgreich geliefert hat.</p>
+        <div class="source-overview-grid">
+          ${rows.map(renderDataHealthSourceCard).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderDataHealthSourceCard(row) {
+    return `
+      <div class="source-overview-card">
+        <div class="card-topline compact-topline">
+          <div>
+            <span class="card-label">${esc(row.mode)}</span>
+            <h4>${esc(row.module)}</h4>
+          </div>
+          ${renderStatusBadge(row.status)}
+        </div>
+        <div class="module-chip-row">
+          ${row.providers.map((providerId) => {
+            const provider = providerById(providerId);
+            const health = providerHealthFor(providerId);
+            return `<span class="module-chip">${esc(provider ? provider.name : providerId)} · ${esc(providerHealthShortLabel(health.status))}</span>`;
+          }).join("")}
+        </div>
+        <p>${esc(row.note)}</p>
+        <div class="data-health-meta">
+          <span><strong>Letzter Abruf:</strong> ${esc(formatTimestamp(row.timestamp))}</span>
+          <span><strong>Status:</strong> ${esc(row.statusText)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function dataHealthModuleRows() {
+    return [
+      dataHealthModuleRow("Screener", ["finnhub", "alphaVantage"], "Hybrid", "Quotes und Profile kommen bevorzugt live; Scoring bleibt Produktlogik mit Fallback-Sicherheitsnetz."),
+      dataHealthModuleRow("Asset-Seiten", ["finnhub", "sec", "alphaVantage"], "Hybrid", "Preis, Profil, News und Events nutzen Live-Daten, sofern verfügbar; Research-Snapshot bleibt kuratiert."),
+      dataHealthModuleRow("Events / Earnings", ["finnhub", "alphaVantage"], "Live/Fallback", "Earnings und IPOs werden providerbasiert geladen; lokaler Kalender bleibt Backup."),
+      dataHealthModuleRow("Makro / Geldmengen", ["fred", "bls", "treasury"], "Live/Fallback", "US-Makro, Geldmengen, CPI, Arbeitsmarkt und Renditen laufen über offizielle Quellen mit Fallback."),
+      dataHealthModuleRow("Euro-Makro", ["ecb"], "Open Data", "ECB ist als offene Quelle ohne Key vorgesehen und wird nur nach erfolgreichem Abruf live gezählt."),
+      dataHealthModuleRow("Energie / Rohstoffe / FX", ["eia", "alphaVantage"], "Live/Fallback", "EIA liefert Energiedaten, Alpha Vantage ergänzt Rohstoffe und Währungen."),
+      dataHealthModuleRow("Globale Länderdaten", ["worldBank", "imf", "oecd"], "Open Data", "World Bank ist Primärpfad; IMF/OECD sind ergänzende offene Makroquellen."),
+      dataHealthModuleRow("Portfolio / Journal / Reports", ["finnhub"], "Hybrid", "Nutzer- und App-Logik bleibt lokal; Marktdaten werden soweit möglich aus Live-Quotes gespeist.")
+    ];
+  }
+
+  function dataHealthModuleRow(moduleName, providerIds, mode, note) {
+    const healthItems = providerIds.map(providerHealthFor);
+    const statuses = healthItems.map((health) => health.status);
+    const status = aggregateHealthStatus(statuses);
+    const timestamp = Math.max(...healthItems.map((health) => Number(health.lastSuccess || health.timestamp || BOOT_TIME)), BOOT_TIME);
+    return {
+      module: moduleName,
+      providers: providerIds,
+      mode,
+      note,
+      status,
+      timestamp,
+      statusText: moduleStatusText(statuses)
+    };
+  }
+
+  function aggregateHealthStatus(statuses) {
+    if (statuses.includes("live")) {
+      return "live";
+    }
+    if (statuses.includes("stale")) {
+      return "stale";
+    }
+    if (statuses.includes("fallback")) {
+      return "fallback";
+    }
+    if (statuses.every((status) => status === "missing")) {
+      return "missing";
+    }
+    if (statuses.includes("error") && !statuses.some((status) => ["prepared", "mapped", "notUsed"].includes(status))) {
+      return "error";
+    }
+    return "fallback";
+  }
+
+  function moduleStatusText(statuses) {
+    if (statuses.includes("live")) {
+      return "Mindestens eine Quelle hat in dieser Sitzung live geliefert.";
+    }
+    if (statuses.includes("stale")) {
+      return "Es gibt Daten, aber sie stammen aus Cache oder sind nicht frisch.";
+    }
+    if (statuses.includes("fallback")) {
+      return "Fallback aktiv, Live-Abruf fehlt oder ist noch nicht erfolgt.";
+    }
+    if (statuses.includes("missing")) {
+      return "Für mindestens eine Key-Quelle fehlt noch ein Key.";
+    }
+    if (statuses.includes("error")) {
+      return "Mindestens ein Abruf ist fehlgeschlagen.";
+    }
+    return "Zugeordnet oder Open Data, aber aktuell nicht live genutzt.";
+  }
+
+  function providerHealthShortLabel(status) {
+    const labels = {
+      live: "live",
+      stale: "Cache",
+      fallback: "Fallback",
+      prepared: "zugeordnet",
+      mapped: "zugeordnet",
+      notUsed: "nicht genutzt",
+      missing: "Key fehlt",
+      error: "Fehler",
+      disabled: "deaktiviert"
+    };
+    return labels[status] || status || "unklar";
   }
 
   function renderProviderHealthRow(provider) {
@@ -4202,6 +4705,7 @@
           <span class="provider-test-status ${test.className}">${esc(test.label)}</span>
           <span class="small">${esc(test.message || provider.testHint)}</span>
         </div>
+        ${renderProviderDebugDetails(provider, test)}
         <div class="card-actions provider-actions">
           <button class="ghost-button" type="button" data-test-provider="${escAttr(provider.id)}">Testen</button>
           ${provider.keyMode !== "none" ? `<button class="ghost-button" type="button" data-delete-provider-key="${escAttr(provider.id)}">Key löschen</button>` : ""}
@@ -4212,6 +4716,52 @@
         </div>
       </article>
     `;
+  }
+
+  function renderProviderDebugDetails(provider, test) {
+    if (!provider || provider.id !== "fred" || !test.details) {
+      return "";
+    }
+    const details = test.details;
+    const rows = [
+      ["Codepfad", details.codePath],
+      ["Endpoint", details.endpoint],
+      ["HTTP-Methode", details.method],
+      ["Pfad", details.path],
+      ["api_key gesetzt", details.apiKeyParamPresent ? "ja" : "nein"],
+      ["file_type", details.fileTypeJson ? "json gesetzt" : `nicht json (${details.fileType || "fehlt"})`],
+      ["Key im Feld", keyShapeText(details.inputKey)],
+      ["Key gespeichert", keyShapeText(details.savedKey)],
+      ["Key aus Storage", keyShapeText(details.storageKey)],
+      ["Key gesendet", keyShapeText(details.sentKey)],
+      ["Gespeichert = gesendet", details.savedEqualsSent ? "ja" : "nein"],
+      ["Storage = gespeichert", details.storageEqualsSaved ? "ja" : "nein"],
+      ["Stage", details.stage],
+      ["HTTP-Status", details.httpStatus],
+      ["Content-Type", details.contentType],
+      ["Response-Format", details.responseFormat],
+      ["Parsing", details.parseStatus],
+      ["FRED-Fehler", details.fredError || "kein FRED-error_message Feld"]
+    ];
+    return `
+      <details class="provider-debug">
+        <summary>FRED Diagnose anzeigen</summary>
+        <div class="provider-debug-grid">
+          ${rows.map(([label, value]) => `
+            <span>${esc(label)}</span>
+            <strong>${esc(value ?? "nicht verfügbar")}</strong>
+          `).join("")}
+        </div>
+        ${details.responseBody ? `<pre>${esc(details.responseBody)}</pre>` : ""}
+      </details>
+    `;
+  }
+
+  function keyShapeText(shape) {
+    if (!shape) {
+      return "nicht verfügbar";
+    }
+    return `${shape.mask}; roh ${shape.rawLength}, getrimmt ${shape.trimmedLength}; trim ${shape.trimChanged ? "ja" : "nein"}; Whitespace ${shape.hasWhitespace ? "ja" : "nein"}; 32 Kleinbuchstaben/Zahlen ${shape.lowercaseAlnum32 ? "ja" : "nein"}`;
   }
 
   function renderProviderKeyField(provider, keyValue) {
@@ -4260,27 +4810,31 @@
       return {
         label: "Nicht getestet",
         className: "test-untested",
-        message: "Noch kein Test ausgeführt."
+        message: "Noch kein Test ausgeführt.",
+        details: null
       };
     }
     if (test.status === "ok") {
       return {
         label: "Test OK",
         className: "test-ok",
-        message: test.message || "Provider hat geantwortet."
+        message: test.message || "Provider hat geantwortet.",
+        details: test.details || null
       };
     }
     if (test.status === "warn") {
       return {
         label: "Hinweis",
         className: "test-warn",
-        message: test.message || "Provider ist vorbereitet, aber nicht live getestet."
+        message: test.message || "Provider ist vorbereitet, aber nicht live getestet.",
+        details: test.details || null
       };
     }
     return {
       label: "Fehler",
       className: "test-error",
-      message: test.message || "Provider-Test fehlgeschlagen."
+      message: test.message || "Provider-Test fehlgeschlagen.",
+      details: test.details || null
     };
   }
 
@@ -4482,6 +5036,7 @@
         state.quotes[symbol] = await api.getQuote(symbol);
       }));
       state.macro = await api.getMacro();
+      state.globalMacro = await api.getGlobalMacro();
       state.lastHomeRefresh = Date.now();
       checkAlerts(false);
     } catch (error) {
@@ -4505,9 +5060,25 @@
 
     state.loadingScreener = true;
     try {
-      const symbols = filteredScreenerRows().slice(0, 12).map((row) => row.symbol);
-      await Promise.all(symbols.map(async (symbol) => {
+      const rows = filteredScreenerRows();
+      const quoteSymbols = rows.slice(0, SCREENER_LIVE_LIMITS.quotes).map((row) => row.symbol);
+      await Promise.all(quoteSymbols.map(async (symbol) => {
         state.quotes[symbol] = await api.getQuote(symbol);
+      }));
+      const equitySymbols = rows
+        .filter((row) => ["Stock", "ETF"].includes(row.type))
+        .map((row) => row.symbol);
+      await Promise.all(equitySymbols.slice(0, SCREENER_LIVE_LIMITS.profiles).map(async (symbol) => {
+        state.profiles[symbol] = await api.getProfile(symbol);
+      }));
+      await Promise.all(equitySymbols.slice(0, SCREENER_LIVE_LIMITS.fundamentals).map(async (symbol) => {
+        state.fundamentals[symbol] = await api.getFundamentals(symbol);
+      }));
+      await Promise.all(equitySymbols.slice(0, SCREENER_LIVE_LIMITS.series).map(async (symbol) => {
+        const stats = await api.getDailyStats(symbol);
+        if (stats) {
+          state.seriesStats[symbol] = stats;
+        }
       }));
       state.lastScreenerRefresh = Date.now();
     } catch (error) {
@@ -4531,16 +5102,20 @@
 
     state.loadingAssets[symbol] = true;
     try {
-      const [quote, profile, fundamentals, news] = await Promise.all([
+      const [quote, profile, fundamentals, news, seriesStats] = await Promise.all([
         api.getQuote(symbol),
         api.getProfile(symbol),
         api.getFundamentals(symbol),
-        api.getCompanyNews(symbol)
+        api.getCompanyNews(symbol),
+        api.getDailyStats(symbol)
       ]);
       state.quotes[symbol] = quote;
       state.profiles[symbol] = profile;
       state.fundamentals[symbol] = fundamentals;
       state.news[symbol] = news;
+      if (seriesStats) {
+        state.seriesStats[symbol] = seriesStats;
+      }
       state.assetLoadedAt[symbol] = Date.now();
     } catch (error) {
       logError(error);
@@ -4585,8 +5160,20 @@
         return this.getCryptoQuote(symbol);
       }
 
-      if (asset.type === "Commodity" || asset.type === "Index") {
-        return fallbackQuote(symbol, "Kostenlose Live-Quelle für dieses Asset nicht konfiguriert.");
+      if (asset.type === "Commodity") {
+        const commodityQuote = await this.getCommodityQuote(symbol);
+        if (commodityQuote) {
+          return commodityQuote;
+        }
+        return fallbackQuote(symbol, "Kein Rohstoff-Key oder API-Fehler. Lokaler Commodity-Fallback aktiv.");
+      }
+
+      if (asset.type === "Index") {
+        const indexQuote = await this.getAlphaQuote(symbol);
+        if (indexQuote) {
+          return indexQuote;
+        }
+        return fallbackQuote(symbol, "Index-Livequelle nicht sauber verfügbar. Lokaler Index-Fallback aktiv.");
       }
 
       const finnhubKey = cleanKey(state.apiKeys.finnhub);
@@ -4639,6 +5226,109 @@
       }
 
       return fallbackQuote(symbol, "Kein Quote-Key oder API-Fehler.");
+    },
+
+    async getAlphaQuote(symbol) {
+      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
+      if (!alphaKey) {
+        return null;
+      }
+      try {
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(alphaKey)}`;
+        const result = await cachedJson(`alpha:quote:${symbol}`, url, CACHE_TTL.quote, "alphaVantage");
+        const quote = result.data && result.data["Global Quote"];
+        if (!quote || !quote["05. price"]) {
+          throw new Error("Alpha Vantage Quote nicht verfügbar");
+        }
+        return {
+          symbol,
+          price: Number(quote["05. price"]),
+          changePct: Number(String(quote["10. change percent"] || "0").replace("%", "")),
+          changeAbs: Number(quote["09. change"] || 0),
+          meta: makeMeta("Alpha Vantage GLOBAL_QUOTE", result.status, result.timestamp)
+        };
+      } catch (error) {
+        logError(error);
+        return null;
+      }
+    },
+
+    async getCommodityQuote(symbol) {
+      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
+      if (alphaKey) {
+        const alphaQuote = await this.getAlphaCommodityQuote(symbol, alphaKey);
+        if (alphaQuote) {
+          return alphaQuote;
+        }
+      } else {
+        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key für Gold/Silber/WTI hinterlegt.");
+      }
+
+      if (symbol === "OIL") {
+        const eiaKey = cleanKey(state.apiKeys.eia);
+        if (eiaKey) {
+          const eiaQuote = await this.getEiaOilQuote(eiaKey);
+          if (eiaQuote) {
+            return eiaQuote;
+          }
+        } else {
+          recordProviderHealth("eia", "missing", "Kein EIA Key für Öl/Energie hinterlegt.");
+        }
+      }
+      return null;
+    },
+
+    async getAlphaCommodityQuote(symbol, key) {
+      const config = {
+        GOLD: { fn: "GOLD_SILVER_SPOT", symbol: "GOLD", source: "Alpha Vantage GOLD_SILVER_SPOT" },
+        SILVER: { fn: "GOLD_SILVER_SPOT", symbol: "SILVER", source: "Alpha Vantage GOLD_SILVER_SPOT" },
+        OIL: { fn: "WTI", source: "Alpha Vantage WTI" }
+      }[symbol];
+      if (!config) {
+        return null;
+      }
+      try {
+        const url = config.fn === "WTI"
+          ? `https://www.alphavantage.co/query?function=WTI&interval=daily&apikey=${encodeURIComponent(key)}`
+          : `https://www.alphavantage.co/query?function=GOLD_SILVER_SPOT&symbol=${encodeURIComponent(config.symbol)}&apikey=${encodeURIComponent(key)}`;
+        const result = await cachedJson(`alpha:commodity:${symbol}`, url, CACHE_TTL.quote, "alphaVantage");
+        const price = extractAlphaCommodityPrice(result.data);
+        if (!Number.isFinite(price)) {
+          throw new Error("Alpha Vantage Rohstoffantwort ohne Preis");
+        }
+        return {
+          symbol,
+          price,
+          changePct: commodityChangeFromFallback(symbol, price),
+          changeAbs: 0,
+          meta: makeMeta(config.source, result.status, result.timestamp)
+        };
+      } catch (error) {
+        logError(error);
+        return null;
+      }
+    },
+
+    async getEiaOilQuote(key) {
+      try {
+        const url = `https://api.eia.gov/v2/petroleum/pri/spt/data/?frequency=daily&data[0]=value&facets[series][]=RWTC&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=${encodeURIComponent(key)}`;
+        const result = await cachedJson("eia:oil:wti", url, CACHE_TTL.quote, "eia");
+        const row = result.data && Array.isArray(result.data.response?.data) ? result.data.response.data[0] : null;
+        const price = row ? Number(row.value) : NaN;
+        if (!Number.isFinite(price)) {
+          throw new Error("EIA Ölantwort ohne Preis");
+        }
+        return {
+          symbol: "OIL",
+          price,
+          changePct: commodityChangeFromFallback("OIL", price),
+          changeAbs: 0,
+          meta: makeMeta("EIA APIv2 WTI Spot", result.status, result.timestamp)
+        };
+      } catch (error) {
+        logError(error);
+        return null;
+      }
     },
 
     async getCryptoQuote(symbol) {
@@ -4718,18 +5408,20 @@
           if (!Object.keys(metric).length) {
             throw new Error("Finnhub Metrics leer");
           }
+          const marketCap = normalizeFinnhubMarketCap(firstNumber(metric.marketCapitalization, metric.marketCapitalizationBasic, metric.marketCap));
+          const revenue = firstNumber(metric.revenueTTM, metric.revenuePerShareTTM && metric.sharesOutstanding ? metric.revenuePerShareTTM * metric.sharesOutstanding : null, asset.fallback.revenue);
           return {
             symbol,
-            marketCap: asset.fallback.marketCap,
+            marketCap: marketCap || asset.fallback.marketCap,
             pe: firstNumber(metric.peBasicExclExtraTTM, metric.peNormalizedAnnual, asset.fallback.pe),
             eps: firstNumber(metric.epsBasicExclExtraItemsTTM, metric.epsInclExtraItemsTTM, asset.fallback.eps),
-            revenue: asset.fallback.revenue,
-            profit: analysisFor(symbol).profit,
-            margin: analysisFor(symbol).margin,
-            grossMargin: analysisFor(symbol).grossMargin,
-            cashflow: analysisFor(symbol).cashflow,
-            debt: analysisFor(symbol).debt,
-            revenueGrowth: analysisFor(symbol).revenueGrowth,
+            revenue,
+            profit: firstNumber(metric.netIncomeCommonTTM, metric.netIncomeCommonAnnual, analysisFor(symbol).profit),
+            margin: firstNumber(metric.netProfitMarginTTM, metric.operatingMarginTTM, analysisFor(symbol).margin),
+            grossMargin: firstNumber(metric.grossMarginTTM, metric.grossMarginAnnual, analysisFor(symbol).grossMargin),
+            cashflow: firstNumber(metric.freeCashFlowTTM, metric.operatingCashFlowTTM, analysisFor(symbol).cashflow),
+            debt: firstNumber(metric.totalDebt, metric.totalDebtAnnual, analysisFor(symbol).debt),
+            revenueGrowth: firstNumber(metric.revenueGrowthTTMYoy, metric.revenueGrowthQuarterlyYoy, analysisFor(symbol).revenueGrowth),
             beta: firstNumber(metric.beta, null),
             meta: makeMeta("Finnhub Basic Financials", result.status, result.timestamp)
           };
@@ -4782,35 +5474,72 @@
       return fallbackNews(symbol, "Kein Finnhub News-Key oder API-Fehler.");
     },
 
-    async getMacro() {
-      const fredKey = cleanKey(state.apiKeys.fred);
-      if (!fredKey) {
-        recordProviderHealth("fred", "missing", "Kein FRED Key hinterlegt. Makro nutzt Fallbacks.");
-        return fallbackMacro("Kein FRED Key hinterlegt.");
+    async getDailyStats(symbol) {
+      const asset = getAsset(symbol);
+      if (!["Stock", "ETF"].includes(asset.type)) {
+        return null;
       }
-
+      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
+      if (!alphaKey) {
+        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key für Zeitreihen/Performance hinterlegt.");
+        return null;
+      }
       try {
-        const series = [
-          { id: "FEDFUNDS", label: "Fed Funds Rate", suffix: "%", mode: "level" },
-          { id: "CPIAUCSL", label: "US CPI / Inflation", suffix: "%", mode: "inflation" },
-          { id: "UNRATE", label: "Arbeitslosenquote", suffix: "%", mode: "level" },
-          { id: "DGS10", label: "US 10Y Yield", suffix: "%", mode: "level" }
-        ];
-        const rows = await Promise.all(series.map((item) => fetchFredSeries(item, fredKey)));
-        rows.push({
-          id: "DXY",
-          label: "DXY Dollar Index",
-          value: 104.2,
-          display: "104.2",
-          trend: "Placeholder, später über Markt-API anbinden",
-          meta: makeMeta("Lokaler DXY Placeholder", "fallback", BOOT_TIME)
-        });
-        return rows;
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${encodeURIComponent(alphaKey)}`;
+        const result = await cachedJson(`alpha:daily:${symbol}`, url, CACHE_TTL.series, "alphaVantage");
+        const series = result.data && result.data["Time Series (Daily)"] ? result.data["Time Series (Daily)"] : {};
+        const rows = Object.entries(series)
+          .map(([date, values]) => ({ date, close: Number(values["4. close"]) }))
+          .filter((row) => Number.isFinite(row.close))
+          .sort((a, b) => b.date.localeCompare(a.date));
+        if (rows.length < 22) {
+          throw new Error("Alpha Vantage Tagesreihe enthält zu wenige Datenpunkte");
+        }
+        return dailyStatsFromRows(symbol, rows, result);
       } catch (error) {
         logError(error);
-        recordProviderHealth("fred", "fallback", "FRED API nicht erreichbar, Rate Limit oder CORS-Block.");
-        return fallbackMacro("FRED API nicht erreichbar, Rate Limit oder CORS-Block.");
+        return null;
       }
+    },
+
+    async getMacro() {
+      const rows = [];
+      const fredKey = cleanKey(state.apiKeys.fred);
+
+      if (fredKey) {
+        try {
+          const fredRows = await Promise.all(FRED_MACRO_SERIES.map((item) => fetchFredSeries(item, fredKey)));
+          rows.push(...fredRows);
+        } catch (error) {
+          logError(error);
+          recordProviderHealth("fred", "fallback", error.message || "FRED Live-Abruf fehlgeschlagen.");
+        }
+      } else {
+        recordProviderHealth("fred", "missing", "Kein FRED Key hinterlegt. Makro nutzt BLS/Treasury/Open-Data und Fallbacks.");
+      }
+
+      const openDataRows = await Promise.allSettled([
+        fetchBlsMacroRows(),
+        fetchTreasuryRows()
+      ]);
+      openDataRows.forEach((result) => {
+        if (result.status === "fulfilled") {
+          rows.push(...result.value);
+        } else {
+          logError(result.reason);
+        }
+      });
+
+      return mergeMacroRows(rows);
+    },
+
+    async getGlobalMacro() {
+      const rows = [];
+      const wb = await fetchWorldBankGrowthRows();
+      rows.push(...wb);
+      const imf = await fetchImfGrowthRows();
+      rows.push(...imf);
+      return rows.length ? rows : fallbackGlobalMacro("Globale Open-Data-Quellen nicht erreichbar. Lokaler Vergleich aktiv.");
     },
 
     async getEvents() {
@@ -4846,14 +5575,23 @@
         recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Earnings Calendar hinterlegt.");
       }
 
+      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
+      if (alphaKey) {
+        const alphaEvents = await fetchAlphaCalendarEvents(alphaKey);
+        liveEvents.push(...alphaEvents);
+      } else {
+        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key für Earnings-/IPO-Kalender hinterlegt.");
+      }
+
       const fallback = fallbackEvents(liveEvents.length ? "Fallback ergänzt Live-Kalender für Dividenden, Splits und Makrotermine." : "Kein Live-Event-Feed aktiv. Lokaler Kalender aktiv.");
-      return [...liveEvents, ...fallback].sort((a, b) => a.date - b.date).slice(0, 30);
+      return dedupeEvents([...liveEvents, ...fallback]).sort((a, b) => a.date - b.date).slice(0, 34);
     }
   };
 
   async function fetchFredSeries(item, key) {
-    const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(item.id)}&api_key=${encodeURIComponent(key)}&file_type=json&sort_order=desc&limit=14`;
-    const result = await cachedJson(`fred:${item.id}`, url, CACHE_TTL.macro, "fred");
+    const seriesId = item.seriesId || item.id;
+    const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(seriesId)}&api_key=${encodeURIComponent(key)}&file_type=json&sort_order=desc&limit=24`;
+    const result = await cachedJson(`fred:${seriesId}`, url, CACHE_TTL.macro, "fred");
     const observations = (result.data.observations || [])
       .filter((row) => row.value && row.value !== ".")
       .map((row) => ({ date: row.date, value: Number(row.value) }))
@@ -4868,8 +5606,8 @@
     let displayValue = latest.value;
     let trend = latest.value - previous.value;
 
-    if (item.mode === "inflation") {
-      const yearAgo = observations.find((row) => row.date.slice(5, 7) === latest.date.slice(5, 7) && row.date.slice(0, 4) !== latest.date.slice(0, 4));
+    if (item.mode === "inflation" || item.mode === "yoy") {
+      const yearAgo = yearAgoObservation(observations, latest);
       if (yearAgo && yearAgo.value) {
         displayValue = ((latest.value / yearAgo.value) - 1) * 100;
       } else {
@@ -4884,8 +5622,315 @@
       value: displayValue,
       display: `${formatNumber(displayValue)}${item.suffix}`,
       trend: trendText(trend),
-      meta: makeMeta(`FRED ${item.id}`, result.status, result.timestamp || Date.parse(latest.date))
+      meta: makeMeta(`FRED ${seriesId}`, result.status, result.timestamp || Date.parse(latest.date))
     };
+  }
+
+  async function fetchBlsMacroRows() {
+    const currentYear = new Date().getFullYear();
+    const rows = [];
+    try {
+      const cpiUrl = `https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0?startyear=${currentYear - 2}&endyear=${currentYear}`;
+      const cpiResult = await cachedJson("bls:cpi:history", cpiUrl, CACHE_TTL.openData, "bls");
+      const cpiRows = parseBlsSeries(cpiResult.data);
+      const latest = cpiRows[0];
+      const yearAgo = latest ? yearAgoObservation(cpiRows, latest) : null;
+      if (latest && yearAgo) {
+        const inflation = ((latest.value / yearAgo.value) - 1) * 100;
+        rows.push({
+          id: "CPIAUCSL",
+          label: "US CPI / Inflation",
+          value: inflation,
+          display: `${formatNumber(inflation)}%`,
+          trend: "Live aus BLS CPI-Serie berechnet",
+          meta: makeMeta("BLS CPI Public API", cpiResult.status, cpiResult.timestamp || Date.now())
+        });
+      }
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("bls", "fallback", "BLS CPI nicht erreichbar, FRED/Fallback bleibt aktiv.");
+    }
+
+    try {
+      const unrateUrl = "https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000?latest=true";
+      const unrateResult = await cachedJson("bls:unrate:latest", unrateUrl, CACHE_TTL.openData, "bls");
+      const latest = parseBlsSeries(unrateResult.data)[0];
+      if (latest) {
+        rows.push({
+          id: "UNRATE",
+          label: "Arbeitslosenquote",
+          value: latest.value,
+          display: `${formatNumber(latest.value)}%`,
+          trend: "Live aus BLS Labor-Serie",
+          meta: makeMeta("BLS Labor Public API", unrateResult.status, unrateResult.timestamp || Date.now())
+        });
+      }
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("bls", "fallback", "BLS Arbeitsmarkt nicht erreichbar, FRED/Fallback bleibt aktiv.");
+    }
+    return rows;
+  }
+
+  async function fetchTreasuryRows() {
+    try {
+      const url = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/daily_treasury_rates?sort=-record_date&page[size]=1";
+      const result = await cachedJson("treasury:daily-rates", url, CACHE_TTL.openData, "treasury");
+      const row = result.data && Array.isArray(result.data.data) ? result.data.data[0] : null;
+      const y2 = firstNumber(row?.bc_2year, row?.tc_2year);
+      const y10 = firstNumber(row?.bc_10year, row?.tc_10year);
+      const rows = [];
+      if (y10 !== null) {
+        rows.push({
+          id: "DGS10",
+          label: "US 10Y Yield",
+          value: y10,
+          display: `${formatNumber(y10)}%`,
+          trend: "Live aus Treasury Daily Rates",
+          meta: makeMeta("U.S. Treasury Fiscal Data", result.status, result.timestamp)
+        });
+      }
+      if (y10 !== null && y2 !== null) {
+        const spread = y10 - y2;
+        rows.push({
+          id: "YCURVE",
+          label: "Yield Curve 2Y-10Y",
+          value: spread,
+          display: `${formatNumber(spread)}%`,
+          trend: spread < 0 ? "Treasury-Kurve invers" : "Treasury-Kurve positiv",
+          meta: makeMeta("U.S. Treasury Daily Rates", result.status, result.timestamp)
+        });
+      }
+      return rows;
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("treasury", "fallback", "Treasury Daily Rates nicht erreichbar, FRED/Fallback bleibt aktiv.");
+      return [];
+    }
+  }
+
+  async function fetchWorldBankGrowthRows() {
+    try {
+      const url = "https://api.worldbank.org/v2/country/US;DE;CN/indicator/NY.GDP.MKTP.KD.ZG?format=json&per_page=60";
+      const result = await cachedJson("worldbank:gdp-growth", url, CACHE_TTL.openData, "worldBank");
+      const rows = Array.isArray(result.data) && Array.isArray(result.data[1]) ? result.data[1] : [];
+      const latestByCountry = {};
+      rows
+        .filter((row) => row.value !== null && row.country?.value)
+        .forEach((row) => {
+          const name = row.country.value;
+          if (!latestByCountry[name] || Number(row.date) > Number(latestByCountry[name].date)) {
+            latestByCountry[name] = row;
+          }
+        });
+      return Object.values(latestByCountry).map((row) => ({
+        country: row.country.value,
+        indicator: "BIP-Wachstum",
+        value: Number(row.value),
+        display: `${formatPercent(Number(row.value))}`,
+        source: "World Bank Indicators API",
+        status: result.status,
+        meta: makeMeta("World Bank Indicators API", result.status, result.timestamp)
+      }));
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("worldBank", "fallback", "World Bank API nicht erreichbar, globaler Fallback aktiv.");
+      return [];
+    }
+  }
+
+  async function fetchImfGrowthRows() {
+    try {
+      const url = "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/USA/DEU/CHN";
+      const result = await cachedJson("imf:ngdp-rpch", url, CACHE_TTL.openData, "imf");
+      const values = result.data?.values?.NGDP_RPCH || {};
+      const labels = { USA: "USA", DEU: "Deutschland", CHN: "China" };
+      return Object.entries(values).map(([code, series]) => {
+        const years = Object.keys(series || {}).sort((a, b) => Number(b) - Number(a));
+        const year = years[0];
+        return {
+          country: labels[code] || code,
+          indicator: "IMF reales BIP-Wachstum",
+          value: Number(series[year]),
+          display: `${formatPercent(Number(series[year]))}`,
+          source: "IMF DataMapper API",
+          status: result.status,
+          meta: makeMeta("IMF DataMapper API", result.status, result.timestamp)
+        };
+      }).filter((row) => Number.isFinite(row.value));
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("imf", "fallback", "IMF DataMapper nicht erreichbar, World-Bank/Fallback bleibt aktiv.");
+      return [];
+    }
+  }
+
+  async function fetchAlphaCalendarEvents(key) {
+    const events = [];
+    try {
+      const earningsText = await cachedText("alpha:events:earnings", `https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey=${encodeURIComponent(key)}`, CACHE_TTL.events, "alphaVantage");
+      parseCsv(earningsText.data).slice(0, 24).forEach((row) => {
+        const symbol = normalizeSymbol(row.symbol || "");
+        if (!symbol || !assetMap.has(symbol)) {
+          return;
+        }
+        events.push({
+          title: `${symbol} Earnings`,
+          type: "Earnings",
+          symbol,
+          date: parseEventDate(row.reportDate || row.reportdate),
+          detail: `Alpha Vantage Kalender | EPS-Schätzung: ${row.estimate || "--"} ${row.currency || ""}`.trim(),
+          meta: makeMeta("Alpha Vantage Earnings Calendar CSV", earningsText.status, earningsText.timestamp)
+        });
+      });
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage Earnings Calendar nicht erreichbar.");
+    }
+
+    try {
+      const ipoText = await cachedText("alpha:events:ipo", `https://www.alphavantage.co/query?function=IPO_CALENDAR&apikey=${encodeURIComponent(key)}`, CACHE_TTL.events, "alphaVantage");
+      parseCsv(ipoText.data).slice(0, 10).forEach((row) => {
+        const symbol = normalizeSymbol(row.symbol || "");
+        if (!symbol) {
+          return;
+        }
+        events.push({
+          title: `${row.name || symbol} IPO`,
+          type: "IPO",
+          symbol,
+          date: parseEventDate(row.ipoDate || row.ipodate),
+          detail: `Alpha Vantage IPO Calendar | Spanne: ${row.priceRangeLow || "--"}-${row.priceRangeHigh || "--"} ${row.currency || ""}`.trim(),
+          meta: makeMeta("Alpha Vantage IPO Calendar CSV", ipoText.status, ipoText.timestamp)
+        });
+      });
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage IPO Calendar nicht erreichbar.");
+    }
+    return events;
+  }
+
+  function mergeMacroRows(rows) {
+    const byId = new Map();
+    rows.forEach((row) => {
+      if (!row || !row.id) {
+        return;
+      }
+      const current = byId.get(row.id);
+      if (!current || statusRank(row.meta?.status) > statusRank(current.meta?.status)) {
+        byId.set(row.id, row);
+      }
+    });
+    fallbackMacro("Fallback ergänzt fehlende Makro-Reihen.").forEach((row) => {
+      if (!byId.has(row.id)) {
+        byId.set(row.id, row);
+      }
+    });
+    MACRO_EXTENSIONS.forEach((row) => {
+      if (!byId.has(row.id)) {
+        byId.set(row.id, { ...row, meta: makeMeta(row.source, row.status, BOOT_TIME) });
+      }
+    });
+    return Array.from(byId.values());
+  }
+
+  function parseBlsSeries(data) {
+    const series = data && data.Results && Array.isArray(data.Results.series) ? data.Results.series[0] : null;
+    const rows = series && Array.isArray(series.data) ? series.data : [];
+    return rows
+      .map((row) => ({
+        date: blsDate(row),
+        value: Number(row.value)
+      }))
+      .filter((row) => row.date && Number.isFinite(row.value))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  function blsDate(row) {
+    if (!row || !row.year || !row.period || !/^M\d{2}$/.test(row.period)) {
+      return "";
+    }
+    return `${row.year}-${row.period.slice(1)}-01`;
+  }
+
+  function yearAgoObservation(rows, latest) {
+    if (!latest || !latest.date) {
+      return null;
+    }
+    const targetYear = String(Number(latest.date.slice(0, 4)) - 1);
+    return rows.find((row) => row.date.slice(0, 4) === targetYear && row.date.slice(5, 7) === latest.date.slice(5, 7)) || null;
+  }
+
+  function dailyStatsFromRows(symbol, rows, result) {
+    const latest = rows[0];
+    const day20 = rows[Math.min(20, rows.length - 1)];
+    const day60 = rows[Math.min(60, rows.length - 1)];
+    const performance1m = day20 ? ((latest.close / day20.close) - 1) * 100 : 0;
+    const performance6m = day60 ? ((latest.close / day60.close) - 1) * 100 : performance1m;
+    const returns = rows.slice(0, 31).map((row, index) => {
+      const next = rows[index + 1];
+      return next ? ((row.close / next.close) - 1) * 100 : 0;
+    }).filter((value) => Number.isFinite(value));
+    const volatility = standardDeviation(returns) * Math.sqrt(252);
+    return {
+      symbol,
+      performance1m,
+      performance6m,
+      volatility: clamp(volatility, 10, 95),
+      momentum: clamp(50 + performance1m * 2.2, 10, 95),
+      trend: clamp(50 + performance6m * 0.75, 10, 95),
+      rsi: clamp(50 + performance1m * 1.1, 20, 80),
+      meta: makeMeta("Alpha Vantage TIME_SERIES_DAILY", result.status, result.timestamp)
+    };
+  }
+
+  function standardDeviation(values) {
+    if (!values.length) {
+      return 0;
+    }
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    const variance = values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / values.length;
+    return Math.sqrt(variance);
+  }
+
+  function extractAlphaCommodityPrice(data) {
+    if (!data || typeof data !== "object") {
+      return NaN;
+    }
+    if (Array.isArray(data.data) && data.data[0]) {
+      return Number(data.data[0].value);
+    }
+    const direct = firstNumber(data.price, data.value, data["05. price"]);
+    if (direct !== null) {
+      return direct;
+    }
+    const nested = Object.values(data).find((value) => value && typeof value === "object" && !Array.isArray(value));
+    return nested ? firstNumber(nested.price, nested.value, nested["05. price"]) : NaN;
+  }
+
+  function commodityChangeFromFallback(symbol, price) {
+    const fallback = getAsset(symbol).fallback.price;
+    return fallback ? ((price / fallback) - 1) * 100 : 0;
+  }
+
+  function fallbackGlobalMacro(message) {
+    return FALLBACK_GLOBAL_MACRO.map((row) => ({
+      ...row,
+      meta: makeMeta(row.source, row.status, BOOT_TIME, message)
+    }));
+  }
+
+  function dedupeEvents(events) {
+    const seen = new Set();
+    return events.filter((eventItem) => {
+      const key = `${eventItem.type}|${eventItem.symbol}|${toIsoDate(eventItem.date)}|${eventItem.title}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   async function cachedJson(cacheKey, url, maxAge, providerId = "") {
@@ -4898,7 +5943,7 @@
     }
 
     try {
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, providerId);
       const entry = { timestamp: Date.now(), data };
       cache[cacheKey] = entry;
       storageSet(STORAGE_KEYS.cache, trimCache(cache));
@@ -4914,7 +5959,67 @@
     }
   }
 
-  async function fetchJson(url) {
+  async function cachedText(cacheKey, url, maxAge, providerId = "") {
+    const cache = storageGet(STORAGE_KEYS.cache, {});
+    const cached = cache[cacheKey];
+
+    if (cached && Date.now() - cached.timestamp < maxAge) {
+      recordProviderHealth(providerId, "live", "Frische CSV/Text-Daten aus lokalem Cache genutzt.", cached.timestamp);
+      return { data: cached.data, timestamp: cached.timestamp, status: "live" };
+    }
+
+    try {
+      const data = await fetchText(url);
+      const entry = { timestamp: Date.now(), data };
+      cache[cacheKey] = entry;
+      storageSet(STORAGE_KEYS.cache, trimCache(cache));
+      recordProviderHealth(providerId, "live", "Live-Abruf erfolgreich.", entry.timestamp);
+      return { data, timestamp: entry.timestamp, status: "live" };
+    } catch (error) {
+      if (cached) {
+        recordProviderHealth(providerId, "stale", "API nicht erreichbar, veralteter CSV/Text-Cache genutzt.", cached.timestamp);
+        return { data: cached.data, timestamp: cached.timestamp, status: "stale" };
+      }
+      recordProviderHealth(providerId, "error", error.message || "API-Fehler ohne Cache.");
+      throw error;
+    }
+  }
+
+  async function fetchJson(url, providerId = "") {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 9000);
+    try {
+      const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+      const text = await response.text();
+      const parsed = parsedProviderBody(text);
+      if (!response.ok) {
+        const error = new Error(providerHttpMessage(response, text, parsed.ok ? parsed.data : null, providerId));
+        error.kind = response.status === 429 ? "rate-limit" : "http";
+        error.httpStatus = response.status;
+        error.responseText = text;
+        error.responseData = parsed.ok ? parsed.data : null;
+        error.contentType = response.headers.get("content-type") || "";
+        error.parseOk = parsed.ok;
+        error.apiMessage = extractProviderErrorMessage(parsed.ok ? parsed.data : null, text);
+        throw error;
+      }
+      if (!parsed.ok) {
+        const error = new Error("Parse-Fehler: API lieferte keine gültige JSON-Antwort.");
+        error.kind = "parse";
+        error.cause = parsed.error;
+        error.httpStatus = response.status;
+        error.responseText = text;
+        error.contentType = response.headers.get("content-type") || "";
+        error.parseOk = false;
+        throw error;
+      }
+      return parsed.data;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function fetchText(url) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 9000);
     try {
@@ -4922,7 +6027,7 @@
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      return await response.json();
+      return await response.text();
     } finally {
       window.clearTimeout(timer);
     }
@@ -5007,17 +6112,52 @@
       why: macroWhy(item.id),
       meaning: macroMeaning(item.id)
     }));
-    return [...base, ...MACRO_EXTENSIONS.map((item) => ({
+    const liveIds = new Set(base.map((item) => item.id));
+    return [...base, ...MACRO_EXTENSIONS.filter((item) => !liveIds.has(item.id)).map((item) => ({
       ...item,
       meta: makeMeta(item.source, item.status, BOOT_TIME)
     }))];
   }
 
   function liquidityForView() {
+    const macroRows = new Map(macroForView().map((item) => [item.id, item]));
     return LIQUIDITY_DATA.map((item) => ({
       ...item,
+      ...(macroRows.get(item.id) || {}),
+      bucket: item.bucket,
+      pressure: liquidityPressureFor(macroRows.get(item.id) || item),
+      why: item.why,
+      meaning: item.meaning,
       meta: makeMeta(item.source, item.status, BOOT_TIME)
+    })).map((item) => ({
+      ...item,
+      meta: item.meta && item.meta.status !== "fallback" ? item.meta : (macroRows.get(item.id)?.meta || item.meta)
     }));
+  }
+
+  function liquidityPressureFor(item) {
+    const value = Number(item.value);
+    if (item.id === "M1" || item.id === "M2" || item.id === "M3" || item.id === "M4") {
+      if (value > 3) return 1;
+      if (value < 0) return -1;
+      return 0;
+    }
+    if (item.id === "REALYIELD") {
+      if (value > 1.5) return -1;
+      if (value < 0.5) return 1;
+      return 0;
+    }
+    if (item.id === "YCURVE") {
+      if (value < -0.25) return -1;
+      if (value > 0.4) return 1;
+      return 0;
+    }
+    if (item.id === "CBBS") {
+      if (value > 0) return 1;
+      if (value < -1) return -1;
+      return 0;
+    }
+    return Number(item.pressure || 0);
   }
 
   function liquidityNarrativeForView() {
@@ -5212,14 +6352,25 @@
         { label: "Sentiment", score: Math.round(sentimentScore), text: sentimentScore >= 65 ? "Sentiment unterstützt das Setup." : "Sentiment liefert kein klares Signal." },
         { label: "Volatilität / Risiko", score: Math.round(riskScore), text: analysis.volatility >= 70 ? "Erhöhtes Risiko und größere Schwankungen." : "Risiko im Modell kontrollierbar." }
       ],
-      meta: makeMeta("Lokales Regelmodell + Quote-Daten", quote.meta.status, quote.meta.timestamp, "Keine Fake-Charts, nur Kurzrating aus Datenpunkten.")
+      meta: makeMeta("Hybrid: Regelmodell + Quote-/Zeitreihen-Inputs", bestDataStatus([quote.meta.status, analysis.meta?.status]), Math.max(Number(quote.meta.timestamp || 0), Number(analysis.meta?.timestamp || 0)) || Date.now(), "Rating bleibt Produktlogik; Inputs kommen bevorzugt aus Live-Quotes und Alpha-Zeitreihen.")
     };
   }
 
   function analysisFor(symbol) {
     const asset = getAsset(symbol);
+    const series = state.seriesStats[asset.symbol];
     if (ANALYTIC_DATA[asset.symbol]) {
-      return ANALYTIC_DATA[asset.symbol];
+      const base = ANALYTIC_DATA[asset.symbol];
+      return series ? {
+        ...base,
+        rsi: series.rsi,
+        momentum: series.momentum,
+        trend: series.trend,
+        volatility: series.volatility,
+        performance1m: series.performance1m,
+        performance6m: series.performance6m,
+        meta: series.meta
+      } : { ...base, meta: makeMeta("Lokales Analysemodell", "fallback", BOOT_TIME) };
     }
 
     const change = Number(asset.fallback.changePct || 0);
@@ -5229,28 +6380,29 @@
     const typeRisk = asset.type === "Crypto" ? 84 : asset.type === "Commodity" ? 62 : asset.type === "ETF" || asset.type === "Index" ? 34 : 50;
     const valueScore = pe ? clamp(78 - pe * 0.9 + (marketCap > 200000000000 ? 4 : 0), 20, 82) : asset.type === "ETF" ? 56 : 48;
     const growthScore = clamp(44 + sectorBoost + (asset.sentiment - 50) * 0.45 + change * 4, 25, 90);
-    const momentumScore = clamp(50 + change * 10 + (asset.sentiment - 55) * 0.35, 20, 88);
-    const trendScore = clamp(48 + change * 8 + (asset.sentiment - 50) * 0.42, 22, 86);
+    const momentumScore = series ? series.momentum : clamp(50 + change * 10 + (asset.sentiment - 55) * 0.35, 20, 88);
+    const trendScore = series ? series.trend : clamp(48 + change * 8 + (asset.sentiment - 50) * 0.42, 22, 86);
     const qualityScore = clamp((marketCap > 300000000000 ? 72 : 58) + (asset.type === "ETF" ? 8 : 0) + (asset.sentiment - 55) * 0.35, 35, 88);
 
     return {
-      rsi: clamp(50 + change * 5, 28, 72),
+      rsi: series ? series.rsi : clamp(50 + change * 5, 28, 72),
       momentum: momentumScore,
       volume: clamp(48 + Math.abs(change) * 8 + (marketCap > 1000000000000 ? 7 : 0), 32, 78),
       trend: trendScore,
-      volatility: clamp(typeRisk + Math.abs(change) * 6 - (asset.type === "ETF" ? 8 : 0), 24, 90),
+      volatility: series ? series.volatility : clamp(typeRisk + Math.abs(change) * 6 - (asset.type === "ETF" ? 8 : 0), 24, 90),
       value: valueScore,
       growth: growthScore,
       quality: qualityScore,
-      performance1m: clamp(change * 3.8, -18, 24),
-      performance6m: clamp(change * 14 + sectorBoost * 0.8, -35, 70),
+      performance1m: series ? series.performance1m : clamp(change * 3.8, -18, 24),
+      performance6m: series ? series.performance6m : clamp(change * 14 + sectorBoost * 0.8, -35, 70),
       margin: null,
       grossMargin: null,
       profit: null,
       cashflow: null,
       debt: null,
       revenueGrowth: pe ? clamp(growthScore - 48, -10, 42) : null,
-      levels: { support: asset.fallback.price * 0.94, resistance: asset.fallback.price * 1.08 }
+      levels: { support: asset.fallback.price * 0.94, resistance: asset.fallback.price * 1.08 },
+      meta: series ? series.meta : makeMeta("Lokales Analysemodell", "fallback", BOOT_TIME)
     };
   }
 
@@ -5278,10 +6430,13 @@
   function snapshotFor(symbol) {
     const asset = getAsset(symbol);
     const quote = quoteFor(symbol);
+    const profile = profileFor(symbol);
     const fundamentals = fundamentalsFor(symbol);
     const analysis = analysisFor(symbol);
     const rating = technicalFor(symbol, quote);
-    const marketCap = valueOr(valueOr(fundamentals.marketCap, quote.marketCap), asset.fallback.marketCap);
+    const marketCap = valueOr(valueOr(profile.marketCap, valueOr(fundamentals.marketCap, quote.marketCap)), asset.fallback.marketCap);
+    const sector = profile.sector || asset.sector;
+    const dataStatus = bestDataStatus([quote.meta.status, profile.meta.status, fundamentals.meta.status, analysis.meta?.status]);
     const score = Math.round(clamp(
       rating.score * 0.44 +
       analysis.value * 0.16 +
@@ -5293,15 +6448,17 @@
     ));
     return {
       symbol: asset.symbol,
-      name: asset.name,
-      sector: asset.sector,
+      name: profile.name || asset.name,
+      sector,
       type: asset.type,
       currency: asset.currency,
       quote,
+      profile,
       fundamentals,
       analysis,
       rating,
       marketCap,
+      dataStatus,
       score,
       valueScore: analysis.value,
       growthScore: analysis.growth,
@@ -5385,6 +6542,39 @@
     };
   }
 
+  function dailyRecapForView() {
+    const briefing = dailyBriefingForView();
+    const todayEvents = eventsForView()
+      .filter((eventItem) => matchesEventWindow(eventItem, "today"))
+      .sort((a, b) => eventRelevance(b) - eventRelevance(a))
+      .slice(0, 4);
+    const news = unique([...state.watchlist, ...dashboardPrefs().favorites, state.activeSymbol])
+      .flatMap((symbol) => newsFor(symbol).items.slice(0, 1).map((item) => ({ ...item, symbol })))
+      .sort((a, b) => Number(b.relevance || 0) - Number(a.relevance || 0))
+      .slice(0, 4);
+    const watchlistItems = watchlistNewsForView();
+    return {
+      moves: briefing.marketMoves.slice(0, 4),
+      news,
+      events: todayEvents.length ? todayEvents : briefing.upcomingEvents.slice(0, 4),
+      watchlistItems,
+      watchlistTone: recapWatchlistTone(watchlistItems)
+    };
+  }
+
+  function recapWatchlistTone(items) {
+    if (!items.length) {
+      return {
+        label: "Ruhig",
+        text: "Keine größeren Watchlist-Hinweise im aktuellen Datenfenster. Fokus auf geplante Setups und Events."
+      };
+    }
+    return {
+      label: `${items.length} Hinweise`,
+      text: "Es gibt Bewegungen oder Termine in deiner Watchlist. Prüfe zuerst, ob sich deine These verändert hat."
+    };
+  }
+
   function marketRegimeFromMoves(avgMove, moves) {
     const positive = moves.filter((item) => item.changePct > 0).length;
     const negative = moves.filter((item) => item.changePct < 0).length;
@@ -5426,6 +6616,62 @@
     return eventsForView().filter((eventItem) => eventItem.symbol === symbol || eventItem.symbol === "Macro").slice(0, 6);
   }
 
+  function filteredEventHubEvents(events) {
+    return events
+      .filter((eventItem) => matchesEventType(eventItem, state.eventHub.type))
+      .filter((eventItem) => matchesEventWindow(eventItem, state.eventHub.window))
+      .sort((a, b) => eventRelevance(b) - eventRelevance(a) || a.date - b.date);
+  }
+
+  function matchesEventType(eventItem, filter) {
+    const type = String(eventItem.type || "").toLowerCase();
+    if (!filter || filter === "all") return true;
+    if (filter === "earnings") return type.includes("earnings");
+    if (filter === "dividend") return type.includes("dividende") || type.includes("dividend") || type.includes("split");
+    if (filter === "macro") return type.includes("makro");
+    if (filter === "ipo") return type.includes("ipo");
+    return true;
+  }
+
+  function matchesEventWindow(eventItem, filter) {
+    const start = startOfToday();
+    const date = new Date(eventItem.date);
+    if (filter === "today") {
+      return date >= start && date < daysFromNow(1);
+    }
+    if (filter === "next") {
+      return date >= daysFromNow(7) && date < daysFromNow(14);
+    }
+    return date >= start && date < daysFromNow(7);
+  }
+
+  function eventHubCounts(events) {
+    const windowed = events.filter((eventItem) => matchesEventWindow(eventItem, state.eventHub.window));
+    return {
+      all: windowed.length,
+      earnings: windowed.filter((eventItem) => matchesEventType(eventItem, "earnings")).length,
+      dividend: windowed.filter((eventItem) => matchesEventType(eventItem, "dividend")).length,
+      macro: windowed.filter((eventItem) => matchesEventType(eventItem, "macro")).length,
+      ipo: windowed.filter((eventItem) => matchesEventType(eventItem, "ipo")).length
+    };
+  }
+
+  function isWatchlistRelevantEvent(eventItem) {
+    return state.watchlist.includes(eventItem.symbol) || dashboardPrefs().favorites.includes(eventItem.symbol);
+  }
+
+  function eventRelevance(eventItem) {
+    let score = 40;
+    if (isWatchlistRelevantEvent(eventItem)) score += 35;
+    if (eventItem.type === "Earnings") score += 18;
+    if (eventItem.type === "Makro") score += 15;
+    if (eventItem.type === "IPO") score += 8;
+    if (eventItem.meta?.status === "live") score += 10;
+    const days = Math.abs((new Date(eventItem.date) - Date.now()) / (24 * 60 * 60 * 1000));
+    score += Math.max(0, 10 - days);
+    return Math.round(clamp(score, 0, 100));
+  }
+
   function watchlistNewsForView() {
     const eventItems = eventsForView()
       .filter((eventItem) => state.watchlist.includes(eventItem.symbol))
@@ -5449,11 +6695,14 @@
 
   function renderEventCard(eventItem) {
     const symbolButton = assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : "";
+    const relevance = eventRelevance(eventItem);
+    const watchlistBadge = isWatchlistRelevantEvent(eventItem) ? `<span class="pill bull">Watchlist</span>` : "";
     return `
       <button class="event-card" type="button" ${symbolButton}>
         <span class="pill">${esc(eventItem.type)}</span>
+        ${watchlistBadge}
         <strong>${esc(eventItem.title)}</strong>
-        <span class="small">${eventItem.date.toLocaleDateString("de-DE")} | ${esc(eventItem.symbol)}</span>
+        <span class="small">${eventItem.date.toLocaleDateString("de-DE")} ${eventItem.date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} | ${esc(eventItem.symbol)} | Relevanz ${relevance}/100</span>
         <p>${esc(eventItem.detail)}</p>
         ${renderDataMeta(eventItem.meta, true)}
       </button>
@@ -5482,6 +6731,10 @@
   function renderAlertRow(alert) {
     const asset = getAsset(alert.symbol);
     const quote = quoteFor(alert.symbol);
+    const status = normalizeAlertStatus(alert);
+    const snoozed = isAlertSnoozed(alert);
+    const statusLabel = alertStatusLabel(alert);
+    const statusClass = status === "triggered" ? "bull" : status === "done" ? "neutral" : "muted";
     return `
       <div class="alert-row">
         <button class="symbol-button" type="button" data-symbol="${escAttr(alert.symbol)}">
@@ -5490,8 +6743,18 @@
         </button>
         <span class="right-cell">
           <strong>${formatMoney(quote.price, asset.currency)}</strong>
-          <span class="${alert.status === "triggered" ? "bull" : "neutral"}">${esc(alert.status === "triggered" ? "Ausgelöst" : "Aktiv")}</span>
+          <span class="${statusClass}">${esc(statusLabel)}</span>
         </span>
+        <span class="right-cell">
+          <strong>${esc(priorityLabel(alert.priority))}</strong>
+          <span class="small">Priorität</span>
+        </span>
+        <span class="right-cell">
+          <strong>${alert.lastCheckedAt ? formatTimestamp(alert.lastCheckedAt) : "noch offen"}</strong>
+          <span class="small">${snoozed ? `Pausiert bis ${formatTimestamp(alert.snoozedUntil)}` : "Letzter Check"}</span>
+        </span>
+        <button class="tiny-button" type="button" data-alert-snooze="${escAttr(alert.id)}">Snooze</button>
+        <button class="tiny-button" type="button" data-alert-done="${escAttr(alert.id)}">Erledigt</button>
         <button class="icon-button danger-button" type="button" data-alert-delete="${escAttr(alert.id)}" aria-label="Alert löschen">X</button>
       </div>
     `;
@@ -5582,6 +6845,21 @@
     }
     state.etf[name] = input.type === "number" ? Number(input.value) : input.value;
     if (state.route === "etf") {
+      render();
+    }
+  }
+
+  function updateCompareState(input) {
+    const name = input.name;
+    if (!name) {
+      return;
+    }
+    const symbol = normalizeSymbol(input.value);
+    if (!assetMap.has(symbol)) {
+      return;
+    }
+    state.compare[name] = symbol;
+    if (state.route === "home") {
       render();
     }
   }
@@ -6083,7 +7361,10 @@
     const symbol = normalizeSymbol(formData.get("symbol"));
     const type = String(formData.get("type") || "price");
     const condition = String(formData.get("condition") || "above");
-    const target = Number(formData.get("target"));
+    const rawTarget = String(formData.get("target") ?? "").trim();
+    const target = rawTarget === "" ? NaN : Number(rawTarget);
+    const priority = String(formData.get("priority") || "medium");
+    const createdAt = Date.now();
 
     if (!assetMap.has(symbol)) {
       toast("Alert konnte nicht gespeichert werden: Asset fehlt.");
@@ -6093,7 +7374,7 @@
       toast("Bitte einen Zielwert für den Preis-Alert eintragen.");
       return;
     }
-    if (condition === "move" && !Number.isFinite(target)) {
+    if (type === "price" && condition === "move" && !Number.isFinite(target)) {
       toast("Bitte eine Prozent-Schwelle für die Tagesbewegung eintragen.");
       return;
     }
@@ -6104,12 +7385,21 @@
       type,
       condition,
       target: Number.isFinite(target) ? target : null,
-      status: "active",
-      createdAt: Date.now(),
-      lastCheckedAt: null
+      priority: ["high", "medium", "low"].includes(priority) ? priority : "medium",
+      status: "open",
+      createdAt,
+      lastCheckedAt: null,
+      snoozedUntil: null,
+      history: [
+        {
+          status: "open",
+          message: "Alert angelegt",
+          timestamp: createdAt
+        }
+      ]
     };
     state.alerts = [alert, ...state.alerts].slice(0, 40);
-    storageSet(STORAGE_KEYS.alerts, state.alerts);
+    saveAlerts();
     toast("Alert gespeichert.");
     form.reset();
     checkAlerts(false);
@@ -6118,7 +7408,7 @@
 
   function deleteAlertById(id) {
     state.alerts = state.alerts.filter((alert) => alert.id !== id);
-    storageSet(STORAGE_KEYS.alerts, state.alerts);
+    saveAlerts();
     toast("Alert gelöscht.");
     render();
   }
@@ -6126,28 +7416,52 @@
   function checkAlerts(showToast) {
     let triggered = 0;
     state.alerts = state.alerts.map((alert) => {
+      if (normalizeAlertStatus(alert) === "done") {
+        return alert;
+      }
       const quote = quoteFor(alert.symbol);
-      const wasTriggered = alert.status === "triggered";
+      if (isAlertSnoozed(alert)) {
+        return {
+          ...alert,
+          status: "open",
+          lastCheckedAt: Date.now()
+        };
+      }
+      const wasTriggered = normalizeAlertStatus(alert) === "triggered";
       const isTriggered = evaluateAlert(alert, quote);
       if (isTriggered && !wasTriggered) {
         triggered += 1;
+        const inboxItem = {
+          id: `${alert.id}-${Date.now()}`,
+          alertId: alert.id,
+          type: alert.type,
+          priority: alert.priority || "medium",
+          status: "triggered",
+          title: `${alert.symbol} Alert`,
+          message: alertLabel(alert),
+          timestamp: Date.now()
+        };
         state.alertInbox = [
-          {
-            id: `${alert.id}-${Date.now()}`,
-            title: `${alert.symbol} Alert`,
-            message: alertLabel(alert),
-            timestamp: Date.now()
-          },
+          inboxItem,
           ...state.alertInbox
         ].slice(0, 30);
       }
       return {
         ...alert,
-        status: isTriggered ? "triggered" : "active",
-        lastCheckedAt: Date.now()
+        status: isTriggered ? "triggered" : "open",
+        triggeredAt: isTriggered ? (alert.triggeredAt || Date.now()) : alert.triggeredAt,
+        lastCheckedAt: Date.now(),
+        history: isTriggered && !wasTriggered ? [
+          {
+            status: "triggered",
+            message: alertLabel(alert),
+            timestamp: Date.now()
+          },
+          ...(alert.history || [])
+        ].slice(0, 8) : (alert.history || [])
       };
     });
-    storageSet(STORAGE_KEYS.alerts, state.alerts);
+    saveAlerts();
     storageSet(STORAGE_KEYS.alertInbox, state.alertInbox);
     if (showToast) {
       toast(triggered ? `${triggered} Alert(s) ausgelöst.` : "Keine neuen Alerts ausgelöst.");
@@ -6157,6 +7471,9 @@
   function evaluateAlert(alert, quote) {
     if (alert.type === "earnings") {
       return eventsForSymbol(alert.symbol).some((eventItem) => eventItem.type === "Earnings" && eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(14));
+    }
+    if (alert.type === "event") {
+      return eventsForSymbol(alert.symbol).some((eventItem) => eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(14));
     }
     if (alert.type === "watchlist") {
       return state.watchlist.includes(alert.symbol) && Math.abs(Number(quote.changePct || 0)) >= 2;
@@ -6183,6 +7500,9 @@
     if (alert.type === "earnings") {
       return "Earnings-/Event-Reminder in den nächsten 14 Tagen";
     }
+    if (alert.type === "event") {
+      return "Event-Hinweis in den nächsten 14 Tagen";
+    }
     if (alert.condition === "below") {
       return `Preis unter ${formatMoney(alert.target, getAsset(alert.symbol).currency)}`;
     }
@@ -6190,6 +7510,176 @@
       return `Tagesbewegung größer als ${formatNumber(alert.target)}%`;
     }
     return `Preis über ${formatMoney(alert.target, getAsset(alert.symbol).currency)}`;
+  }
+
+  function alertsForView() {
+    return state.alerts
+      .map(normalizeAlertRecord)
+      .filter((alert) => alertMatchesFilter(alert, state.alertFilter))
+      .sort((a, b) => alertSortRank(a) - alertSortRank(b));
+  }
+
+  function alertInboxForView() {
+    return [...state.alertInbox]
+      .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+      .map((item) => ({
+        ...item,
+        priority: item.priority || "medium",
+        type: item.type || "price"
+      }));
+  }
+
+  function normalizeAlertRecord(alert) {
+    return {
+      priority: "medium",
+      snoozedUntil: null,
+      history: [],
+      ...alert,
+      status: normalizeAlertStatus(alert)
+    };
+  }
+
+  function normalizeAlertStatus(alert) {
+    if (alert.status === "active") {
+      return "open";
+    }
+    if (["open", "triggered", "done"].includes(alert.status)) {
+      return alert.status;
+    }
+    return "open";
+  }
+
+  function alertStatusLabel(alert) {
+    const status = normalizeAlertStatus(alert);
+    if (status === "done") {
+      return "Erledigt";
+    }
+    if (status === "triggered") {
+      return "Ausgelöst";
+    }
+    if (isAlertSnoozed(alert)) {
+      return "Pausiert";
+    }
+    return "Offen";
+  }
+
+  function priorityLabel(priority) {
+    const labels = {
+      high: "hoch",
+      medium: "mittel",
+      low: "niedrig"
+    };
+    return labels[priority] || "mittel";
+  }
+
+  function alertMatchesFilter(alert, filter) {
+    if (!filter || filter === "all") {
+      return true;
+    }
+    if (filter === "price") {
+      return alert.type === "price";
+    }
+    if (filter === "earnings") {
+      return alert.type === "earnings";
+    }
+    if (filter === "event") {
+      return alert.type === "event" || alert.type === "sentiment";
+    }
+    if (filter === "watchlist") {
+      return alert.type === "watchlist";
+    }
+    return true;
+  }
+
+  function alertSortRank(alert) {
+    const statusRank = { triggered: 0, open: 1, done: 3 };
+    const priorityRank = { high: 0, medium: 1, low: 2 };
+    return (statusRank[normalizeAlertStatus(alert)] ?? 2) * 10 + (priorityRank[alert.priority || "medium"] ?? 1);
+  }
+
+  function isAlertSnoozed(alert) {
+    return Number(alert.snoozedUntil || 0) > Date.now() && normalizeAlertStatus(alert) !== "done";
+  }
+
+  function markAlertDone(id) {
+    let changed = false;
+    state.alerts = state.alerts.map((alert) => {
+      if (alert.id !== id) {
+        return alert;
+      }
+      changed = true;
+      return {
+        ...alert,
+        status: "done",
+        completedAt: Date.now(),
+        history: [
+          { status: "done", message: "Als erledigt markiert", timestamp: Date.now() },
+          ...(alert.history || [])
+        ].slice(0, 8)
+      };
+    });
+    if (changed) {
+      saveAlerts();
+      state.alertInbox = [
+        {
+          id: `${id}-done-${Date.now()}`,
+          alertId: id,
+          type: "system",
+          priority: "low",
+          status: "done",
+          title: "Alert erledigt",
+          message: "Der Alert wurde in die Historie verschoben.",
+          timestamp: Date.now()
+        },
+        ...state.alertInbox
+      ].slice(0, 30);
+      storageSet(STORAGE_KEYS.alertInbox, state.alertInbox);
+      toast("Alert als erledigt markiert.");
+      render();
+    }
+  }
+
+  function snoozeAlert(id) {
+    let changed = false;
+    const until = Date.now() + 24 * 60 * 60 * 1000;
+    state.alerts = state.alerts.map((alert) => {
+      if (alert.id !== id) {
+        return alert;
+      }
+      changed = true;
+      return {
+        ...alert,
+        status: "open",
+        snoozedUntil: until,
+        history: [
+          { status: "open", message: "Für 24 Stunden pausiert", timestamp: Date.now() },
+          ...(alert.history || [])
+        ].slice(0, 8)
+      };
+    });
+    if (changed) {
+      saveAlerts();
+      state.alertInbox = [
+        {
+          id: `${id}-snooze-${Date.now()}`,
+          alertId: id,
+          type: "system",
+          priority: "low",
+          status: "open",
+          title: "Alert pausiert",
+          message: `Nächster Check nach ${formatTimestamp(until)}.`,
+          timestamp: Date.now()
+        },
+        ...state.alertInbox
+      ].slice(0, 30);
+      storageSet(STORAGE_KEYS.alertInbox, state.alertInbox);
+      toast("Alert für 24 Stunden pausiert.");
+      render();
+    }
+  }
+
+  function saveAlerts() {
+    storageSet(STORAGE_KEYS.alerts, state.alerts.map(normalizeAlertRecord));
   }
 
   function fundamentalInterpretation(asset, fundamentals) {
@@ -6422,6 +7912,88 @@
     render();
   }
 
+  function buildFredMinimalTestRequest(key) {
+    const url = new URL("https://api.stlouisfed.org/fred/series/updates");
+    url.searchParams.set("api_key", key);
+    url.searchParams.set("file_type", "json");
+    return {
+      url: url.toString(),
+      responseType: "json",
+      providerId: "fred",
+      method: "GET"
+    };
+  }
+
+  function fredRequestDiagnostics(rawInput, savedKey, storageKey, request, responseInfo = {}) {
+    const url = new URL(request.url);
+    const sentKey = url.searchParams.get("api_key") || "";
+    const fileType = url.searchParams.get("file_type") || "";
+    return {
+      codePath: "testProviderById > runFredMinimalProviderTest > buildFredMinimalTestRequest > fetchProviderTestPayload",
+      method: request.method || "GET",
+      endpoint: maskFredEndpoint(request.url, sentKey),
+      path: url.pathname,
+      apiKeyParamPresent: Boolean(sentKey),
+      fileType,
+      fileTypeJson: fileType === "json",
+      inputKey: describeKeyShape(rawInput),
+      savedKey: describeKeyShape(savedKey),
+      storageKey: describeKeyShape(storageKey),
+      sentKey: describeKeyShape(sentKey),
+      savedEqualsSent: cleanKey(savedKey) === sentKey,
+      storageEqualsSaved: storageKey === savedKey,
+      ...responseInfo
+    };
+  }
+
+  function describeKeyShape(value) {
+    const raw = String(value ?? "");
+    const trimmed = raw.trim();
+    return {
+      rawLength: raw.length,
+      trimmedLength: trimmed.length,
+      trimChanged: raw !== trimmed,
+      mask: maskSecret(trimmed),
+      lowercaseAlnum32: /^[a-z0-9]{32}$/.test(trimmed),
+      hasWhitespace: /\s/.test(raw)
+    };
+  }
+
+  function maskSecret(value) {
+    const text = String(value || "");
+    if (!text) {
+      return "leer";
+    }
+    if (text.length <= 6) {
+      return `${text.slice(0, 1)}…${text.slice(-1)} (${text.length} Zeichen)`;
+    }
+    return `${text.slice(0, 3)}…${text.slice(-3)} (${text.length} Zeichen)`;
+  }
+
+  function maskFredEndpoint(url, key) {
+    if (!key) {
+      return String(url).replace(/api_key=[^&]*/, "api_key=leer");
+    }
+    return String(url).replace(encodeURIComponent(key), encodeURIComponent(maskSecret(key)));
+  }
+
+  function providerInputValue(providerId) {
+    const input = Array.from(document.querySelectorAll("[data-api-key]")).find((item) => item.dataset.apiKey === providerId);
+    return input ? input.value : "";
+  }
+
+  function parsedProviderBody(text) {
+    const body = String(text || "");
+    if (!body.trim()) {
+      return { ok: true, data: {}, empty: true };
+    }
+    try {
+      return { ok: true, data: JSON.parse(body), empty: false };
+    } catch (error) {
+      return { ok: false, data: null, empty: false, error };
+    }
+  }
+
   async function fetchProviderTestPayload(request) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 9000);
@@ -6432,20 +8004,33 @@
         headers: request.headers || {}
       });
       const text = await response.text();
+      const contentType = response.headers.get("content-type") || "";
+      const parsed = request.responseType === "text" ? { ok: true, data: text, empty: !text } : parsedProviderBody(text);
       if (!response.ok) {
-        const error = new Error(providerHttpMessage(response, text));
+        const error = new Error(providerHttpMessage(response, text, parsed.ok ? parsed.data : null, request.providerId));
         error.kind = response.status === 429 ? "rate-limit" : "http";
+        error.httpStatus = response.status;
+        error.responseText = text;
+        error.responseData = parsed.ok ? parsed.data : null;
+        error.contentType = contentType;
+        error.parseOk = parsed.ok;
+        error.apiMessage = extractProviderErrorMessage(parsed.ok ? parsed.data : null, text);
         throw error;
       }
       if (request.responseType === "text") {
-        return { data: text, response };
+        return { data: text, response, text, contentType, parseOk: true };
       }
-      try {
-        return { data: text ? JSON.parse(text) : {}, response };
-      } catch (parseError) {
+      if (parsed.ok) {
+        return { data: parsed.data, response, text, contentType, parseOk: true };
+      }
+      {
         const error = new Error("Parse-Fehler: Provider lieferte keine gültige JSON-Antwort. Prüfe, ob ein JSON-Parameter nötig ist.");
         error.kind = "parse";
-        error.cause = parseError;
+        error.cause = parsed.error;
+        error.httpStatus = response.status;
+        error.responseText = text;
+        error.contentType = contentType;
+        error.parseOk = false;
         throw error;
       }
     } catch (error) {
@@ -6466,7 +8051,12 @@
     }
   }
 
-  function providerHttpMessage(response, bodyText) {
+  function providerHttpMessage(response, bodyText, data, providerId = "") {
+    const apiMessage = extractProviderErrorMessage(data, bodyText);
+    if (apiMessage) {
+      const prefix = providerId === "fred" ? "FRED API meldet" : "Provider meldet";
+      return `HTTP ${response.status}: ${prefix}: ${apiMessage}`;
+    }
     const body = String(bodyText || "").slice(0, 220);
     if (response.status === 401 || response.status === 403) {
       return `HTTP ${response.status}: Key nicht akzeptiert oder Zugriff nicht erlaubt.`;
@@ -6475,6 +8065,29 @@
       return "Rate Limit erreicht. Bitte später erneut testen.";
     }
     return `HTTP ${response.status}: Provider antwortet mit Fehler.${body ? ` Antwort: ${body}` : ""}`;
+  }
+
+  function extractProviderErrorMessage(data, bodyText = "") {
+    if (data && typeof data === "object") {
+      if (data.error_message) {
+        return String(data.error_message);
+      }
+      if (data.error) {
+        return typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+      }
+      if (data.message) {
+        return String(data.message);
+      }
+      if (data["Error Message"]) {
+        return String(data["Error Message"]);
+      }
+      if (data.Note || data.Information) {
+        return String(data.Note || data.Information);
+      }
+    }
+    const text = String(bodyText || "");
+    const match = text.match(/"error_message"\s*:\s*"([^"]+)"/);
+    return match ? match[1] : "";
   }
 
   function describeProviderTestError(error) {
@@ -6534,6 +8147,17 @@
     return "Test erfolgreich: FRED liefert JSON-Beobachtungen für FEDFUNDS.";
   }
 
+  function validateFredSeriesUpdates(data) {
+    if (data && data.error_code) {
+      throw new Error(`FRED API-Fehler ${data.error_code}: ${data.error_message || "Antwort ungültig."}`);
+    }
+    const series = data && Array.isArray(data.seriess) ? data.seriess : [];
+    if (!series.length) {
+      throw new Error("FRED-Antwort ungültig: JSON ist erreichbar, aber `seriess` fehlt oder ist leer.");
+    }
+    return "Test erfolgreich: FRED Minimaltest `/fred/series/updates?api_key=…&file_type=json` liefert JSON.";
+  }
+
   function validateBlsSeries(data) {
     if (!data || data.status !== "REQUEST_SUCCEEDED") {
       throw new Error(`BLS-Antwort ungültig: ${data?.status || "kein Status"}`);
@@ -6591,6 +8215,11 @@
       return;
     }
 
+    if (providerId === "fred") {
+      await runFredMinimalProviderTest(provider);
+      return;
+    }
+
     state.apiKeys = collectApiKeysFromInputs();
     storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
     setProviderTest(providerId, "warn", "Test läuft lokal im Browser...");
@@ -6631,6 +8260,77 @@
     render();
   }
 
+  async function runFredMinimalProviderTest(provider) {
+    const rawInput = providerInputValue("fred");
+    state.apiKeys = collectApiKeysFromInputs();
+    storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
+    const savedKey = providerKeyValue("fred");
+    const storedKey = providerKeyValue("fred", storageGet(STORAGE_KEYS.apiKeys, {}));
+    const key = cleanKey(savedKey);
+
+    if (!key) {
+      const emptyRequest = buildFredMinimalTestRequest("");
+      setProviderTest("fred", "warn", "Kein FRED-Key gespeichert. Test wurde nicht gesendet.", fredRequestDiagnostics(rawInput, savedKey, storedKey, emptyRequest, {
+        stage: "nicht gesendet",
+        httpStatus: "kein Request",
+        responseFormat: "keine Antwort",
+        parseStatus: "nicht ausgeführt"
+      }));
+      toast("FRED: kein Key gespeichert.");
+      render();
+      return;
+    }
+
+    const request = buildFredMinimalTestRequest(key);
+    setProviderTest("fred", "warn", "FRED Minimaltest läuft: Request gebaut, file_type=json gesetzt.", fredRequestDiagnostics(rawInput, savedKey, storedKey, request, {
+      stage: "Request gebaut",
+      httpStatus: "wartet",
+      responseFormat: "wartet",
+      parseStatus: "wartet"
+    }));
+    render();
+
+    try {
+      const testResult = await fetchProviderTestPayload(request);
+      let message = "FRED hat im Browser-Test geantwortet.";
+      try {
+        message = provider.validateTest ? provider.validateTest(testResult.data, testResult.response) : message;
+      } catch (validationError) {
+        validationError.httpStatus = testResult.response.status;
+        validationError.responseText = testResult.text;
+        validationError.responseData = testResult.data;
+        validationError.contentType = testResult.contentType || "";
+        validationError.parseOk = testResult.parseOk;
+        validationError.apiMessage = extractProviderErrorMessage(testResult.data, testResult.text);
+        throw validationError;
+      }
+      const details = fredRequestDiagnostics(rawInput, savedKey, storedKey, request, {
+        stage: "Response erhalten",
+        httpStatus: testResult.response.status,
+        contentType: testResult.contentType || "unbekannt",
+        responseFormat: "JSON",
+        parseStatus: testResult.parseOk ? "Parsing erfolgreich" : "Parsing fehlgeschlagen",
+        fredError: ""
+      });
+      setProviderTest("fred", "ok", message, details);
+      toast("FRED: Minimaltest erfolgreich.");
+    } catch (error) {
+      const details = fredRequestDiagnostics(rawInput, savedKey, storedKey, request, {
+        stage: error.httpStatus ? "Response erhalten" : "Fetch fehlgeschlagen",
+        httpStatus: error.httpStatus || "keine HTTP-Antwort",
+        contentType: error.contentType || "unbekannt",
+        responseFormat: error.parseOk === false ? "nicht JSON" : error.responseData ? "JSON" : "unbekannt",
+        parseStatus: error.parseOk === false ? "Parsing fehlgeschlagen" : error.responseData ? "Parsing erfolgreich" : "nicht ausgeführt",
+        fredError: error.apiMessage || "",
+        responseBody: error.responseText ? String(error.responseText).slice(0, 420) : ""
+      });
+      setProviderTest("fred", "error", describeProviderTestError(error), details);
+      toast("FRED: Minimaltest fehlgeschlagen.");
+      logError(error);
+    }
+    render();
+  }
+
   async function testConfiguredProviders() {
     state.apiKeys = collectApiKeysFromInputs();
     storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
@@ -6653,13 +8353,14 @@
     }
   }
 
-  function setProviderTest(providerId, status, message) {
+  function setProviderTest(providerId, status, message, details = null) {
     state.providerTests = {
       ...state.providerTests,
       [providerId]: {
         status,
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        details
       }
     };
     storageSet(STORAGE_KEYS.providerTests, state.providerTests);
@@ -7022,6 +8723,14 @@
     return null;
   }
 
+  function normalizeFinnhubMarketCap(value) {
+    const number = numberOrNull(value);
+    if (number === null) {
+      return null;
+    }
+    return number < 100000000 ? number * 1000000 : number;
+  }
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -7036,6 +8745,53 @@
 
   function csvCell(value) {
     return `"${String(value ?? "").replace(/"/g, '""')}"`;
+  }
+
+  function parseCsv(text) {
+    const rows = String(text || "").trim().split(/\r?\n/).filter(Boolean).map(parseCsvLine);
+    if (rows.length < 2) {
+      return [];
+    }
+    const headers = rows[0].map((header) => String(header || "").trim());
+    return rows.slice(1).map((row) => {
+      const entry = {};
+      headers.forEach((header, index) => {
+        entry[header] = row[index] || "";
+      });
+      return entry;
+    });
+  }
+
+  function parseCsvLine(line) {
+    const cells = [];
+    let current = "";
+    let quoted = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      const next = line[index + 1];
+      if (char === '"' && quoted && next === '"') {
+        current += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === "," && !quoted) {
+        cells.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    cells.push(current.trim());
+    return cells;
+  }
+
+  function statusRank(status) {
+    const ranks = { live: 4, stale: 3, fallback: 2, missing: 1, error: 0 };
+    return ranks[status || ""] ?? 0;
+  }
+
+  function bestDataStatus(statuses) {
+    return statuses.filter(Boolean).sort((a, b) => statusRank(b) - statusRank(a))[0] || "fallback";
   }
 
   function esc(value) {
