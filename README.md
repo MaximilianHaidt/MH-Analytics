@@ -1,15 +1,14 @@
 # MH Analytics
 
-MH Analytics ist eine statische Premium-Finanzwebsite für Research, Live-Daten, Watchlist, Screener, Ratings, Alerts, ETF, Portfolio, Insider-/Institutionellen-Daten, Makro, Geldmengen, Reports und TradingView-Analyse.
+MH Analytics ist eine statische Premium-Finanzwebsite für Research, Watchlist, Screener, Ratings, Alerts, ETF, Portfolio, Makro, Geldmengen, Reports und TradingView-Analyse.
 
 Die Website bleibt bewusst einfach:
 
-- kein Node.js
+- kein Node.js für das Frontend
 - kein npm
 - kein Build-Prozess
-- kein eigener Server
 - lokal per Doppelklick nutzbar
-- online als statische Website deploybar
+- online über Vercel deploybar
 
 ## Schnellstart für Anfänger
 
@@ -17,166 +16,171 @@ Die Website bleibt bewusst einfach:
 2. `index.html` doppelklicken.
 3. Die Website startet direkt im Browser.
 
-Die Seite funktioniert sofort mit lokalen Fallback-Daten. Für Live-Daten brauchst du Internet und optional API Keys im Bereich `API Keys`.
+Lokal nutzt MH Analytics Fallback-Daten, wenn serverseitige Live-Quellen nicht verfügbar sind. Das ist gewollt, damit die Seite auch ohne Deployment stabil bleibt.
 
-## Was in dieser API-Runde bereinigt wurde
+## Was in dieser Datenarchitektur-Runde geändert wurde
 
-- Die aktive Provider-Seite zeigt nur noch den öffentlichen Kernstack.
-- “Live genutzt” wird nicht mehr durch einen bloßen Key-Test erzeugt.
-- Provider zeigen getrennt: Key-Status, Teststatus, Datenlayer-Status, Nutzungsstatus und Einsatzart.
-- FRED wurde auf einen JSON-Test mit `file_type=json` umgestellt.
-- Financial Modeling Prep, Twelve Data, NewsAPI, GNews, CoinCap und weitere alte Slots wurden aus der aktiven öffentlichen API-Key-Seite entfernt.
-- Events/Earnings sind klar Finnhub und Alpha Vantage zugeordnet; Dividenden/Splits bleiben lokal abgesichert.
-- README und Footer beschreiben den neuen Provider-Stack ehrlich.
+- Der öffentliche Bereich bleibt `Datenquellen`, nicht API-Key-Verwaltung.
+- Normale Nutzer sehen keine editierbaren API-Key-Felder, keine Key-Speicherbuttons und keine Key-Testbuttons.
+- EIA wurde serverseitig angebunden.
+- FX/Währungen laufen serverseitig über Frankfurter.
+- CoinGecko läuft als klarer Krypto-Datenpfad über eine eigene Vercel Function.
+- BLS, Treasury, World Bank und IMF laufen über eine normalisierte Open-Data-Schicht.
+- Das Frontend ruft für diese Daten nur noch eigene Routen auf:
+  - `/api/fred`
+  - `/api/finnhub`
+  - `/api/alphavantage`
+  - `/api/eia`
+  - `/api/fx`
+  - `/api/coingecko`
+  - `/api/opendata`
 
-## Was in der Prioritätsrunde ergänzt wurde
+## Environment Variables in Vercel
 
-- Startseite mit neuem Bereich **“Was ist heute wichtig?”** für Marktbewegungen, Events, Earnings, auffällige Assets und Risk-on/Risk-off-Einordnung.
-- Asset-Seiten mit stärkerer 5-Minuten-Research-Zusammenfassung, Chancen/Risiken, Triggern und eigenem **Thesis / Journal** Tab.
-- Liquidität und Geldmengen bleiben als eigener Bereich sichtbar und wurden auf der Startseite stärker mit Markt-Wirkung erklärt.
-- Screener zeigt das erweiterte lokale Universum mit aktuell knapp 80 Assets und bleibt hybrid aus Live-Quotes und Fallback-Research-Score.
-- Watchlist zeigt zusätzliche Watchlist-News und Event-Hinweise.
-- Alerts unterstützen jetzt Preis-, Watchlist-, Sentiment- und Earnings-/Event-Reminder.
-- Portfolio-Bereich erklärt Risiko, Exposure, Klumpenrisiko und Rebalancing klarer.
-- ETF-Overlap Checker enthält eine verständliche Einordnung der Überschneidung.
-- Research/Report wurde um eine 5-Minuten-Aktienanalyse und mehr Thesis-/Risiko-Logik erweitert.
-- Journal-/Psychologie-Basis speichert These, Trigger, Emotion und Regel-Check lokal im Browser.
+Diese Variablen sind für serverseitige Anbieter nötig:
 
-## Was in dieser Vertiefungsrunde verbessert wurde
+```text
+FRED_API_KEY
+FINNHUB_API_KEY
+ALPHA_VANTAGE_API_KEY
+EIA_API_KEY
+```
 
-- Makro und Liquidität haben jetzt eine klarere Kernaussage mit Liquiditätsampel, Score und verständlicher Wirkung auf Aktien, Gold, Krypto und Anleihen.
-- M1, M2, M3 und M4 sind im Liquiditätsbereich stärker gruppiert und werden nicht mehr nur als lose Zahlen gezeigt.
-- Realzins, Yield Curve und Zentralbank-Bilanz werden deutlicher als Zins- und Liquiditätsrisiken eingeordnet.
-- Die Startseite verbindet den Tagesüberblick stärker mit dem Makro-/Liquiditätsbild.
-- ETF-Karten erklären jetzt Einsatz, Ausschüttungstyp, Top-5-Konzentration, Regionen, Währungsrisiko und Struktur klarer.
-- Der ETF-Kostenrechner zeigt grobe Kosten pro Jahr, pro Monat und über den gewählten Zeitraum.
-- Der ETF-Overlap-Checker bewertet nicht nur Top-Holdings, sondern auch regionale Überschneidung und TER-Differenz.
-- Portfolio, Journal, Watchlist und Reports wurden sprachlich und logisch weiter geschärft, ohne neue technische Infrastruktur einzuführen.
+Optional:
 
-## Was in der Dateninput-Runde echter wurde
+```text
+COINGECKO_API_KEY
+```
 
-- Der Screener lädt jetzt mehr echte Inputs: Finnhub für Quotes, Profile und Fundamentals; Alpha Vantage für Tageszeitreihen, Performance, Momentum und volatilitätsnahe Inputs.
-- Makro nutzt nicht mehr nur FRED/Fallback: BLS kann CPI und Arbeitsmarkt ergänzen, Treasury kann 10Y-Rendite und 2Y-10Y-Kurve liefern, FRED erweitert Geldmengen, Realzins, Broad-Dollar-Index und Zentralbank-Bilanz.
-- Events/Earnings nutzen jetzt zusätzlich Alpha Vantage Earnings Calendar und IPO Calendar. Lokale Events bleiben nur Backup für Dividenden, Splits und Makrotermine.
-- Rohstoffe werden datenstärker: Gold/Silber/WTI können über Alpha Vantage laufen; WTI kann zusätzlich über EIA APIv2 geladen werden.
-- Asset-Seiten nutzen stärkere Live-Inputs aus Finnhub und zeigen SEC/EDGAR als offiziellen Filings-Pfad transparent, ohne ihn fälschlich als Browser-Livequelle zu markieren.
-- Globale Makrovergleiche bekommen einen echten Open-Data-Pfad über World Bank und IMF DataMapper.
-- Ratings, Top Picks, Reports und Portfolio bleiben bewusst hybrid: echte Dateninputs plus eigene MH-Analytics-Heuristik.
+Für die aktuelle FX-Quelle wird kein `FX_API_KEY` benötigt, weil Frankfurter ohne Key läuft. Falls später ein anderer FX-Anbieter gewählt wird, kann `FX_API_KEY` ergänzt werden.
 
-## Was in dieser Nutzwert-Runde ergänzt wurde
+## Serverseitige Provider
 
-- Der Bereich `Events` ist jetzt ein echter Event-/Earnings-Hub mit Typfilter, Zeitfilter, Watchlist-Hervorhebung, Relevanz und Quellenstatus.
-- Auf der Startseite gibt es einen Tages-Recap: “Was habe ich heute verpasst?” mit Marktbewegungen, News, Events und Watchlist-Hinweisen.
-- Quick Compare vergleicht zwei Assets direkt nebeneinander: Preis, Tagesbewegung, Market Cap, Sektor, KGV, Rating, Chancen und Risiken.
-- Alerts V2 speichert lokale Alerts mit Status `offen`, `ausgelöst` und `erledigt`, Priorität, Snooze, Inbox und Historie.
-- Data Health zeigt zusätzlich eine Quellenübersicht pro Modul: Screener, Asset-Seiten, Events, Makro, Energie, globale Daten, Portfolio und Reports.
+**FRED**
 
-## Öffentlicher Kernstack
+- Route: `/api/fred`
+- Environment Variable: `FRED_API_KEY`
+- Zuständig für: US-Makro, Geldmengen, Fed Funds, CPI, Arbeitslosenquote, Zinsserien und Spreads
 
-Diese elf Quellen bilden ab jetzt den sichtbaren Provider-Kern:
+**Finnhub**
 
-1. **Finnhub**: Aktien-Quotes, Unternehmensprofile, Company News, Earnings Calendar.
-2. **Alpha Vantage**: FX, Rohstoffe, technische Indikatoren, IPO-/Earnings-Zusatz, Quote-Fallback.
-3. **FRED**: US-Makro, Geldmengen, Zinsserien und Spreads.
-4. **ECB**: Eurozone, EZB-Daten, EUR-bezogene Makrodaten.
-5. **BLS**: CPI, Inflation und US-Arbeitsmarkt.
-6. **U.S. Treasury Fiscal Data**: Yield Curve, Treasury Rates und Zinsstruktur.
-7. **SEC / EDGAR**: Filings, Submissions, XBRL und offizielle Fundamentaldatenbasis.
-8. **EIA**: Energie, Öl, Gas und Energiedaten.
-9. **World Bank**: globale Länderprofile und Makrodaten.
-10. **IMF DataMapper**: internationale Makroergänzung.
-11. **OECD Data Explorer**: OECD-Vergleiche und Wirtschaftsstruktur.
+- Route: `/api/finnhub`
+- Environment Variable: `FINNHUB_API_KEY`
+- Zuständig für: Aktien-Quotes, Unternehmensprofile, Company News, Basic Financials und Earnings
 
-## Welche Keys zuerst sinnvoll sind
+**Alpha Vantage**
 
-1. **Finnhub**: wichtigster Key für Aktienkurse, Profile, Company News und Earnings.
-2. **FRED**: wichtigster Key für US-Makro, Geldmengen und Zinsdaten.
-3. **Alpha Vantage**: sinnvoll für FX, Rohstoffe, technische Indikatoren und Quote-Fallback.
-4. **EIA**: sinnvoll, wenn Energie-/Rohstoffdaten live genutzt werden sollen.
+- Route: `/api/alphavantage`
+- Environment Variable: `ALPHA_VANTAGE_API_KEY`
+- Zuständig für: FX-/Rohstoff-Zusatzdaten, Zeitreihen, technische Indikatoren, IPO- und Earnings-Zusatzdaten
 
-ECB, BLS, Treasury, SEC, World Bank, IMF und OECD brauchen in dieser Startphase kein Key-Feld. Sie sind Open-Data-Quellen oder browserkritische offizielle Quellen und werden entsprechend gekennzeichnet.
+**EIA**
 
-## Bewusst entfernte öffentliche Provider-Slots
+- Route: `/api/eia`
+- Environment Variable: `EIA_API_KEY`
+- Zuständig für: Öl, Gas und Energie-/Rohstoffdaten
 
-Diese Anbieter werden nicht mehr in der aktiven öffentlichen API-Key-Seite beworben:
+**Frankfurter FX**
 
-- Financial Modeling Prep
-- Twelve Data
-- NewsAPI
-- GNews
-- CoinCap
-- EODHD
-- Marketaux
-- ExchangeRate-API
-- Open Exchange Rates
-- Metals-API
-- Reddit
-- Brevo
-- Supabase
+- Route: `/api/fx`
+- Kein API-Key nötig
+- Zuständig für: Basis-FX-Kurse und einfache Währungsumrechnung
 
-CoinGecko bleibt nur als optionaler interner Krypto-Prototyp für BTC/ETH-Fallbacks erhalten und ist kein Kernprovider für den öffentlichen Start.
+**CoinGecko**
 
-## Live, Fallback oder zugeordnet
+- Route: `/api/coingecko`
+- `COINGECKO_API_KEY` optional
+- Zuständig für: BTC, ETH und SOL Preise, Market Cap und 24h-Bewegung
 
-- Start-Ticker: live mit Finnhub oder Alpha Vantage, sonst Fallback. Krypto nutzt optional CoinGecko-Prototyp/Fallback.
-- Asset-Kurse: Finnhub primär, Alpha Vantage als Fallback, Rohstoffe über Alpha Vantage/EIA soweit verfügbar, sonst lokaler Fallback.
-- Company News: Finnhub, sonst lokaler News-Fallback.
-- Fundamentals: Finnhub Basic Financials, SEC/EDGAR als offizieller Filings-Pfad, sonst lokaler Fallback.
-- Makro: FRED live bei Key; BLS und Treasury als Open Data; World Bank/IMF für globale Vergleiche; Fallbacks ergänzen fehlende Reihen.
-- Geldmengen/Liquidität: FRED für M1/M2, Realzins, Yield Curve, Zentralbank-Bilanz und Dollar-Index; M3/M4 bleiben sauber gekennzeichnete lokale/ECB-Struktur.
-- Events/Earnings: Finnhub live bei Key, Alpha Vantage Earnings/IPO Calendar als Zusatzpfad, lokaler Kalender bleibt Backup.
-- Screener: Hybrid aus Live-Quotes, Finnhub-Profilen/Fundamentals, Alpha-Vantage-Zeitreihen und lokalem Research-Universum.
-- ETF: lokale strukturierte Datenbasis.
-- Portfolio/Watchlist/Alerts V2: lokal im Browser gespeichert, inklusive Snooze, Inbox und Alert-Historie.
-- Reports: Browser-Print/PDF-Fallback ohne Backend.
+**Open-Data-Normalisierung**
 
-## Data Health
+- Route: `/api/opendata`
+- Kein API-Key nötig
+- Aktuell normalisiert: BLS CPI, BLS Arbeitsmarkt, Treasury Daily Rates, World Bank GDP Growth und IMF Growth
 
-Der Bereich `Data Health` zeigt:
+ECB, SEC/EDGAR, OECD, Eurostat und OpenFIGI sind im Datenquellenbereich sauber eingeordnet. Sie sind aber nicht alle vollständig live verdrahtet.
 
-- Key vorhanden oder Key fehlt
-- Test verfügbar oder nicht sinnvoll
-- Test erfolgreich oder fehlgeschlagen
-- aktuell live genutzt, Fallback aktiv oder aktuell nicht genutzt
-- browsergeeignet, browserkritisch oder später serverseitig sinnvoll
-- welche Module welchen Provider verwenden
-- welche Plattformbereiche live, hybrid oder fallbackbasiert arbeiten
+## Öffentliche Datenquellen-Übersicht
 
-Wichtig: Ein erfolgreicher API-Test bedeutet nur “Test erfolgreich”. Erst ein erfolgreicher Datenabruf durch ein Modul zählt als “aktuell live genutzt”.
+Der Reiter `Datenquellen` zeigt für normale Nutzer:
+
+- Provider-Name
+- Kategorie
+- Rolle
+- Typ: serverseitig, serverseitig normalisiert, Open Data oder hybrid
+- Status: Live, Fallback, teilweise oder nicht genutzt
+- verwendete Module
+- kurzer Transparenztext
+
+Sichtbare Quellen:
+
+1. Finnhub
+2. Alpha Vantage
+3. Frankfurter FX
+4. FRED
+5. ECB
+6. BLS
+7. U.S. Treasury Fiscal Data
+8. SEC / EDGAR
+9. EIA
+10. CoinGecko
+11. World Bank
+12. IMF DataMapper
+13. OECD Data Explorer
+14. Eurostat
+15. OpenFIGI
+
+## Data Health / Quellenübersicht
+
+Der Reiter `Data Health` ist die öffentliche Transparenzseite für Datenqualität und Quellenstatus. Er ersetzt keine interne Betreiber-Konfiguration und zeigt keine API-Key-Felder.
+
+Data Health zeigt jetzt:
+
+- Gesamtstatus der Datenlage
+- Anzahl aktiver, live erfolgreicher, hybrider/fallback-gestützter und problematischer Quellen
+- Modulstatus für Startseite, Tagesüberblick, Tages-Recap, Asset-Seiten, Events, Quick Compare, Watchlist, Alerts, Makro/Liquidität, ETF, Portfolio, Research und Datenquellen
+- Provider-Karten mit Rolle, Quellentyp, Health, Frische, letzter erfolgreicher Aktualisierung und betroffenen Modulen
+- klare Zuständigkeit je Quelle, z. B. FRED für US-Makro, Finnhub für Aktien/News/Earnings, EIA für Energie und Frankfurter für FX
+
+Die verwendeten Statusbegriffe sind:
+
+- `Live`: eine Quelle hat in dieser Sitzung erfolgreich geliefert oder frische Cache-Daten aus einem erfolgreichen Abruf geliefert.
+- `Hybrid`: echte Daten und Fallback-/Produktlogik werden kombiniert.
+- `Fallback`: strukturierte lokale Daten sichern das Modul ab, wenn kein Live-Abruf verfügbar ist.
+- `Offline`: Quelle meldet Fehler, ist nicht konfiguriert oder bewusst nicht aktiv.
+- `Unbekannt`: es gibt noch keinen belastbaren Laufzeitstatus.
+
+Die Health-Einordnung ist bewusst nutzerfreundlich:
+
+- `Gesund`: Datenlage wirkt belastbar.
+- `Eingeschränkt`: Bereich ist nutzbar, aber teilweise Cache, Hybrid oder Zusatzquelle.
+- `Degradiert`: Fallback steht im Vordergrund.
+- `Gestört`: Fehler, fehlende Konfiguration oder offline.
+
+Wichtig: Diese Werte sind Transparenz- und Vertrauensinformationen. Sie sind keine Garantie für Vollständigkeit, Echtzeit oder Fehlerfreiheit.
+
+## Live, Fallback oder hybrid
+
+- Start-Ticker: bevorzugt Finnhub über `/api/finnhub`, danach Alpha Vantage über `/api/alphavantage`, Krypto über `/api/coingecko`, sonst Fallback.
+- Asset-Seiten: Finnhub liefert Quotes, Profile, News, Basic Financials und Earnings, wenn die Vercel Function konfiguriert ist.
+- Makro: FRED läuft über `/api/fred`; BLS, Treasury, World Bank und IMF laufen über `/api/opendata`; FX-Kernpaare laufen über `/api/fx`.
+- Energie/Rohstoffe: Öl läuft bevorzugt über `/api/eia`, Gold/Silber/WTI-Zusatzdaten über `/api/alphavantage`, sonst Fallback.
+- Events/Earnings: Finnhub und Alpha Vantage laufen über eigene `/api/...`-Routen; lokale Events bleiben Backup.
+- ETF, Portfolio, Journal und Reports bleiben bewusst hybrid oder lokal, weil dort viel Produktlogik und Nutzereingabe enthalten ist.
 
 ## Die wichtigsten Dateien
 
 - `index.html` enthält Grundgerüst, Navigation, Footer und bindet CSS/JS relativ ein.
 - `styles.css` enthält Premium-Design, Dark/Light Mode, Mobile Layout und Print/Report Styles.
-- `app.js` enthält die statische App-Logik: Routing, Provider Registry, API Layer, Fallback-Daten, Data Health, Screener, Ratings, Top Picks, Alerts, Asset-Seiten, ETF, Portfolio, Makro, Geldmengen, Insider, Reports und Personalisierung.
-- `README.md` erklärt Projekt, Nutzung, Datenlogik und Deployment.
+- `app.js` enthält die statische App-Logik, Routing, Datenquellenstatus, API-Layer, Fallback-Daten und Module.
+- `api/fred.js` ist die Vercel Function für FRED.
+- `api/finnhub.js` ist die Vercel Function für Finnhub.
+- `api/alphavantage.js` ist die Vercel Function für Alpha Vantage.
+- `api/eia.js` ist die Vercel Function für EIA.
+- `api/fx.js` ist die Vercel Function für Währungskurse über Frankfurter.
+- `api/coingecko.js` ist die Vercel Function für Krypto-Preise.
+- `api/opendata.js` normalisiert ausgewählte Open-Data-Quellen.
 - `DEPLOYMENT.md` erklärt GitHub und Vercel Schritt für Schritt.
-- `vercel.json` ist eine kleine optionale Vercel-Konfiguration für statisches Hosting.
-
-## API Keys und Sicherheit
-
-API Keys werden in dieser statischen Version im Browser per localStorage gespeichert. Das ist für private lokale Tests praktisch.
-
-Für eine echte öffentliche App sollten geheime Keys später geschützt werden:
-
-- Backend-Proxy
-- Edge Functions
-- Supabase oder anderer Backend-Dienst
-- Public/Private-Key-Trennung
-
-## Deployment
-
-Eine einfache Anleitung steht in `DEPLOYMENT.md`.
-
-Kurzfassung:
-
-1. Projektordner bei GitHub hochladen.
-2. Vercel mit GitHub verbinden.
-3. Repository importieren.
-4. Framework: `Other`.
-5. Build Command leer lassen.
-6. Output Directory leer lassen.
-7. Deploy klicken.
 
 ## Disclaimer
 

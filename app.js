@@ -21,7 +21,6 @@
 
   const STORAGE_KEYS = {
     theme: "mh.theme.v2",
-    apiKeys: "mh.apiKeys.v2",
     providerTests: "mh.providerTests.v1",
     providerHealth: "mh.providerHealth.v1",
     watchlist: "mh.watchlist.v2",
@@ -58,12 +57,14 @@
   const PROVIDER_GROUPS = [
     { id: "market", label: "Markt / Aktien / Unternehmen" },
     { id: "alpha", label: "FX / Rohstoffe / Indikatoren" },
+    { id: "fx", label: "Währungen / FX" },
     { id: "usMacro", label: "Makro USA" },
     { id: "euroMacro", label: "Makro Europa" },
     { id: "rates", label: "Zinsen / Yield Curve" },
     { id: "filings", label: "Filings / Fundamentals" },
     { id: "energy", label: "Energie / Rohstoffe" },
-    { id: "globalMacro", label: "Globale Länderdaten" }
+    { id: "globalMacro", label: "Globale Länderdaten" },
+    { id: "reference", label: "Referenzdaten / Identifikatoren" }
   ];
 
   const PROVIDERS = [
@@ -73,12 +74,12 @@
       group: "market",
       categories: ["Market Data", "News", "Events / Earnings"],
       status: "active",
-      keyMode: "required",
-      security: "backend-recommended",
+      keyMode: "serverEnv",
+      security: "backend-only",
       description: "Aktien-Quotes, Firmenprofile, Company News, Basic Financials und Earnings/Events.",
-      usage: "Primärquelle im Datenlayer für Aktien, News und Earnings. Live-Status entsteht erst nach erfolgreichem Abruf.",
-      testHint: "Testet AAPL Quote über Finnhub.",
-      testRequest: (key) => ({ url: `https://finnhub.io/api/v1/quote?symbol=AAPL&token=${encodeURIComponent(key)}`, responseType: "json" }),
+      usage: "Primärquelle für Aktien, Profile, News und Earnings. Läuft öffentlich nur noch serverseitig über /api/finnhub mit FINNHUB_API_KEY.",
+      testHint: "Kein öffentlicher Browser-Key. Status entsteht über echte Modulabrufe auf /api/finnhub.",
+      testRequest: buildFinnhubProxyTestRequest,
       validateTest: validateFinnhubQuote
     },
     {
@@ -87,13 +88,25 @@
       group: "alpha",
       categories: ["FX", "Rohstoffe", "Indikatoren", "Fallback"],
       status: "active",
-      keyMode: "required",
-      security: "backend-recommended",
+      keyMode: "serverEnv",
+      security: "backend-only",
       description: "FX, Rohstoffe, technische Indikatoren, IPO-/Earnings-Zusatz und optionaler Aktienkurs-Fallback.",
-      usage: "Eigener Zuständigkeitsbereich für FX/Rohstoffe/Indikatoren; bei Aktien als Fallback nach Finnhub.",
-      testHint: "Testet GLOBAL_QUOTE für AAPL.",
-      testRequest: (key) => ({ url: `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${encodeURIComponent(key)}`, responseType: "json" }),
+      usage: "Eigener Zuständigkeitsbereich für FX, Rohstoffe, Indikatoren, Zeitreihen sowie IPO-/Earnings-Zusatz. Läuft öffentlich nur noch serverseitig über /api/alphavantage mit ALPHA_VANTAGE_API_KEY.",
+      testHint: "Kein öffentlicher Browser-Key. Status entsteht über echte Modulabrufe auf /api/alphavantage.",
+      testRequest: buildAlphaProxyTestRequest,
       validateTest: validateAlphaVantageQuote
+    },
+    {
+      id: "frankfurter",
+      name: "Frankfurter FX",
+      group: "fx",
+      categories: ["FX", "Währungen", "Umrechnung"],
+      status: "active",
+      keyMode: "none",
+      security: "server-normalized",
+      description: "Offene FX-Quelle für Basis-Währungspaare und einfache Umrechnung.",
+      usage: "Währungsdaten laufen über /api/fx. Kein öffentliches Key-Feld, keine direkte Browser-Abhängigkeit.",
+      testHint: "Status entsteht über echte Modulabrufe auf /api/fx."
     },
     {
       id: "twelveData",
@@ -137,12 +150,12 @@
       group: "usMacro",
       categories: ["US-Makro", "Geldmengen", "Zinsen"],
       status: "active",
-      keyMode: "required",
-      security: "browser-ok-private",
+      keyMode: "serverEnv",
+      security: "backend-only",
       description: "US-Makrodaten wie Fed Funds, CPI, Arbeitslosenquote, Geldmengen, Zinsserien und Spreads.",
-      usage: "Zuständig für US-Makro und Geldmengen. Der Test erzwingt JSON, weil FRED sonst XML liefert.",
-      testHint: "Isolierter Minimaltest: /fred/series/updates mit file_type=json.",
-      testRequest: buildFredMinimalTestRequest,
+      usage: "Zuständig für US-Makro und Geldmengen. FRED läuft nicht mehr direkt im Browser, sondern über die Vercel Function /api/fred mit FRED_API_KEY als Environment Variable.",
+      testHint: "Testet die Vercel Function /api/fred?action=test. Kein FRED-Key im Frontend.",
+      testRequest: buildFredProxyTestRequest,
       validateTest: validateFredSeriesUpdates
     },
     {
@@ -212,13 +225,12 @@
       name: "CoinGecko",
       group: "crypto",
       categories: ["Crypto"],
-      status: "optional",
-      keyMode: "optional",
-      security: "proxy-recommended",
+      status: "active",
+      keyMode: "none",
+      security: "server-normalized",
       description: "Krypto-Preise für BTC/ETH. Public/Demo nutzbar; produktionsnah besser mit Key oder Proxy.",
-      usage: "Optionaler Krypto-Prototyp, nicht Kernbestandteil des öffentlichen Provider-Stacks.",
-      testHint: "Testet Public/Demo Simple Price für Bitcoin.",
-      testUrl: () => "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+      usage: "Krypto-Daten laufen über /api/coingecko. COINGECKO_API_KEY ist optional und wird, falls gesetzt, nur serverseitig genutzt.",
+      testHint: "Status entsteht über echte Crypto-Abrufe auf /api/coingecko."
     },
     {
       id: "coincap",
@@ -309,28 +321,24 @@
       name: "BLS",
       group: "usMacro",
       categories: ["CPI", "Arbeitsmarkt", "US-Labor"],
-      status: "mapped",
+      status: "active",
       keyMode: "none",
-      security: "browser-ok-public",
+      security: "server-normalized",
       description: "Offizielle Open-Data-Quelle für US-Arbeitsmarkt, CPI und Labor-Daten.",
-      usage: "Kein Key nötig. Wird als Open-Data-Ergänzung für CPI und Arbeitsmarkt genutzt, besonders wenn FRED fehlt oder als Plausibilitätsquelle.",
-      testHint: "Open-Data-Test: Latest CPI-Serie.",
-      testRequest: () => ({ url: "https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0?latest=true", responseType: "json" }),
-      validateTest: validateBlsSeries
+      usage: "Kein Key nötig. Wird über /api/opendata normalisiert und ergänzt CPI sowie Arbeitsmarkt.",
+      testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
       id: "treasury",
       name: "U.S. Treasury Fiscal Data",
       group: "rates",
       categories: ["Yield Curve", "Treasury Rates", "Zinsstruktur"],
-      status: "mapped",
+      status: "active",
       keyMode: "none",
-      security: "browser-ok-public",
+      security: "server-normalized",
       description: "Offizielle Open-Data-Quelle für Treasury-Rates, Yield Curve und Zinsstruktur.",
-      usage: "Kein Key nötig. Wird für 10Y-Rendite und 2Y-10Y-Zinskurve als offizielle Open-Data-Ergänzung genutzt.",
-      testHint: "Open-Data-Test: Treasury Average Interest Rates.",
-      testRequest: () => ({ url: "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/avg_interest_rates?sort=-record_date&page[size]=1", responseType: "json" }),
-      validateTest: validateFiscalData
+      usage: "Kein Key nötig. Wird über /api/opendata normalisiert und für 10Y-Rendite sowie Yield Curve genutzt.",
+      testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
       id: "sec",
@@ -349,42 +357,36 @@
       name: "EIA",
       group: "energy",
       categories: ["Energie", "Öl", "Gas"],
-      status: "mapped",
-      keyMode: "required",
-      security: "browser-ok-private",
+      status: "active",
+      keyMode: "serverEnv",
+      security: "backend-only",
       description: "Offizielle Energiequelle für Öl, Gas, Strom und Energiemarktdaten.",
-      usage: "Key nötig. Wird für Öl/Energie als offizieller Datenpfad genutzt, sobald ein erfolgreicher EIA-Abruf vorliegt.",
-      testHint: "Browser-Test: EIA APIv2 Root-Metadaten mit API-Key.",
-      testRequest: (key) => ({ url: `https://api.eia.gov/v2/?api_key=${encodeURIComponent(key)}`, responseType: "json" }),
-      validateTest: validateEiaResponse
+      usage: "EIA läuft über /api/eia mit EIA_API_KEY als Vercel Environment Variable. Öl wird aktiv für Rohstoffdaten genutzt; Gas/Energie sind serverseitig vorbereitet.",
+      testHint: "Kein öffentliches Key-Feld. Status entsteht über echte Modulabrufe auf /api/eia."
     },
     {
       id: "worldBank",
       name: "World Bank",
       group: "globalMacro",
       categories: ["Länderprofile", "Globale Makro"],
-      status: "mapped",
+      status: "active",
       keyMode: "none",
-      security: "browser-ok-public",
+      security: "server-normalized",
       description: "Open-Data-Quelle für globale Länder-, Entwicklungs- und Strukturdaten.",
-      usage: "Kein Key nötig. Wird im Makro-Dashboard für globale BIP-/Ländervergleiche genutzt, wenn der Browserabruf erfolgreich ist.",
-      testHint: "Open-Data-Test: US GDP-Indikator im JSON-Format.",
-      testRequest: () => ({ url: "https://api.worldbank.org/v2/country/US/indicator/NY.GDP.MKTP.CD?format=json&per_page=1", responseType: "json" }),
-      validateTest: validateWorldBankResponse
+      usage: "Kein Key nötig. Wird über /api/opendata normalisiert und für globale BIP-/Ländervergleiche genutzt.",
+      testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
       id: "imf",
       name: "IMF DataMapper",
       group: "globalMacro",
       categories: ["Internationale Makro", "Länder"],
-      status: "mapped",
+      status: "active",
       keyMode: "none",
-      security: "browser-ok-public",
+      security: "server-normalized",
       description: "Offizielle internationale Makroergänzung über IMF DataMapper und IMF APIs.",
-      usage: "Kein Key nötig für DataMapper. Ergänzt globale Makrovergleiche, wenn der Browserabruf erfolgreich ist; World Bank bleibt der stabilere Primärpfad.",
-      testHint: "Open-Data-Test: IMF DataMapper Real GDP Growth USA.",
-      testRequest: () => ({ url: "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/USA", responseType: "json" }),
-      validateTest: validateImfResponse
+      usage: "Kein Key nötig für DataMapper. Wird über /api/opendata normalisiert und ergänzt globale Makrovergleiche.",
+      testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
       id: "oecd",
@@ -397,69 +399,108 @@
       description: "OECD Open Data über SDMX-APIs für Länder- und Wirtschaftsvergleiche.",
       usage: "Kein Key nötig. Wegen SDMX-Komplexität und Browser-/Rate-Limit-Fragen zugeordnet, aber nicht als Live-Frontendquelle markiert.",
       testHint: "Kein Browser-Test in dieser statischen Startphase. Später besser über kontrollierten Datenadapter."
+    },
+    {
+      id: "eurostat",
+      name: "Eurostat",
+      group: "euroMacro",
+      categories: ["Euro-Makro", "EU-Daten", "Länder"],
+      status: "mapped",
+      keyMode: "none",
+      security: "browser-ok-public",
+      description: "Offizielle Open-Data-Quelle für EU-Statistiken, Eurozone-Kennzahlen und Länderprofile.",
+      usage: "Kein Key nötig. In dieser Runde als transparenter Quellenstatus eingeordnet; Live-Module werden später gezielt angebunden.",
+      testHint: "Kein öffentlicher Testbutton. Status entsteht später über echte Modulabrufe."
+    },
+    {
+      id: "openfigi",
+      name: "OpenFIGI",
+      group: "reference",
+      categories: ["Referenzdaten", "Identifier", "Mapping"],
+      status: "mapped",
+      keyMode: "none",
+      security: "backend-ready",
+      description: "Referenzdatenquelle für spätere Symbol-, FIGI- und Instrumenten-Zuordnung.",
+      usage: "Kein öffentliches Key-Feld. Für diese Runde nur als Datenquellenstatus eingeordnet; spätere Nutzung erfolgt kontrolliert serverseitig.",
+      testHint: "Kein öffentlicher Testbutton. Nicht als Live-Modul beworben."
     }
   ];
 
   const DEFAULT_WATCHLIST = ["NVDA", "MSFT", "AAPL", "SPY", "BTC"];
   const HOME_TICKER = ["SPY", "QQQ", "DAX", "NVDA", "MSFT", "AAPL", "BTC", "ETH", "GOLD"];
-  const PUBLIC_PROVIDER_IDS = ["finnhub", "alphaVantage", "fred", "ecb", "bls", "treasury", "sec", "eia", "worldBank", "imf", "oecd"];
+  const PUBLIC_PROVIDER_IDS = ["finnhub", "alphaVantage", "frankfurter", "fred", "ecb", "bls", "treasury", "sec", "eia", "coingecko", "worldBank", "imf", "oecd", "eurostat", "openfigi"];
   const REMOVED_PUBLIC_PROVIDER_IDS = ["newsApi", "gnews", "fmp", "twelveData", "coincap", "eodhd", "marketaux", "exchangeRateApi", "openExchangeRates", "metalsApi", "reddit", "brevo", "supabase", "finnhubNews"];
-  const OPTIONAL_INTERNAL_PROVIDER_IDS = ["coingecko"];
-  const PRIORITY_PROVIDER_IDS = ["finnhub", "alphaVantage", "fred", "ecb", "bls", "treasury", "sec", "eia", "worldBank", "imf", "oecd"];
+  const OPTIONAL_INTERNAL_PROVIDER_IDS = [];
+  const PRIORITY_PROVIDER_IDS = ["finnhub", "alphaVantage", "frankfurter", "fred", "ecb", "bls", "treasury", "sec", "eia", "coingecko", "worldBank", "imf", "oecd", "eurostat", "openfigi"];
   const DATA_HEALTH_PROVIDER_IDS = [
     "finnhub",
     "alphaVantage",
+    "frankfurter",
     "fred",
     "ecb",
     "bls",
     "treasury",
     "sec",
     "eia",
+    "coingecko",
     "worldBank",
     "imf",
-    "oecd"
+    "oecd",
+    "eurostat",
+    "openfigi"
   ];
 
   const PROVIDER_MODULE_USAGE = {
     finnhub: ["Aktien-Quotes", "Unternehmensprofile", "Company News", "Earnings Calendar", "Asset-Seiten"],
     alphaVantage: ["Quote-Fallback", "FX", "Rohstoffe", "technische Indikatoren", "IPO/Earnings-Zusatz"],
+    frankfurter: ["FX-Kurse", "Währungsumrechnung", "EUR/USD", "USD/JPY"],
     fred: ["US-Makro", "Fed Funds", "CPI/Inflation", "Arbeitslosenquote", "Geldmengen/Zinsen"],
     ecb: ["Eurozone", "EZB-Zinsen", "EUR-FX", "Euro-Makro"],
     bls: ["CPI", "Arbeitsmarkt", "US-Labor"],
     treasury: ["Yield Curve", "Treasury Rates", "Zinsstruktur"],
     sec: ["Filings", "Submissions", "XBRL", "Fundamentaldatenbasis"],
     eia: ["Energie", "Öl", "Gas", "Rohstoffdaten"],
+    coingecko: ["Krypto-Preise", "Market Cap", "BTC/ETH/SOL"],
     worldBank: ["Länderprofile", "globale Makrodaten", "Strukturdaten"],
     imf: ["internationale Makroergänzung", "Ländervergleiche"],
-    oecd: ["OECD-Vergleiche", "Wirtschaftsstruktur"]
+    oecd: ["OECD-Vergleiche", "Wirtschaftsstruktur"],
+    eurostat: ["Eurozone", "EU-Statistik", "Länderprofile"],
+    openfigi: ["Symbol-Mapping", "Instrumenten-Referenz", "spätere Datenharmonisierung"]
   };
 
-  const API_ONBOARDING_GUIDE = [
-    {
-      providerId: "finnhub",
-      title: "1. Finnhub zuerst",
-      text: "Primärquelle für Aktien-Quotes, Profile, Company News und Earnings. Das ist der wichtigste Key für den öffentlichen Start."
-    },
-    {
-      providerId: "alphaVantage",
-      title: "2. Alpha Vantage als Zusatz",
-      text: "Quote-Fallback, FX, Rohstoffe, technische Indikatoren sowie IPO-/Earnings-Zusatz. Nicht Primärprovider für Aktien."
-    },
-    {
-      providerId: "fred",
-      title: "3. FRED für US-Makro",
-      text: "Fed Funds, CPI, Arbeitslosenquote, Geldmengen, Zinsserien und Spreads. Der Test erzwingt JSON."
-    },
-    {
-      providerId: "eia",
-      title: "4. EIA für Energie",
-      text: "Offizielle Quelle für Öl, Gas und Energiedaten. Key nötig, aber klar auf Energie begrenzt."
-    },
-    {
-      providerId: "worldBank",
-      title: "5. Open Data Quellen",
-      text: "ECB, BLS, Treasury, SEC, World Bank, IMF und OECD brauchen keine API-Key-Felder. Sie werden nach Aufgaben zugeordnet."
-    }
+  const DATA_SOURCE_REGISTRY = [
+    { id: "finnhub", role: "Primärquelle", type: "Serverseitig", category: "Markt / Unternehmen", description: "Aktienkurse, Unternehmensprofile, Company News und Earnings laufen über die eigene Vercel Function.", fallback: "Bei Fehlern bleiben lokale Quotes, Profile und Event-Fallbacks aktiv." },
+    { id: "alphaVantage", role: "Zusatzquelle", type: "Serverseitig", category: "FX / Rohstoffe / Zeitreihen", description: "Ergänzt FX, Rohstoffe, technische Indikatoren sowie IPO- und Earnings-Zusatzdaten.", fallback: "Wird bei Aktien auch als Quote-Fallback genutzt, wenn Finnhub nicht liefert." },
+    { id: "frankfurter", role: "Primärquelle FX", type: "Serverseitig normalisiert", category: "Währungen", description: "Offene FX-Kurse laufen zentral über /api/fx, ohne öffentliches Key-Feld.", fallback: "Bei Ausfall nutzt die App strukturierte lokale FX-Kontexte." },
+    { id: "fred", role: "Primärquelle US-Makro", type: "Serverseitig", category: "US-Makro / Geldmengen", description: "FRED versorgt Zinsen, Geldmengen, Spreads und US-Makroserien ausschließlich serverseitig.", fallback: "Makro- und Liquiditätskarten bleiben fallback-gestützt nutzbar." },
+    { id: "ecb", role: "Euro-Makro", type: "Open Data", category: "Eurozone", description: "ECB ist als offene Quelle für Eurozone, EZB-Zinsen und EUR-Kontext eingeordnet.", fallback: "Noch nicht jede ECB-Reihe ist live verdrahtet; lokale Euro-Makro-Basis bleibt sichtbar." },
+    { id: "bls", role: "Offizielle US-Daten", type: "Serverseitig normalisiert", category: "Inflation / Arbeit", description: "BLS ergänzt CPI und Arbeitsmarkt über die Open-Data-Normalisierung.", fallback: "CPI und Arbeitsmarkt bleiben mit lokalen Makro-Fallbacks verfügbar." },
+    { id: "treasury", role: "Zinsstruktur", type: "Serverseitig normalisiert", category: "Yield Curve", description: "Treasury liefert Renditen, Yield Curve und Zinsstruktur über /api/opendata.", fallback: "FRED/Treasury-Fallbacks sichern Zinskarten ab." },
+    { id: "sec", role: "Fundamentaldatenbasis", type: "Open Data / serverseitig sinnvoll", category: "Filings", description: "SEC/EDGAR ist für Filings, Submissions und XBRL eingeordnet, aber browserseitig kritisch.", fallback: "Asset-Seiten nutzen derzeit Finnhub und lokale Fundamentaldatenbasis." },
+    { id: "eia", role: "Energiequelle", type: "Serverseitig", category: "Energie / Rohstoffe", description: "EIA ist die offizielle Energiequelle für Öl, Gas und Energiedaten.", fallback: "Rohstoffkarten nutzen Alpha Vantage und lokale Fallbacks, falls EIA nicht liefert." },
+    { id: "coingecko", role: "Krypto-Preise", type: "Serverseitig", category: "Krypto", description: "CoinGecko liefert Krypto-Preise über eine eigene serverseitige Route.", fallback: "BTC/ETH/SOL bleiben über lokale Krypto-Fallbacks sichtbar." },
+    { id: "worldBank", role: "Globale Makroquelle", type: "Serverseitig normalisiert", category: "Länderdaten", description: "World Bank liefert globale Länder- und BIP-Daten über die Open-Data-Schicht.", fallback: "Globale Vergleichskarten nutzen lokale Länder-Fallbacks." },
+    { id: "imf", role: "Internationale Makroergänzung", type: "Serverseitig normalisiert", category: "Globale Makro", description: "IMF ergänzt internationale Wachstums- und Länderdaten.", fallback: "IMF ist Ergänzung, nicht alleinige Basis." },
+    { id: "oecd", role: "Vergleichsdaten", type: "Open Data / späterer Adapter", category: "OECD", description: "OECD ist für strukturierte Länder- und Wirtschaftsvergleiche eingeordnet.", fallback: "Noch nicht als Live-Kernpfad beworben." },
+    { id: "eurostat", role: "EU-Statistik", type: "Open Data", category: "Euro-Makro", description: "Eurostat ist als offizielle EU-Datenquelle eingeordnet.", fallback: "Eurostat-Reihen werden erst nach gezielter Modulverdrahtung live gezählt." },
+    { id: "openfigi", role: "Referenzdaten", type: "Open Data / Mapping", category: "Identifier", description: "OpenFIGI ist für spätere Instrumenten- und Identifier-Logik eingeordnet.", fallback: "Aktuell kein produktiver Live-Pfad; Symboluniversum bleibt lokal kontrolliert." }
+  ];
+
+  const DATA_HEALTH_MODULES = [
+    { id: "home", name: "Startseite", providers: ["finnhub", "alphaVantage", "coingecko", "fred"], mode: "Hybrid", quality: "hoch", description: "Ticker, Tagesüberblick, Tages-Recap und Marktstatus bündeln Live- und Fallback-Daten." },
+    { id: "briefing", name: "Tagesüberblick", providers: ["finnhub", "fred", "treasury", "eia"], mode: "Hybrid", quality: "hoch", description: "Marktbewegungen, Makro, Liquidität und Event-Fokus werden aus vorhandenen Daten priorisiert." },
+    { id: "recap", name: "Tages-Recap", providers: ["finnhub", "alphaVantage", "coingecko"], mode: "Hybrid / lokal priorisiert", quality: "mittel", description: "Watchlist, Alerts, Events, News und Bewegungen werden lokal kuratiert und nach Relevanz sortiert." },
+    { id: "asset", name: "Asset-Seiten", providers: ["finnhub", "sec", "alphaVantage"], mode: "Hybrid", quality: "hoch", description: "Preis, Profil, News und Events bevorzugen Live-Daten; Research bleibt Produktlogik." },
+    { id: "events", name: "Event-/Earnings-Hub", providers: ["finnhub", "alphaVantage"], mode: "Hybrid / Fallback", quality: "mittel", description: "Earnings und IPO-Zusatzdaten werden providerbasiert geladen; lokaler Kalender bleibt Backup." },
+    { id: "compare", name: "Quick Compare", providers: ["finnhub", "alphaVantage"], mode: "Hybrid", quality: "mittel", description: "Quotes und Fundamentals speisen den Vergleich; ETF-Struktur bleibt lokal modelliert." },
+    { id: "watchlist", name: "Watchlist", providers: ["finnhub", "alphaVantage"], mode: "Hybrid / lokal", quality: "mittel", description: "Gespeicherte Assets sind lokal, Kurs- und Newsdaten kommen soweit möglich live." },
+    { id: "alerts", name: "Alerts V2", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "Regeln, Snooze und Historie sind lokal; Auslösung nutzt vorhandene Kurs- und Eventdaten." },
+    { id: "macro", name: "Makro / Liquidität / Geldmengen", providers: ["fred", "bls", "treasury", "ecb"], mode: "Hybrid / Fallback", quality: "hoch", description: "US-Makro, CPI, Arbeitsmarkt, Renditen und Euro-Kontext werden offiziellen Quellen zugeordnet." },
+    { id: "energy", name: "Energie / Rohstoffe / FX", providers: ["eia", "alphaVantage", "frankfurter"], mode: "Hybrid", quality: "mittel", description: "EIA, Alpha Vantage und FX-Normalisierung speisen Cross-Asset-Kontexte." },
+    { id: "etf", name: "ETF", providers: ["finnhub"], mode: "Lokal / Hybrid", quality: "mittel", description: "ETF-Struktur, TER und Holdings sind strukturiert lokal; Marktpreise können über Quote-Pfade kommen." },
+    { id: "portfolio", name: "Portfolio", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "Positionen und Notizen sind lokal; Marktdaten werden soweit verfügbar live ergänzt." },
+    { id: "research", name: "Research / Report", providers: ["finnhub", "fred", "sec"], mode: "Hybrid / Synthese", quality: "mittel", description: "Reports kombinieren echte Inputs, lokale Fallbacks und eigene Research-Synthese." },
+    { id: "sources", name: "Datenquellen", providers: DATA_HEALTH_PROVIDER_IDS, mode: "Transparenz", quality: "hoch", description: "Zeigt Quellen, Status, Frische, Health und betroffene Module ohne öffentliche Key-Konfiguration." }
   ];
 
   const ASSETS = [
@@ -1588,8 +1629,8 @@
       provider: "Finnhub",
       status: "active",
       providerId: "finnhub",
-      coverage: "Earnings Calendar, Company News und Asset-Termine über denselben Finnhub-Key",
-      source: "Finnhub API Slot"
+      coverage: "Earnings Calendar, Company News und Asset-Termine über /api/finnhub",
+      source: "Finnhub via Vercel Function"
     },
     {
       name: "Alpha Vantage Zusatzkalender",
@@ -1611,7 +1652,7 @@
       name: "Lokaler Event-Fallback",
       provider: "MH Analytics",
       status: "fallback",
-      coverage: "Earnings, Dividenden, Splits und Makrotermine bleiben ohne Key sichtbar",
+      coverage: "Earnings, Dividenden, Splits und Makrotermine bleiben auch ohne Live-Abruf sichtbar",
       source: "Lokale strukturierte Event-Daten"
     }
   ];
@@ -1660,8 +1701,9 @@
     { title: "US CPI Release", dateOffset: 6, type: "Makro", symbol: "Macro", detail: "Inflation beeinflusst Zinsfantasie, Multiples und Gold/Dollar." },
     { title: "Fed Meeting / Rate Decision", dateOffset: 28, type: "Makro", symbol: "Macro", detail: "Dot Plot, Statement und Pressekonferenz bestimmen den Liquiditätsblick." },
     { title: "EZB Zinsentscheid", dateOffset: 34, type: "Makro", symbol: "DAX", detail: "Wichtig für DAX, EUR/USD und europäische Bewertungsmultiples." },
+    { title: "US IPO Window", dateOffset: 10, type: "IPO", symbol: "IPO", detail: "Lokaler IPO-Fallback für Neuemissionen, bis Alpha Vantage IPO-Daten live liefern." },
     { title: "Bitcoin Network / ETF Flow Check", dateOffset: 15, type: "Krypto", symbol: "BTC", detail: "ETF-Flows und Liquidität bleiben kurzfristige Kurstreiber." },
-    { title: "SPY Ex-Dividend Reminder", dateOffset: 42, type: "Dividende", symbol: "SPY", detail: "ETF-spezifischer Dividenden-Termin als lokaler Fallback." },
+    { title: "SPY Ex-Dividend Reminder", dateOffset: 13, type: "Dividende", symbol: "SPY", detail: "ETF-spezifischer Dividenden-Termin als lokaler Fallback." },
     { title: "Apple Dividend Window", dateOffset: 52, type: "Dividende", symbol: "AAPL", detail: "Lokaler Dividenden-Fallback; spätere Live-Daten über offiziellen Corporate-Action-Adapter." },
     { title: "Amazon Split Monitor", dateOffset: 65, type: "Split", symbol: "AMZN", detail: "Corporate-Action-Slot für Aktiensplits und Reverse Splits vorbereitet." },
     { title: "DAX Dividend Season Check", dateOffset: 74, type: "Dividende", symbol: "DAX", detail: "Europäische Ausschüttungssaison als strukturierter Fallback-Termin." }
@@ -1857,7 +1899,6 @@
     route: "home",
     activeSymbol: storageGet(STORAGE_KEYS.activeSymbol, "NVDA"),
     theme: storageGet(STORAGE_KEYS.theme, "dark"),
-    apiKeys: storageGet(STORAGE_KEYS.apiKeys, {}),
     providerTests: storageGet(STORAGE_KEYS.providerTests, {}),
     providerHealth: sanitizeProviderHealth(storageGet(STORAGE_KEYS.providerHealth, {})),
     watchlist: storageGet(STORAGE_KEYS.watchlist, DEFAULT_WATCHLIST),
@@ -1875,9 +1916,24 @@
     },
     eventHub: {
       type: "all",
-      window: "week"
+      window: "week",
+      scope: "all",
+      relevance: "all",
+      source: "all",
+      search: ""
     },
     alertFilter: "all",
+    alertFilters: {
+      status: "all",
+      priority: "all",
+      type: "all",
+      scope: "all",
+      search: ""
+    },
+    alertDraft: {
+      symbol: "",
+      type: "price"
+    },
     screener: {
       search: "",
       momentum: "all",
@@ -1896,7 +1952,11 @@
     },
     portfolioScenario: {
       shock: -10,
-      contribution: 500
+      contribution: 500,
+      symbol: "SPY",
+      quantity: 0,
+      avgPrice: "",
+      cashChange: 0
     },
     quotes: {},
     profiles: {},
@@ -1921,6 +1981,7 @@
   const assetMap = new Map(ASSETS.map((asset) => [asset.symbol, asset]));
 
   function init() {
+    removeLegacyBrowserApiKeys();
     applyTheme();
     bindGlobalEvents();
     syncRouteFromHash();
@@ -1950,6 +2011,24 @@
     const routeButton = event.target.closest("[data-route]");
     if (routeButton) {
       navigate(routeButton.dataset.route);
+      return;
+    }
+
+    const compareOpen = event.target.closest("[data-compare-open]");
+    if (compareOpen) {
+      openCompareWith(compareOpen.dataset.compareOpen);
+      return;
+    }
+
+    const comparePair = event.target.closest("[data-compare-pair-left]");
+    if (comparePair) {
+      openComparePair(comparePair.dataset.comparePairLeft, comparePair.dataset.comparePairRight);
+      return;
+    }
+
+    const compareSwap = event.target.closest("[data-compare-swap]");
+    if (compareSwap) {
+      swapCompareAssets();
       return;
     }
 
@@ -2014,30 +2093,6 @@
       return;
     }
 
-    const saveKeys = event.target.closest("[data-save-api-keys]");
-    if (saveKeys) {
-      saveApiKeys();
-      return;
-    }
-
-    const deleteProviderKey = event.target.closest("[data-delete-provider-key]");
-    if (deleteProviderKey) {
-      deleteProviderKeyById(deleteProviderKey.dataset.deleteProviderKey);
-      return;
-    }
-
-    const testProviderButton = event.target.closest("[data-test-provider]");
-    if (testProviderButton) {
-      testProviderById(testProviderButton.dataset.testProvider);
-      return;
-    }
-
-    const testAllProvidersButton = event.target.closest("[data-test-all-providers]");
-    if (testAllProvidersButton) {
-      testConfiguredProviders();
-      return;
-    }
-
     const clearCache = event.target.closest("[data-clear-cache]");
     if (clearCache) {
       storageSet(STORAGE_KEYS.cache, {});
@@ -2086,6 +2141,18 @@
       return;
     }
 
+    const quickAlert = event.target.closest("[data-alert-quick]");
+    if (quickAlert) {
+      openAlertDraft(quickAlert.dataset.alertQuick, quickAlert.dataset.alertQuickType || "price");
+      return;
+    }
+
+    const eventAlert = event.target.closest("[data-alert-event-title]");
+    if (eventAlert) {
+      createEventAlertFromDataset(eventAlert.dataset);
+      return;
+    }
+
     const alertDone = event.target.closest("[data-alert-done]");
     if (alertDone) {
       markAlertDone(alertDone.dataset.alertDone);
@@ -2094,13 +2161,15 @@
 
     const alertSnooze = event.target.closest("[data-alert-snooze]");
     if (alertSnooze) {
-      snoozeAlert(alertSnooze.dataset.alertSnooze);
+      snoozeAlert(alertSnooze.dataset.alertSnooze, alertSnooze.dataset.alertSnoozeDuration || "tomorrow");
       return;
     }
 
     const alertFilter = event.target.closest("[data-alert-filter]");
     if (alertFilter) {
-      state.alertFilter = alertFilter.dataset.alertFilter || "all";
+      const group = alertFilter.dataset.alertFilterGroup || "type";
+      state.alertFilters[group] = alertFilter.dataset.alertFilter || "all";
+      state.alertFilter = group === "type" ? state.alertFilters.type : state.alertFilter;
       render();
       return;
     }
@@ -2115,6 +2184,20 @@
     const eventWindow = event.target.closest("[data-event-window]");
     if (eventWindow) {
       state.eventHub.window = eventWindow.dataset.eventWindow || "week";
+      render();
+      return;
+    }
+
+    const eventScope = event.target.closest("[data-event-scope]");
+    if (eventScope) {
+      state.eventHub.scope = eventScope.dataset.eventScope || "all";
+      render();
+      return;
+    }
+
+    const eventRelevance = event.target.closest("[data-event-relevance]");
+    if (eventRelevance) {
+      state.eventHub.relevance = eventRelevance.dataset.eventRelevance || "all";
       render();
       return;
     }
@@ -2155,9 +2238,19 @@
       updateCompareState(compareInput);
     }
 
+    const eventInput = event.target.closest("[data-event-control]");
+    if (eventInput) {
+      updateEventHubState(eventInput);
+    }
+
     const scenarioInput = event.target.closest("[data-portfolio-scenario]");
     if (scenarioInput) {
       updatePortfolioScenario(scenarioInput);
+    }
+
+    const alertInput = event.target.closest("[data-alert-control]");
+    if (alertInput) {
+      updateAlertFilterState(alertInput);
     }
   }
 
@@ -2177,9 +2270,19 @@
       updateCompareState(compareInput);
     }
 
+    const eventInput = event.target.closest("[data-event-control]");
+    if (eventInput) {
+      updateEventHubState(eventInput);
+    }
+
     const scenarioInput = event.target.closest("[data-portfolio-scenario]");
     if (scenarioInput) {
       updatePortfolioScenario(scenarioInput);
+    }
+
+    const alertInput = event.target.closest("[data-alert-control]");
+    if (alertInput) {
+      updateAlertFilterState(alertInput);
     }
   }
 
@@ -2279,6 +2382,8 @@
 
     if (state.route === "asset") {
       renderAssetPage();
+    } else if (state.route === "compare") {
+      renderComparePage();
     } else if (state.route === "screener") {
       renderScreenerPage();
     } else if (state.route === "macro") {
@@ -2326,7 +2431,7 @@
             <button class="primary-button" type="button" data-route="asset">Aktie analysieren</button>
             <button class="ghost-button" type="button" data-route="screener">Screener öffnen</button>
             <button class="ghost-button" type="button" data-report="topPicks">Top Picks Report</button>
-            <button class="ghost-button" type="button" data-route="settings">API Keys eintragen</button>
+            <button class="ghost-button" type="button" data-route="settings">Datenquellen ansehen</button>
           </div>
           <div class="hero-meta">
             <div class="meta-tile">
@@ -2464,8 +2569,8 @@
             <div class="stack-list">
               ${briefing.upcomingEvents.map((eventItem) => `
                 <button class="brief-event-row" type="button" ${assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : ""}>
-                  <span class="pill">${esc(eventItem.type)}</span>
-                  <span><strong>${esc(eventItem.title)}</strong><small>${eventItem.date.toLocaleDateString("de-DE")} | ${esc(eventItem.symbol)}</small></span>
+                  <span class="pill">${esc(eventTypeLabel(eventItem))}</span>
+                  <span><strong>${esc(eventItem.title)}</strong><small>${esc(eventTimingLabel(eventItem))} | ${esc(eventAreaLabel(eventItem))}</small></span>
                 </button>
               `).join("") || renderEmptyState("Keine Termine im 7-Tage-Fenster.")}
             </div>
@@ -2489,60 +2594,160 @@
   function renderDailyRecapSection() {
     const recap = dailyRecapForView();
     return `
-      <section class="section compact-section">
+      <section class="section daily-recap-section">
         <div class="section-head">
           <div>
             <p class="eyebrow">Tages-Recap</p>
             <h2>Was habe ich heute verpasst?</h2>
-            <p>Ein kurzer Rückblick aus Marktbewegungen, Watchlist-Hinweisen, News und Events. Live-Daten werden genutzt, Fallbacks bleiben sichtbar.</p>
+            <p>Ein kuratierter Blick auf heutige Marktbewegungen, Events, Watchlist-Hinweise, Alerts und News. Live-Daten fließen ein, lokale Priorisierung bleibt sichtbar.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="events">Event-Hub öffnen</button>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="events">Event-Hub öffnen</button>
+            <button class="ghost-button" type="button" data-route="alerts">Alerts prüfen</button>
+            <button class="ghost-button" type="button" data-route="screener">Screener öffnen</button>
+          </div>
         </div>
-        <div class="grid four recap-grid">
-          <article class="card">
-            <span class="card-label">Marktbewegungen</span>
+        <article class="card daily-recap-hero">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Heute im Fokus · ${esc(recap.dateLabel)}</span>
+              <h3>${esc(recap.conclusion.label)}</h3>
+              <p>${esc(recap.conclusion.text)}</p>
+            </div>
+            ${renderStatusBadge(recap.status)}
+          </div>
+          <div class="metric-grid">
+            ${renderMiniMetric("Top-Punkte", String(recap.priorityItems.length))}
+            ${renderMiniMetric("Watchlist", String(recap.watchlistItems.length))}
+            ${renderMiniMetric("Events heute", String(recap.todayEventCount))}
+            ${renderMiniMetric("Alerts relevant", String(recap.alerts.length))}
+          </div>
+          <div class="recap-priority-list">
+            ${recap.priorityItems.map(renderRecapPriorityItem).join("") || renderEmptyState("Heute gibt es keine stark priorisierten Punkte im aktuellen Datenfenster.")}
+          </div>
+          ${renderDataMeta(makeMeta("Daily-Recap: Watchlist + Events + Alerts + News", recap.status, Date.now(), "Relevanz wird lokal aus vorhandenen Daten priorisiert."), true)}
+        </article>
+        <div class="daily-recap-layout">
+          <article class="card recap-panel">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Markt</span>
+                <h3>Wichtigste Bewegungen</h3>
+              </div>
+              <span class="pill">${esc(recap.moveMode)}</span>
+            </div>
             <div class="stack-list">
-              ${recap.moves.map((item) => `
-                <button class="brief-row" type="button" data-symbol="${escAttr(item.symbol)}">
-                  <span><strong>${esc(item.symbol)}</strong><small>${esc(item.name)}</small></span>
-                  <span class="${toneClass(item.changePct)}">${formatPercent(item.changePct)}</span>
-                </button>
-              `).join("") || renderEmptyState("Keine größeren Bewegungen geladen.")}
+              ${recap.moves.map(renderRecapMoveItem).join("") || renderEmptyState("Keine größeren Bewegungen geladen.")}
             </div>
           </article>
-          <article class="card">
-            <span class="card-label">Wichtige News</span>
+          <article class="card recap-panel">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Events</span>
+                <h3>Heute oder unmittelbar relevant</h3>
+              </div>
+              <button class="tiny-button" type="button" data-route="events">Alle Termine</button>
+            </div>
             <div class="stack-list">
-              ${recap.news.map((item) => `
-                <button class="brief-event-row" type="button" data-symbol="${escAttr(item.symbol)}">
-                  <span class="pill">${esc(item.symbol)}</span>
-                  <span><strong>${esc(item.headline)}</strong><small>${esc(item.source)} | ${esc(item.sentiment)}</small></span>
-                </button>
-              `).join("") || renderEmptyState("Keine News im aktuellen Feed.")}
+              ${recap.events.map(renderRecapEventItem).join("") || renderEmptyState("Keine heutigen Termine. Der Event-Hub bleibt für die Woche verfügbar.")}
             </div>
           </article>
-          <article class="card">
-            <span class="card-label">Events</span>
+          <article class="card recap-panel recap-watchlist-panel">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Deine Watchlist</span>
+                <h3>${esc(recap.watchlistTone.label)}</h3>
+                <p>${esc(recap.watchlistTone.text)}</p>
+              </div>
+              ${renderStatusBadge(recap.watchlistStatus)}
+            </div>
             <div class="stack-list">
-              ${recap.events.map((eventItem) => `
-                <button class="brief-event-row" type="button" ${assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : ""}>
-                  <span class="pill">${esc(eventItem.type)}</span>
-                  <span><strong>${esc(eventItem.title)}</strong><small>${eventItem.date.toLocaleDateString("de-DE")} | ${esc(eventItem.symbol)}</small></span>
-                </button>
-              `).join("") || renderEmptyState("Keine heutigen Termine.")}
+              ${recap.watchlistItems.map(renderRecapWatchlistItem).join("") || renderEmptyState("Keine Watchlist-Hinweise im aktuellen Datenfenster.")}
             </div>
           </article>
-          <article class="card">
-            <span class="card-label">Watchlist</span>
-            <h3>${esc(recap.watchlistTone.label)}</h3>
-            <p>${esc(recap.watchlistTone.text)}</p>
-            <div class="metric-grid">
-              ${renderMiniMetric("Hinweise", String(recap.watchlistItems.length))}
-              ${renderMiniMetric("Alerts offen", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "open").length))}
+          <article class="card recap-panel">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">News / Treiber</span>
+                <h3>Was den Markt bewegt</h3>
+              </div>
+              ${renderStatusBadge(recap.newsStatus)}
+            </div>
+            <div class="stack-list">
+              ${recap.news.map(renderRecapNewsItem).join("") || renderEmptyState("Keine kuratierten News im aktuellen Feed.")}
             </div>
           </article>
         </div>
       </section>
+    `;
+  }
+
+  function renderRecapPriorityItem(item) {
+    const action = item.symbol && assetMap.has(item.symbol) ? `data-symbol="${escAttr(item.symbol)}"` : `data-route="${escAttr(item.route || "events")}"`;
+    return `
+      <button class="recap-priority-item" type="button" ${action}>
+        <span class="score-pill ${recapScoreTone(item.score)}">${Math.round(item.score)}</span>
+        <span>
+          <strong>${esc(item.title)}</strong>
+          <small>${esc(item.text)}</small>
+        </span>
+        <span class="pill">${esc(item.kind)}</span>
+      </button>
+    `;
+  }
+
+  function renderRecapMoveItem(item) {
+    return `
+      <button class="brief-row recap-row" type="button" data-symbol="${escAttr(item.symbol)}">
+        <span>
+          <strong>${esc(item.symbol)} · ${esc(item.name)}</strong>
+          <small>${esc(item.reason)}</small>
+        </span>
+        <span class="right-cell">
+          <strong class="${toneClass(item.changePct)}">${formatPercent(item.changePct)}</strong>
+          <small>${esc(recapRelevanceLabel(item.score))}</small>
+        </span>
+      </button>
+    `;
+  }
+
+  function renderRecapEventItem(eventItem) {
+    const action = assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : `data-route="events"`;
+    return `
+      <button class="brief-event-row recap-event-row" type="button" ${action}>
+        <span class="score-pill ${eventRelevanceTone(eventItem)}">${eventRelevance(eventItem)}</span>
+        <span>
+          <strong>${esc(eventItem.title)}</strong>
+          <small>${esc(eventTimingLabel(eventItem))} · ${esc(eventTypeLabel(eventItem))} · ${esc(eventAreaLabel(eventItem))}</small>
+        </span>
+        ${isWatchlistRelevantEvent(eventItem) ? `<span class="pill bull">Watchlist</span>` : renderStatusBadge(eventItem.meta?.status)}
+      </button>
+    `;
+  }
+
+  function renderRecapWatchlistItem(item) {
+    const action = item.symbol && assetMap.has(item.symbol) ? `data-symbol="${escAttr(item.symbol)}"` : `data-route="alerts"`;
+    return `
+      <button class="brief-event-row recap-watch-row" type="button" ${action}>
+        <span class="pill ${item.priority === "high" ? "bear" : ""}">${esc(item.kind)}</span>
+        <span>
+          <strong>${esc(item.symbol || "Watchlist")}</strong>
+          <small>${esc(item.text)}</small>
+        </span>
+      </button>
+    `;
+  }
+
+  function renderRecapNewsItem(item) {
+    return `
+      <button class="brief-event-row recap-news-row" type="button" data-symbol="${escAttr(item.symbol)}">
+        <span class="score-pill ${recapScoreTone(item.score)}">${Math.round(item.score)}</span>
+        <span>
+          <strong>${esc(item.headline)}</strong>
+          <small>${esc(item.symbol)} · ${esc(item.source)} · ${esc(item.sentiment || "Neutral")}</small>
+        </span>
+        ${renderStatusBadge(item.status)}
+      </button>
     `;
   }
 
@@ -2602,39 +2807,78 @@
     `;
   }
 
-  function renderQuickCompareSection() {
+  function compareSymbols() {
     const leftSymbol = assetMap.has(state.compare.left) ? state.compare.left : "NVDA";
-    const rightSymbol = assetMap.has(state.compare.right) ? state.compare.right : "MSFT";
+    let rightSymbol = assetMap.has(state.compare.right) ? state.compare.right : "MSFT";
+    if (leftSymbol === rightSymbol) {
+      rightSymbol = leftSymbol === "MSFT" ? "NVDA" : "MSFT";
+      state.compare.right = rightSymbol;
+    }
     ensureAssetData(leftSymbol);
     ensureAssetData(rightSymbol);
+    return { leftSymbol, rightSymbol };
+  }
+
+  function renderComparePage() {
+    const { leftSymbol, rightSymbol } = compareSymbols();
+    app.innerHTML = `
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Quick Compare</p>
+            <h1>Zwei Assets direkt vergleichen.</h1>
+            <p>Aktien und ETFs nebeneinander: Kurs, Profil, Bewertung, Technik, Chancen, Risiken und Datenstatus. Die Interpretation bleibt bewusst als MH-Hybridlogik gekennzeichnet.</p>
+          </div>
+          ${renderDataMeta(makeMeta("Hybrid: Live-Daten + lokale Research-Logik", compareStatusFor(leftSymbol, rightSymbol), Date.now()), true)}
+        </div>
+        ${renderCompareWorkbench(leftSymbol, rightSymbol, { full: true })}
+      </section>
+    `;
+  }
+
+  function renderQuickCompareSection() {
+    const { leftSymbol, rightSymbol } = compareSymbols();
     return `
       <section class="section compact-section">
         <div class="section-head">
           <div>
             <p class="eyebrow">Quick Compare</p>
             <h2>Zwei Assets direkt vergleichen</h2>
-            <p>Preis, Tagesbewegung, Market Cap, KGV, Sektor, Rating, Chancen und Risiken nebeneinander. Für Aktien und ETFs nutzbar.</p>
+            <p>Aktie gegen Aktie oder ETF gegen ETF: Preis, Profil, Bewertung, Technik, Chancen und Risiken in einer ruhigen Gegenüberstellung.</p>
           </div>
-          ${renderDataMeta(makeMeta("Hybrid: Finnhub, Alpha Vantage, lokale Heuristik", compareStatusFor(leftSymbol, rightSymbol), Date.now()), true)}
+          <div class="row-actions">
+            ${renderDataMeta(makeMeta("Hybrid: Finnhub, Alpha Vantage, ETF-Fallback", compareStatusFor(leftSymbol, rightSymbol), Date.now()), true)}
+            <button class="ghost-button" type="button" data-route="compare">Compare öffnen</button>
+          </div>
         </div>
-        <article class="card compare-card">
-          <div class="form-grid compare-controls">
-            <label class="field">
-              <span>Asset A</span>
-              <select data-compare-control name="left">${compareOptions(leftSymbol)}</select>
-            </label>
-            <label class="field">
-              <span>Asset B</span>
-              <select data-compare-control name="right">${compareOptions(rightSymbol)}</select>
-            </label>
-          </div>
-          <div class="grid two compare-grid">
-            ${renderCompareAssetCard(leftSymbol)}
-            ${renderCompareAssetCard(rightSymbol)}
-          </div>
-          ${renderCompareVerdict(leftSymbol, rightSymbol)}
-        </article>
+        ${renderCompareWorkbench(leftSymbol, rightSymbol)}
       </section>
+    `;
+  }
+
+  function renderCompareWorkbench(leftSymbol, rightSymbol, options = {}) {
+    const summary = compareSummary(leftSymbol, rightSymbol);
+    return `
+      <article class="card compare-card ${options.full ? "compare-card-full" : ""}">
+        <div class="form-grid compare-controls">
+          <label class="field">
+            <span>Asset A</span>
+            <select data-compare-control name="left">${compareOptions(leftSymbol)}</select>
+          </label>
+          <label class="field">
+            <span>Asset B</span>
+            <select data-compare-control name="right">${compareOptions(rightSymbol)}</select>
+          </label>
+          <button class="ghost-button compare-swap-button" type="button" data-compare-swap>Seiten tauschen</button>
+        </div>
+        ${renderCompareSummary(summary)}
+        <div class="grid two compare-grid">
+          ${renderCompareAssetCard(leftSymbol)}
+          ${renderCompareAssetCard(rightSymbol)}
+        </div>
+        ${renderCompareMatrix(leftSymbol, rightSymbol)}
+        ${renderCompareVerdict(leftSymbol, rightSymbol)}
+      </article>
     `;
   }
 
@@ -2646,11 +2890,8 @@
   }
 
   function renderCompareAssetCard(symbol) {
-    const asset = getAsset(symbol);
-    const quote = quoteFor(symbol);
-    const profile = profileFor(symbol);
-    const fundamentals = fundamentalsFor(symbol);
-    const technical = technicalFor(symbol, quote);
+    const data = compareDataFor(symbol);
+    const { asset, quote, profile, fundamentals, technical, analysis, etf } = data;
     return `
       <div class="compare-asset-panel">
         <div class="card-topline">
@@ -2660,30 +2901,130 @@
           </div>
           <span class="score-pill ${technical.tone}">${esc(technical.rating)}</span>
         </div>
-        <div class="metric-grid">
+        <div class="metric-grid compare-primary-metrics">
           ${renderMiniMetric("Preis", formatMoney(quote.price, asset.currency))}
           ${renderMiniMetric("Heute", formatPercent(quote.changePct))}
-          ${renderMiniMetric("Market Cap", formatCompactMoney(valueOr(profile.marketCap, fundamentals.marketCap), asset.currency))}
-          ${renderMiniMetric("KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x"))}
-          ${renderMiniMetric("Sektor", profile.sector || asset.sector)}
-          ${renderMiniMetric("Rating", `${technical.probability}%`)}
+          ${renderMiniMetric("1M", formatPercent(analysis.performance1m))}
+          ${renderMiniMetric("Score", `${snapshotFor(symbol).score}/100`)}
         </div>
-        <div class="grid two">
+        <div class="compare-section">
+          <span class="card-label">Grundprofil</span>
+          <div class="metric-grid">
+            ${renderMiniMetric("Typ", asset.type)}
+            ${renderMiniMetric("Sektor", profile.sector || asset.sector)}
+            ${renderMiniMetric("Market Cap", formatCompareValue(valueOr(profile.marketCap, fundamentals.marketCap), (value) => formatCompactMoney(value, asset.currency)))}
+            ${renderMiniMetric("Daten", statusLabel(compareAssetStatus(data)))}
+          </div>
+        </div>
+        ${etf ? renderCompareEtfBlock(etf) : renderCompareFundamentalBlock(asset, fundamentals)}
+        <div class="compare-section">
+          <span class="card-label">Technik</span>
+          <div class="metric-grid">
+            ${renderMiniMetric("Rating", `${technical.rating} · ${technical.probability}%`)}
+            ${renderMiniMetric("Momentum", `${formatNumber(analysis.momentum)}/100`)}
+            ${renderMiniMetric("Trend", `${formatNumber(analysis.trend)}/100`)}
+            ${renderMiniMetric("Volatilität", `${formatNumber(analysis.volatility)}/100`)}
+          </div>
+          <p>${esc(technical.reason)}</p>
+        </div>
+        <div class="grid two compare-risk-grid">
           <div class="insight-row"><span class="pill">Chance</span><p>${esc(asset.thesis)}</p></div>
           <div class="insight-row"><span class="pill">Risiko</span><p>${esc(asset.risks)}</p></div>
         </div>
-        ${renderDataMeta(quote.meta)}
+        ${renderDataMeta(makeMeta(compareDataSourceLabel(data), compareAssetStatus(data), compareLatestTimestamp(data), "Quick Compare nutzt Live-Daten, Cache oder Fallback je nach Verfügbarkeit."))}
+      </div>
+    `;
+  }
+
+  function renderCompareFundamentalBlock(asset, fundamentals) {
+    return `
+      <div class="compare-section">
+        <span class="card-label">Bewertung / Fundamentals</span>
+        <div class="metric-grid">
+          ${renderMiniMetric("KGV", formatCompareValue(valueOr(fundamentals.pe, asset.fallback.pe), (value) => formatNumber(value, "x")))}
+          ${renderMiniMetric("EPS", formatCompareValue(valueOr(fundamentals.eps, asset.fallback.eps), (value) => formatMoney(value, asset.currency)))}
+          ${renderMiniMetric("Umsatz", formatCompareValue(valueOr(fundamentals.revenue, asset.fallback.revenue), (value) => formatCompactMoney(value, asset.currency)))}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCompareEtfBlock(etf) {
+    const concentration = etfHoldingConcentration(etf);
+    const topRegion = etf.region[0] ? `${etf.region[0][0]} ${formatNumber(etf.region[0][1])}%` : "nicht verfügbar";
+    const topHolding = etf.holdings[0] ? `${etf.holdings[0][0]} ${formatNumber(etf.holdings[0][1])}%` : "nicht verfügbar";
+    return `
+      <div class="compare-section">
+        <span class="card-label">ETF-Struktur</span>
+        <div class="metric-grid">
+          ${renderMiniMetric("TER", `${formatNumber(etf.ter)}%`)}
+          ${renderMiniMetric("Ausschüttung", etf.distribution)}
+          ${renderMiniMetric("Top-Region", topRegion)}
+          ${renderMiniMetric("Top-Holding", topHolding)}
+          ${renderMiniMetric("Top-5 Anteil", `${formatNumber(concentration)}%`)}
+          ${renderMiniMetric("Währung", etf.currency)}
+        </div>
+        <p>${esc(etf.useCase)} ${esc(etf.fxRisk)}.</p>
+      </div>
+    `;
+  }
+
+  function renderCompareSummary(summary) {
+    return `
+      <div class="compare-summary">
+        <span class="pill">Kurzfazit</span>
+        <div>
+          <h3>${esc(summary.title)}</h3>
+          <p>${esc(summary.text)}</p>
+        </div>
+        <div class="compare-fit-grid">
+          <div><strong>${esc(summary.left.symbol)}</strong><span>${esc(summary.left.fit)}</span></div>
+          <div><strong>${esc(summary.right.symbol)}</strong><span>${esc(summary.right.fit)}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCompareMatrix(leftSymbol, rightSymbol) {
+    const rows = compareRows(leftSymbol, rightSymbol);
+    return `
+      <div class="compare-matrix">
+        <div class="card-topline compact-topline">
+          <div>
+            <span class="card-label">Direkter Vergleich</span>
+            <h3>Wo liegt der Unterschied?</h3>
+          </div>
+          ${renderStatusBadge(compareStatusFor(leftSymbol, rightSymbol))}
+        </div>
+        <div class="compare-row compare-row-head">
+          <strong>${esc(leftSymbol)}</strong>
+          <span>Kriterium</span>
+          <strong>${esc(rightSymbol)}</strong>
+        </div>
+        ${rows.map(renderCompareRow).join("")}
+      </div>
+    `;
+  }
+
+  function renderCompareRow(row) {
+    const leftClass = row.winner === "left" ? "compare-winner" : "";
+    const rightClass = row.winner === "right" ? "compare-winner" : "";
+    return `
+      <div class="compare-row">
+        <span class="${leftClass}">${esc(row.left)}</span>
+        <span><strong>${esc(row.label)}</strong><small>${esc(row.note)}</small></span>
+        <span class="${rightClass}">${esc(row.right)}</span>
       </div>
     `;
   }
 
   function renderCompareVerdict(leftSymbol, rightSymbol) {
-    const left = snapshotFor(leftSymbol);
-    const right = snapshotFor(rightSymbol);
+    const left = compareDataFor(leftSymbol).snapshot;
+    const right = compareDataFor(rightSymbol).snapshot;
     const winner = left.score === right.score ? null : left.score > right.score ? left : right;
     const text = winner
-      ? `${winner.symbol} hat im aktuellen Hybrid-Score den stärkeren Mix aus Rating, Momentum, Value/Growth und Datenlage.`
-      : "Beide Assets liegen im aktuellen Hybrid-Score nahezu gleichauf. Der Zweck im Portfolio entscheidet.";
+      ? `${winner.symbol} hat im aktuellen Hybrid-Score den stärkeren Mix aus Rating, Momentum, Value/Growth und Datenlage. Das ist keine Kaufempfehlung, sondern eine Research-Priorisierung.`
+      : "Beide Assets liegen im aktuellen Hybrid-Score nahezu gleichauf. Der Zweck im Portfolio entscheidet stärker als ein einzelner Score.";
     return `
       <div class="compare-verdict">
         <span class="pill">Einordnung</span>
@@ -2697,11 +3038,173 @@
       quoteFor(leftSymbol).meta.status,
       profileFor(leftSymbol).meta.status,
       fundamentalsFor(leftSymbol).meta.status,
+      analysisFor(leftSymbol).meta?.status,
       quoteFor(rightSymbol).meta.status,
       profileFor(rightSymbol).meta.status,
-      fundamentalsFor(rightSymbol).meta.status
+      fundamentalsFor(rightSymbol).meta.status,
+      analysisFor(rightSymbol).meta?.status
     ];
     return bestDataStatus(statuses);
+  }
+
+  function compareDataFor(symbol) {
+    const asset = getAsset(symbol);
+    const quote = quoteFor(symbol);
+    const profile = profileFor(symbol);
+    const fundamentals = fundamentalsFor(symbol);
+    const analysis = analysisFor(symbol);
+    const technical = technicalFor(symbol, quote);
+    const snapshot = snapshotFor(symbol);
+    const etf = ETF_DATA.find((item) => item.symbol === symbol) || null;
+    return { symbol, asset, quote, profile, fundamentals, analysis, technical, snapshot, etf };
+  }
+
+  function compareAssetStatus(data) {
+    return bestDataStatus([
+      data.quote.meta.status,
+      data.profile.meta.status,
+      data.fundamentals.meta.status,
+      data.analysis.meta?.status,
+      data.etf ? "fallback" : null
+    ]);
+  }
+
+  function compareLatestTimestamp(data) {
+    return Math.max(
+      Number(data.quote.meta.timestamp || 0),
+      Number(data.profile.meta.timestamp || 0),
+      Number(data.fundamentals.meta.timestamp || 0),
+      Number(data.analysis.meta?.timestamp || 0),
+      BOOT_TIME
+    );
+  }
+
+  function compareDataSourceLabel(data) {
+    if (data.etf) {
+      return "Hybrid: Quotes + lokale ETF-Datenbasis";
+    }
+    return "Hybrid: Quotes, Profil, Fundamentals, Zeitreihen";
+  }
+
+  function compareSummary(leftSymbol, rightSymbol) {
+    const left = compareDataFor(leftSymbol);
+    const right = compareDataFor(rightSymbol);
+    const leftStrengths = compareStrengths(left, right);
+    const rightStrengths = compareStrengths(right, left);
+    const title = `${leftSymbol} vs ${rightSymbol}: ${compareHeadline(left, right)}`;
+    const text = [
+      leftStrengths.length ? `${leftSymbol} wirkt stärker bei ${leftStrengths.join(", ")}.` : `${leftSymbol} hat keinen klaren Vorteil in den Kernmetriken.`,
+      rightStrengths.length ? `${rightSymbol} wirkt stärker bei ${rightStrengths.join(", ")}.` : `${rightSymbol} hat keinen klaren Vorteil in den Kernmetriken.`
+    ].join(" ");
+    return {
+      title,
+      text,
+      left: { symbol: leftSymbol, fit: compareFitText(left) },
+      right: { symbol: rightSymbol, fit: compareFitText(right) }
+    };
+  }
+
+  function compareStrengths(primary, secondary) {
+    const strengths = [];
+    if (primary.snapshot.score >= secondary.snapshot.score + 4) strengths.push("Gesamtscore");
+    if (primary.analysis.momentum >= secondary.analysis.momentum + 6) strengths.push("Momentum");
+    if (primary.analysis.value >= secondary.analysis.value + 6) strengths.push("Bewertung/Value");
+    if (primary.technical.score >= secondary.technical.score + 5) strengths.push("Technik");
+    if (primary.etf && secondary.etf) {
+      if (primary.etf.ter + 0.03 < secondary.etf.ter) strengths.push("Kosten");
+      if (etfHoldingConcentration(primary.etf) + 5 < etfHoldingConcentration(secondary.etf)) strengths.push("geringere Konzentration");
+    }
+    return strengths.slice(0, 3);
+  }
+
+  function compareHeadline(left, right) {
+    if (left.asset.type === "ETF" && right.asset.type === "ETF") {
+      return "Kosten, Konzentration und Einsatzbereich entscheiden";
+    }
+    if (left.asset.type === "ETF" || right.asset.type === "ETF") {
+      return "Einzelwert gegen Baustein bewusst trennen";
+    }
+    if (Math.abs(left.snapshot.score - right.snapshot.score) <= 3) {
+      return "nahe beieinander";
+    }
+    const stronger = left.snapshot.score > right.snapshot.score ? left.symbol : right.symbol;
+    return `${stronger} hat den stärkeren Hybrid-Score`;
+  }
+
+  function compareFitText(data) {
+    if (data.etf) {
+      return data.etf.useCase || "ETF-Baustein für Portfolio-Exposure.";
+    }
+    if (data.technical.rating === "BUY" && data.analysis.volatility < 62) {
+      return "passt eher zu Qualitäts-/Momentum-orientiertem Research.";
+    }
+    if (data.analysis.value >= 65) {
+      return "passt eher zu Value-orientierter Prüfung.";
+    }
+    if (data.analysis.volatility >= 70) {
+      return "eher für aktive, risikobewusste Beobachtung.";
+    }
+    return "passt eher zu neutraler Watchlist-Analyse.";
+  }
+
+  function compareRows(leftSymbol, rightSymbol) {
+    const left = compareDataFor(leftSymbol);
+    const right = compareDataFor(rightSymbol);
+    const rows = [
+      compareRow("Preis", formatMoney(left.quote.price, left.asset.currency), formatMoney(right.quote.price, right.asset.currency), "Nominalpreis ist kein Qualitätsvorteil.", "none"),
+      compareNumericRow("Tagesbewegung", left.quote.changePct, right.quote.changePct, (value) => formatPercent(value), "höher", "Kurzfristiges Momentum."),
+      compareNumericRow("1M Performance", left.analysis.performance1m, right.analysis.performance1m, (value) => formatPercent(value), "höher", "Performance aus Live-/Fallback-Zeitreihen."),
+      compareNumericRow("Hybrid Score", left.snapshot.score, right.snapshot.score, (value) => `${formatNumber(value)}/100`, "höher", "MH Research-Score, keine Anlageberatung."),
+      compareNumericRow("Technik", left.technical.score, right.technical.score, (value) => `${formatNumber(value)}/100`, "höher", "Trend, Momentum, Risiko und Aktivität."),
+      compareRow("Sektor / Typ", left.profile.sector || left.asset.sector, right.profile.sector || right.asset.sector, "Vergleichskontext statt Gewinner.", "none")
+    ];
+
+    if (left.etf && right.etf) {
+      rows.push(
+        compareNumericRow("TER", left.etf.ter, right.etf.ter, (value) => `${formatNumber(value)}%`, "niedriger", "Niedrigere laufende Kosten sind ein Pluspunkt."),
+        compareNumericRow("Top-5 Konzentration", etfHoldingConcentration(left.etf), etfHoldingConcentration(right.etf), (value) => `${formatNumber(value)}%`, "niedriger", "Geringere Konzentration kann breiter streuen."),
+        compareRow("Ausschüttung", left.etf.distribution, right.etf.distribution, "Cashflow vs. Wiederanlage.", "none")
+      );
+      const overlap = etfOverlap(left.etf, right.etf);
+      rows.push(compareRow("ETF-Overlap", `${formatNumber(overlap.score)}% Holdings`, `${formatNumber(overlap.regionScore)}% Regionen`, "Zeigt Dopplung statt Gewinner.", "none"));
+    } else {
+      rows.push(
+        compareNumericRow("KGV", valueOr(left.fundamentals.pe, left.asset.fallback.pe), valueOr(right.fundamentals.pe, right.asset.fallback.pe), (value) => formatNumber(value, "x"), "niedriger", "Niedriger kann günstiger sein, ersetzt aber keine Qualitätsprüfung."),
+        compareRow("Marktkapitalisierung", formatCompareValue(left.snapshot.marketCap, (value) => formatCompactMoney(value, left.asset.currency)), formatCompareValue(right.snapshot.marketCap, (value) => formatCompactMoney(value, right.asset.currency)), "Größe ist Stabilitätskontext, kein automatischer Vorteil.", "none")
+      );
+    }
+    return rows;
+  }
+
+  function compareNumericRow(label, leftValue, rightValue, formatter, direction, note) {
+    const leftNumber = compareNumberOrNull(leftValue);
+    const rightNumber = compareNumberOrNull(rightValue);
+    let winner = "none";
+    if (leftNumber !== null && rightNumber !== null && Math.abs(leftNumber - rightNumber) > 0.01) {
+      winner = direction === "niedriger"
+        ? (leftNumber < rightNumber ? "left" : "right")
+        : (leftNumber > rightNumber ? "left" : "right");
+    }
+    return compareRow(label, formatCompareValue(leftNumber, formatter), formatCompareValue(rightNumber, formatter), note, winner);
+  }
+
+  function compareNumberOrNull(value) {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function compareRow(label, left, right, note, winner = "none") {
+    return { label, left, right, note, winner };
+  }
+
+  function formatCompareValue(value, formatter) {
+    if (value === null || value === undefined || value === "" || Number.isNaN(value)) {
+      return "nicht verfügbar";
+    }
+    return formatter ? formatter(value) : String(value);
   }
 
   function renderMacroSection() {
@@ -2712,9 +3215,9 @@
         <div class="section-head">
           <div>
             <h2>Makro-Schnellblick</h2>
-            <p>FRED-Daten, wenn ein Key hinterlegt ist. Ohne Key bleibt die Seite stabil mit klar markierten Fallback-Werten.</p>
+            <p>FRED-Daten laufen online über die Vercel Function /api/fred. Lokal per Doppelklick bleibt die Seite stabil mit klar markierten Fallback-Werten.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="settings">FRED-Key setzen</button>
+          <button class="ghost-button" type="button" data-route="settings">FRED Function prüfen</button>
         </div>
         <div class="grid five macro-grid">
           ${macro.map((item) => `
@@ -2909,7 +3412,10 @@
             <span class="card-label">Watchlist der Woche</span>
             <h3>Lokal gespeichert</h3>
           </div>
-          <button class="ghost-button" type="button" data-route="portfolio">Verwalten</button>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="alerts">Alerts</button>
+            <button class="ghost-button" type="button" data-route="portfolio">Verwalten</button>
+          </div>
         </div>
         <div class="stack-list">
           ${rows || renderEmptyState("Noch keine Watchlist. Füge ein Asset hinzu.")}
@@ -2990,9 +3496,12 @@
           <div>
             <p class="eyebrow">Screener V1</p>
             <h1>Rankings statt Bauchgefühl.</h1>
-            <p>Filtere ein erweitertes Universum mit ${ASSETS.length} Assets nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener nutzt Finnhub-Quotes/Profile/Fundamentals und Alpha-Vantage-Zeitreihen, sobald Keys vorhanden sind; die Heuristik bleibt stabil hybrid.</p>
+            <p>Filtere ein erweitertes Universum mit ${ASSETS.length} Assets nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener nutzt Finnhub-Quotes/Profile/Fundamentals und Alpha-Vantage-Zeitreihen über serverseitige Vercel Functions, sofern sie im Deployment verfügbar sind; die Heuristik bleibt stabil hybrid.</p>
           </div>
-          <button class="ghost-button" type="button" data-screener-reset>Filter zurücksetzen</button>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="compare">Quick Compare</button>
+            <button class="ghost-button" type="button" data-screener-reset>Filter zurücksetzen</button>
+          </div>
         </div>
         <article class="card screener-controls">
           ${renderScreenerControl("search", "Suche", "input")}
@@ -3072,28 +3581,58 @@
     const events = eventsForView();
     const filtered = filteredEventHubEvents(events);
     const eventStatus = bestDataStatus(events.map((eventItem) => eventItem.meta.status));
+    const summary = eventHubSummary(events);
+    const focusEvents = importantEventsForHub(events).slice(0, 4);
+    const watchlistEvents = events
+      .filter(isWatchlistRelevantEvent)
+      .filter((eventItem) => eventItem.date >= startOfToday() && eventItem.date < daysFromNow(14))
+      .sort(sortEventsForHub)
+      .slice(0, 8);
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
             <p class="eyebrow">Event- / Earnings-Hub</p>
-            <h1>Termine, Earnings, IPOs und Watchlist-Ereignisse.</h1>
-            <p>Events sind klar zugeordnet: Finnhub liefert Earnings, Alpha Vantage ergänzt Earnings- und IPO-Kalender als CSV-Livepfad, SEC/EDGAR bleibt die offizielle Filings-Basis. Dividenden, Splits und Makrotermine bleiben lokal transparent abgesichert.</p>
+            <h1>Termine, Earnings, Dividenden und Makroereignisse.</h1>
+            <p>Der Hub bündelt die nächsten Termine, hebt Watchlist-Bezug hervor und trennt sauber zwischen Live-, Hybrid- und Fallback-Daten.</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="home">Zum Tagesüberblick</button>
           </div>
         </div>
+        <article class="card event-hub-hero">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Was steht an?</span>
+              <h3>${esc(summary.focusTitle)}</h3>
+              <p>${esc(summary.focusText)}</p>
+            </div>
+            ${renderDataMeta(makeMeta("Event-Hub Datenmix", eventStatus, Date.now(), eventHubModeText(events)), true)}
+          </div>
+          <div class="event-hub-summary">
+            ${renderMiniMetric("Heute", String(summary.today))}
+            ${renderMiniMetric("Diese Woche", String(summary.week))}
+            ${renderMiniMetric("Nächste Woche", String(summary.next))}
+            ${renderMiniMetric("Watchlist", String(summary.watchlist))}
+          </div>
+          <div class="event-focus-list">
+            ${focusEvents.map(renderEventFocusRow).join("") || renderEmptyState("Keine anstehenden Termine im aktuellen Kalender.")}
+          </div>
+        </article>
         ${renderEventProviderPanel()}
         ${renderEventHubFilters(events)}
-        <div class="grid two">
+        <div class="event-hub-layout">
           <article class="card">
             <div class="card-topline">
               <div>
-                <span class="card-label">Gefilterte Termine</span>
-                <h3>${filtered.length} Events</h3>
+                <span class="card-label">Event-Liste</span>
+                <h3><span id="eventHubCount">${filtered.length}</span> Events</h3>
+                <p>Gefiltert nach Zeitraum, Typ, Relevanz, Watchlist-Bezug und Quelle.</p>
               </div>
               ${renderStatusBadge(eventStatus)}
             </div>
-            <div class="event-list">
-              ${filtered.map(renderEventCard).join("") || renderEmptyState("Keine Termine für diesen Filter. Zeitraum oder Typ erweitern.")}
+            <div class="event-list" id="eventHubResults">
+              ${filtered.map(renderEventCard).join("") || renderEmptyState("Keine Termine für diesen Filter. Zeitraum, Typ oder Suchbegriff erweitern.")}
             </div>
           </article>
           <article class="card">
@@ -3101,11 +3640,12 @@
               <div>
                 <span class="card-label">Watchlist-Relevanz</span>
                 <h3>Was betrifft dich direkt?</h3>
+                <p>Termine für gespeicherte Watchlist-Werte und Favoriten werden automatisch markiert.</p>
               </div>
               ${renderStatusBadge(eventStatus)}
             </div>
             <div class="event-list">
-              ${events.filter(isWatchlistRelevantEvent).slice(0, 8).map(renderEventCard).join("") || renderEmptyState("Keine Watchlist-relevanten Termine im aktuellen Fenster.")}
+              ${watchlistEvents.map(renderEventCard).join("") || renderEmptyState("Keine Watchlist-relevanten Termine in den nächsten 14 Tagen.")}
             </div>
           </article>
         </div>
@@ -3127,23 +3667,77 @@
       ["week", "Diese Woche"],
       ["next", "Nächste Woche"]
     ];
+    const scopeFilters = [
+      ["all", "Alle Bereiche"],
+      ["watchlist", "Nur Watchlist"],
+      ["stock", "Nur Aktie"],
+      ["macro", "Nur Makro"]
+    ];
+    const relevanceFilters = [
+      ["all", "Alle Relevanzen"],
+      ["high", "Hohe Relevanz"],
+      ["medium", "Mindestens mittel"]
+    ];
+    const sourceFilters = [
+      ["all", "Alle Quellen"],
+      ["live", "Live"],
+      ["fallback", "Fallback"],
+      ["finnhub", "Finnhub"],
+      ["alpha", "Alpha Vantage"],
+      ["local", "Lokal / MH"]
+    ];
     return `
       <article class="card event-filter-card">
         <div class="card-topline">
           <div>
             <span class="card-label">Filter</span>
-            <h3>Typ und Zeitraum</h3>
+            <h3>Zeitraum, Typ und Relevanz</h3>
           </div>
           ${renderDataMeta(makeMeta("Event-Hub Filter", bestDataStatus(events.map((eventItem) => eventItem.meta.status)), Date.now()), true)}
         </div>
-        <div class="chip-row">
-          ${typeFilters.map(([value, label, count]) => `<button class="chip ${state.eventHub.type === value ? "active" : ""}" type="button" data-event-filter="${escAttr(value)}">${esc(label)} ${count}</button>`).join("")}
-        </div>
-        <div class="chip-row">
-          ${windowFilters.map(([value, label]) => `<button class="chip ${state.eventHub.window === value ? "active" : ""}" type="button" data-event-window="${escAttr(value)}">${esc(label)}</button>`).join("")}
+        <div class="event-filter-grid">
+          <div>
+            <span class="filter-label">Zeitraum</span>
+            <div class="chip-row">
+              ${windowFilters.map(([value, label]) => `<button class="chip ${state.eventHub.window === value ? "active" : ""}" type="button" data-event-window="${escAttr(value)}">${esc(label)}</button>`).join("")}
+            </div>
+          </div>
+          <div>
+            <span class="filter-label">Typ</span>
+            <div class="chip-row">
+              ${typeFilters.map(([value, label, count]) => `<button class="chip ${state.eventHub.type === value ? "active" : ""}" type="button" data-event-filter="${escAttr(value)}">${esc(label)} ${count}</button>`).join("")}
+            </div>
+          </div>
+          <div>
+            <span class="filter-label">Bereich</span>
+            <div class="chip-row">
+              ${scopeFilters.map(([value, label]) => `<button class="chip ${state.eventHub.scope === value ? "active" : ""}" type="button" data-event-scope="${escAttr(value)}">${esc(label)}</button>`).join("")}
+            </div>
+          </div>
+          <div>
+            <span class="filter-label">Relevanz</span>
+            <div class="chip-row">
+              ${relevanceFilters.map(([value, label]) => `<button class="chip ${state.eventHub.relevance === value ? "active" : ""}" type="button" data-event-relevance="${escAttr(value)}">${esc(label)}</button>`).join("")}
+            </div>
+          </div>
+          <label class="field">
+            <span>Quelle / Datenstatus</span>
+            <select data-event-control name="source">
+              ${sourceFilters.map(([value, label]) => `<option value="${escAttr(value)}" ${state.eventHub.source === value ? "selected" : ""}>${esc(label)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="field">
+            <span>Symbol oder Begriff</span>
+            <input data-event-control name="search" value="${escAttr(state.eventHub.search)}" placeholder="z. B. NVDA, CPI, IPO">
+          </label>
         </div>
       </article>
     `;
+  }
+
+  function renderEventHubResults(filtered) {
+    const rows = filtered || filteredEventHubEvents(eventsForView());
+    return rows.map(renderEventCard).join("") || renderEmptyState("Keine Termine für diesen Filter. Zeitraum, Typ oder Suchbegriff erweitern.");
   }
 
   function renderEventProviderPanel() {
@@ -3182,7 +3776,7 @@
           <div>
             <p class="eyebrow">Makro Dashboard</p>
             <h1>Liquidität, Zinsen und Risiko in einem Blick.</h1>
-            <p>FRED-Daten werden genutzt, wenn ein Key vorhanden ist. ECB, BLS, Treasury und lokale Fallbacks ergänzen das Bild für Zinsen, Geldmengen, Realzins und Yield Curve.</p>
+            <p>FRED-Daten werden online serverseitig über /api/fred genutzt. ECB, BLS, Treasury und lokale Fallbacks ergänzen das Bild für Zinsen, Geldmengen, Realzins und Yield Curve.</p>
           </div>
           <button class="ghost-button" type="button" data-route="settings">Provider prüfen</button>
         </div>
@@ -3491,6 +4085,9 @@
         </div>
         <p>Top-Holdings-Überschneidung: ${esc(overlap.names.join(", ") || "keine Top-Overlap-Holdings")}. Regionale Überschneidung: ${esc(overlap.regionNames.join(", ") || "keine erkennbare regionale Dopplung")}.</p>
         <div class="insight-row"><span class="pill">Einordnung</span><p>${esc(overlapText)}</p></div>
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-compare-pair-left="${escAttr(left.symbol)}" data-compare-pair-right="${escAttr(right.symbol)}">Im Quick Compare öffnen</button>
+        </div>
         ${renderDataMeta(makeMeta("Lokaler ETF-Overlap-Fallback", "fallback", BOOT_TIME))}
       </article>
     `;
@@ -3498,88 +4095,28 @@
 
   function renderAlertsPage() {
     ensureHomeData();
+    ensureEventData();
     checkAlerts(false);
     const filteredAlerts = alertsForView();
     const inbox = alertInboxForView();
+    const summary = alertSummary();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
             <p class="eyebrow">Alerts V2</p>
-            <h1>Lokale Signale mit Priorität, Status und Snooze.</h1>
-            <p>Preis-, Watchlist-, Sentiment- und Event-Hinweise bleiben vollständig lokal im Browser. Neu: offen/ausgelöst/erledigt, Priorität, Snooze und Historie.</p>
+            <h1>Alert-Center für Preise, Earnings, Events und Watchlist.</h1>
+            <p>Alerts laufen lokal im Browser, nutzen vorhandene Kurs- und Event-Daten und markieren klar, ob ein Hinweis offen, ausgelöst, erledigt oder pausiert ist. Keine Push-Infrastruktur, keine Realtime-Versprechen.</p>
           </div>
-          <button class="ghost-button" type="button" data-alert-check>Jetzt prüfen</button>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="events">Event-Hub</button>
+            <button class="ghost-button" type="button" data-alert-check>Jetzt prüfen</button>
+          </div>
         </div>
-        <div class="grid two">
-          <article class="card">
-            <h3>Alert anlegen</h3>
-            <form class="alert-form" data-alert-form>
-              <label class="field">
-                <span>Asset</span>
-                <select name="symbol">
-                  ${ASSETS.map((asset) => `<option value="${escAttr(asset.symbol)}">${esc(asset.symbol)} - ${esc(asset.name)}</option>`).join("")}
-                </select>
-              </label>
-              <label class="field">
-                <span>Typ</span>
-                <select name="type">
-                  <option value="price">Preis-Alert</option>
-                  <option value="watchlist">Watchlist-Alert</option>
-                  <option value="sentiment">News-/Sentiment-Hinweis</option>
-                  <option value="earnings">Earnings-Reminder</option>
-                  <option value="event">Event-Hinweis</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Bedingung</span>
-                <select name="condition">
-                  <option value="above">Preis über Ziel</option>
-                  <option value="below">Preis unter Ziel</option>
-                  <option value="move">Tagesbewegung größer als %</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Zielwert</span>
-                <input name="target" type="number" step="0.01" placeholder="z. B. 900 oder 3">
-              </label>
-              <label class="field">
-                <span>Priorität</span>
-                <select name="priority">
-                  <option value="high">hoch</option>
-                  <option value="medium" selected>mittel</option>
-                  <option value="low">niedrig</option>
-                </select>
-              </label>
-              <button class="primary-button" type="submit">Alert speichern</button>
-            </form>
-            <p class="small">Preis-Alerts prüfen Kurslevel. Watchlist-, Sentiment- und Event-Hinweise nutzen lokal verfügbare Kurs-, News- und Kalenderdaten.</p>
-          </article>
-          <article class="card">
-            <div class="card-topline">
-              <div>
-                <span class="card-label">Alert Inbox</span>
-                <h3>${inbox.length} Hinweise</h3>
-              </div>
-              <button class="ghost-button" type="button" data-alert-clear-inbox>Leeren</button>
-            </div>
-            <div class="stack-list">
-              ${inbox.slice(0, 8).map((item) => `
-                <div class="alert-inbox-row">
-                  <div>
-                    <strong>${esc(item.title)}</strong>
-                    <span class="small">${esc(item.message)} | ${formatTimestamp(item.timestamp)}</span>
-                  </div>
-                  <span class="pill ${item.priority === "high" ? "bear" : item.priority === "low" ? "neutral" : ""}">${esc(priorityLabel(item.priority))}</span>
-                </div>
-              `).join("") || renderEmptyState("Noch keine Hinweise. Alerts prüfen sich lokal anhand der verfügbaren Daten.")}
-            </div>
-            <div class="metric-grid">
-              ${renderMiniMetric("Offen", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "open").length))}
-              ${renderMiniMetric("Ausgelöst", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "triggered").length))}
-              ${renderMiniMetric("Erledigt", String(state.alerts.filter((alert) => normalizeAlertStatus(alert) === "done").length))}
-            </div>
-          </article>
+        ${renderAlertSummary(summary)}
+        <div class="grid two alerts-workbench">
+          ${renderCreateAlertCard()}
+          ${renderAlertInboxCard(inbox)}
         </div>
       </section>
       <section class="section">
@@ -3588,29 +4125,188 @@
             <div>
               <span class="card-label">Gespeicherte Alerts</span>
               <h3>${filteredAlerts.length} Regeln im Filter</h3>
+              <p>Status, Priorität, Typ, Watchlist-Bezug und Symbolsuche helfen gegen Alert-Chaos.</p>
             </div>
-            ${renderDataMeta(makeMeta("Lokaler Browser-Speicher", "live", Date.now()), true)}
+            ${renderDataMeta(makeMeta("Lokaler Browser-Speicher + Event-Hub-Daten", alertDataStatus(), Date.now()), true)}
           </div>
           ${renderAlertFilters()}
-          <div class="alert-list">
+          <div class="alert-list" id="alertResults">
             ${filteredAlerts.map(renderAlertRow).join("") || renderEmptyState("Keine Alerts in diesem Filter.")}
           </div>
         </article>
       </section>
+      <section class="section compact-section">
+        ${renderAlertHistoryCard()}
+      </section>
+    `;
+  }
+
+  function renderAlertSummary(summary) {
+    return `
+      <div class="alert-summary-grid">
+        ${renderMiniMetric("Offen", String(summary.open))}
+        ${renderMiniMetric("Ausgelöst", String(summary.triggered))}
+        ${renderMiniMetric("Pausiert", String(summary.paused))}
+        ${renderMiniMetric("Erledigt", String(summary.done))}
+        ${renderMiniMetric("Watchlist", String(summary.watchlist))}
+      </div>
+    `;
+  }
+
+  function renderCreateAlertCard() {
+    const draftSymbol = assetMap.has(state.alertDraft.symbol) ? state.alertDraft.symbol : (assetMap.has(state.activeSymbol) ? state.activeSymbol : "NVDA");
+    const draftType = state.alertDraft.type || "price";
+    return `
+      <article class="card alert-create-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Alert anlegen</span>
+            <h3>Schnellregel speichern</h3>
+            <p>Preislevel, Earnings, Events und Watchlist-Bewegungen werden lokal geprüft.</p>
+          </div>
+          ${renderStatusBadge("fallback")}
+        </div>
+        <form class="alert-form" data-alert-form>
+          <label class="field">
+            <span>Asset</span>
+            <select name="symbol">
+              ${ASSETS.map((asset) => `<option value="${escAttr(asset.symbol)}" ${draftSymbol === asset.symbol ? "selected" : ""}>${esc(asset.symbol)} - ${esc(asset.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="field">
+            <span>Typ</span>
+            <select name="type">
+              ${alertTypeOptions(draftType)}
+            </select>
+          </label>
+          <label class="field">
+            <span>Bedingung</span>
+            <select name="condition">
+              <option value="above">Preis über Ziel</option>
+              <option value="below">Preis unter Ziel</option>
+              <option value="move">Tagesbewegung größer als %</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Zielwert</span>
+            <input name="target" type="number" step="0.01" placeholder="nur für Preis, z. B. 900 oder 3">
+          </label>
+          <label class="field">
+            <span>Priorität</span>
+            <select name="priority">
+              <option value="high">hoch</option>
+              <option value="medium" selected>mittel</option>
+              <option value="low">niedrig</option>
+            </select>
+          </label>
+          <button class="primary-button" type="submit">Alert speichern</button>
+        </form>
+        <div class="alert-quick-row">
+          ${state.watchlist.slice(0, 5).map((symbol) => `<button class="chip" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="watchlist">${esc(symbol)} Watchlist</button>`).join("")}
+        </div>
+        <p class="small">Datenstatus: Preis-Alerts nutzen Kursdaten; Event- und Earnings-Alerts nutzen den Event-Hub. Alles bleibt lokal und kann verzögert oder fallback-basiert sein.</p>
+      </article>
+    `;
+  }
+
+  function renderAlertInboxCard(inbox) {
+    return `
+      <article class="card alert-inbox-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Alert Inbox</span>
+            <h3>${inbox.length} Hinweise</h3>
+            <p>Neue Auslösungen, Snooze- und Erledigt-Hinweise.</p>
+          </div>
+          <button class="ghost-button" type="button" data-alert-clear-inbox>Leeren</button>
+        </div>
+        <div class="stack-list">
+          ${inbox.slice(0, 10).map(renderAlertInboxRow).join("") || renderEmptyState("Noch keine Hinweise. Alerts prüfen sich lokal anhand der verfügbaren Daten.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderAlertInboxRow(item) {
+    return `
+      <div class="alert-inbox-row">
+        <div>
+          <strong>${esc(item.title)}</strong>
+          <span class="small">${esc(item.message)} | ${formatTimestamp(item.timestamp)}</span>
+        </div>
+        <span class="pill ${priorityTone(item.priority)}">${esc(priorityLabel(item.priority))}</span>
+      </div>
     `;
   }
 
   function renderAlertFilters() {
-    const filters = [
-      ["all", "Alle"],
-      ["price", "Preis"],
-      ["earnings", "Earnings"],
-      ["event", "Event"],
-      ["watchlist", "Watchlist"]
-    ];
+    const statusFilters = [["all", "Alle"], ["open", "Offen"], ["triggered", "Ausgelöst"], ["paused", "Pausiert"], ["done", "Erledigt"]];
+    const typeFilters = [["all", "Alle Typen"], ["price", "Preis"], ["earnings", "Earnings"], ["event", "Event"], ["watchlist", "Watchlist"]];
+    const priorityFilters = [["all", "Alle Prioritäten"], ["high", "hoch"], ["medium", "mittel"], ["low", "niedrig"]];
+    const scopeFilters = [["all", "Alle Assets"], ["watchlist", "nur Watchlist"]];
     return `
-      <div class="chip-row alert-filter-row">
-        ${filters.map(([value, label]) => `<button class="chip ${state.alertFilter === value ? "active" : ""}" type="button" data-alert-filter="${escAttr(value)}">${esc(label)}</button>`).join("")}
+      <div class="alert-filter-panel">
+        <div>
+          <span class="filter-label">Status</span>
+          <div class="chip-row alert-filter-row">
+            ${statusFilters.map(([value, label]) => renderAlertFilterChip("status", value, label)).join("")}
+          </div>
+        </div>
+        <div>
+          <span class="filter-label">Typ</span>
+          <div class="chip-row alert-filter-row">
+            ${typeFilters.map(([value, label]) => renderAlertFilterChip("type", value, label)).join("")}
+          </div>
+        </div>
+        <div>
+          <span class="filter-label">Priorität</span>
+          <div class="chip-row alert-filter-row">
+            ${priorityFilters.map(([value, label]) => renderAlertFilterChip("priority", value, label)).join("")}
+          </div>
+        </div>
+        <div>
+          <span class="filter-label">Bereich</span>
+          <div class="chip-row alert-filter-row">
+            ${scopeFilters.map(([value, label]) => renderAlertFilterChip("scope", value, label)).join("")}
+          </div>
+        </div>
+        <label class="field">
+          <span>Symbol / Text</span>
+          <input data-alert-control name="search" value="${escAttr(state.alertFilters.search)}" placeholder="z. B. NVDA, Earnings, Macro">
+        </label>
+      </div>
+    `;
+  }
+
+  function renderAlertFilterChip(group, value, label) {
+    const active = (state.alertFilters[group] || "all") === value;
+    return `<button class="chip ${active ? "active" : ""}" type="button" data-alert-filter-group="${escAttr(group)}" data-alert-filter="${escAttr(value)}">${esc(label)}</button>`;
+  }
+
+  function renderAlertHistoryCard() {
+    const history = alertHistoryForView();
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Historie</span>
+            <h3>Was wurde ausgelöst oder bearbeitet?</h3>
+          </div>
+          ${renderDataMeta(makeMeta("Lokale Alert-Historie", "live", Date.now()), true)}
+        </div>
+        <div class="alert-history-list">
+          ${history.map(renderAlertHistoryRow).join("") || renderEmptyState("Noch keine Alert-Historie.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderAlertHistoryRow(item) {
+    return `
+      <div class="alert-history-row">
+        <span class="pill ${item.status === "triggered" ? "bear" : item.status === "done" ? "neutral" : ""}">${esc(alertStatusText(item.status))}</span>
+        <span><strong>${esc(item.symbol)} · ${esc(alertTypeLabel(item.type))}</strong><small>${esc(item.message)} | ${formatTimestamp(item.timestamp)}</small></span>
+        <span class="small">${esc(priorityLabel(item.priority))}</span>
       </div>
     `;
   }
@@ -3626,6 +4322,8 @@
     const technical = technicalFor(symbol, quote);
     const events = eventsForSymbol(symbol);
     const activeTab = ["overview", "technical", "fundamental", "news", "events", "insider", "journal"].includes(state.assetTab) ? state.assetTab : "overview";
+    const assetContext = { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events };
+    const research = buildAssetResearchSnapshot(assetContext);
 
     ensureAssetData(symbol);
     ensureEventData();
@@ -3636,9 +4334,17 @@
           <p class="eyebrow">Einzelaktien-Seite</p>
           <h1>${esc(symbol)} <span>${esc(profile.name || asset.name)}</span></h1>
           <p>${esc(asset.thesis)}</p>
+          <div class="module-chip-row asset-identity-row">
+            <span class="module-chip"><strong>Typ</strong><small>${esc(research.identity.type)}</small></span>
+            <span class="module-chip"><strong>Kategorie</strong><small>${esc(research.identity.category)}</small></span>
+            <span class="module-chip"><strong>Charakter</strong><small>${esc(research.identity.character)}</small></span>
+            <span class="module-chip"><strong>Datenlage</strong><small>${esc(research.dataQuality.label)}</small></span>
+          </div>
           <div class="asset-actions">
             <button class="primary-button" type="button" data-watch-add="${escAttr(symbol)}">Zur Watchlist</button>
+            <button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>
             <button class="ghost-button" type="button" data-favorite-symbol="${escAttr(symbol)}">${isFavoriteSymbol(symbol) ? "Favorit entfernen" : "Favorit"}</button>
+            <button class="ghost-button" type="button" data-compare-open="${escAttr(symbol)}">Vergleichen</button>
             <button class="ghost-button" type="button" data-report="asset" data-symbol="${escAttr(symbol)}">Report exportieren</button>
             <a class="ghost-button" href="${tradingViewUrl(asset)}" target="_blank" rel="noreferrer">Chart bei TradingView</a>
           </div>
@@ -3659,6 +4365,11 @@
           ${renderKpi("Umsatz", formatCompactMoney(valueOr(fundamentals.revenue, asset.fallback.revenue), asset.currency), fundamentals.meta)}
         </div>
         ${renderAssetDataStatusStrip({ quote, profile, fundamentals, news, events })}
+        ${renderAssetAlertStrip(symbol)}
+      </section>
+
+      <section class="section asset-research-section">
+        ${renderAssetResearchSnapshot(assetContext, research)}
       </section>
 
       <section class="section">
@@ -3673,7 +4384,7 @@
         </div>
       </section>
 
-      ${renderAssetTabContent(activeTab, { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events })}
+      ${renderAssetTabContent(activeTab, assetContext)}
     `;
 
     if (activeTab === "overview") {
@@ -3704,6 +4415,29 @@
               <small>${esc(meta.source)}</small>
             </span>
           `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAssetAlertStrip(symbol) {
+    const alerts = state.alerts
+      .map(normalizeAlertRecord)
+      .filter((alert) => alert.symbol === symbol)
+      .slice(0, 3);
+    return `
+      <div class="asset-alert-strip">
+        <div>
+          <span class="card-label">Alerts zu ${esc(symbol)}</span>
+          <p class="small">${alerts.length ? "Aktive oder historische Regeln für diese Asset-Seite." : "Noch keine Regel für dieses Asset. Setze bei Bedarf einen Preis-, Earnings- oder Event-Alert."}</p>
+        </div>
+        <div class="module-chip-row">
+          ${alerts.map((alert) => `
+            <span class="module-chip data-chip">
+              <strong>${esc(alertTypeLabel(alert.type))}</strong>
+              <small>${esc(alertStatusLabel(alert))} · ${esc(priorityLabel(alert.priority))}</small>
+            </span>
+          `).join("") || `<button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>`}
         </div>
       </div>
     `;
@@ -3757,9 +4491,6 @@
       `;
     }
     return `
-      <section class="section">
-        ${renderAssetResearchSnapshot(context)}
-      </section>
       <section class="section chart-card">
         <div class="chart-topbar">
           <div>
@@ -3825,48 +4556,481 @@
     `;
   }
 
-  function renderAssetResearchSnapshot(context) {
-    const { symbol, asset, quote, fundamentals, news, sentiment, technical, events } = context;
-    const fundamental = fundamentalInterpretation(asset, fundamentals);
-    const nextEvent = events[0];
+  function renderAssetResearchSnapshot(context, snapshot = buildAssetResearchSnapshot(context)) {
+    const { symbol, technical } = context;
     return `
-      <article class="card asset-research-snapshot">
+      <article class="card asset-research-snapshot research-snapshot-v2">
         <div class="card-topline">
           <div>
-            <span class="card-label">5-Minuten-Analyse</span>
-            <h3>${esc(symbol)} Mini-Research-Seite</h3>
-            <p>Preis, Chart, Technik, Fundamentales, News, Events, Chancen und Risiken in einem Ablauf.</p>
+            <span class="card-label">5-Minuten-Research</span>
+            <h3>In 5 Minuten verstanden</h3>
+            <p>Verdichteter Research-Snapshot aus Kurs, Profil, Bewertung, Technik, News, Events, Alerts und Datenqualität.</p>
           </div>
-          ${renderDataMeta(makeMeta("Lokale Research-Zusammenfassung", quote.meta.status, Date.now()), true)}
+          ${renderDataMeta(makeMeta("5-Minuten-Research: Daten + Produktlogik", snapshot.dataStatus, Date.now(), snapshot.dataQuality.text), true)}
         </div>
-        <div class="grid four">
-          <div class="snapshot-tile">
-            <span>Technisch</span>
-            <strong class="${technical.tone}">${esc(technical.rating)} ${technical.probability}%</strong>
-            <p>${esc(technical.reason)}</p>
+
+        <div class="research-summary-band">
+          <div>
+            <span class="card-label">${esc(snapshot.identity.type)} · ${esc(snapshot.identity.category)}</span>
+            <h3>${esc(snapshot.headline)}</h3>
+            <p>${esc(snapshot.summary)}</p>
           </div>
-          <div class="snapshot-tile">
-            <span>Fundamental</span>
-            <strong>${esc(fundamental.label)}</strong>
-            <p>${esc(fundamental.text)}</p>
-          </div>
-          <div class="snapshot-tile">
-            <span>News / Sentiment</span>
-            <strong>${esc(sentiment.label)} ${sentiment.score}</strong>
-            <p>${esc(news.items[0]?.headline || "Keine aktuelle Meldung im Feed.")}</p>
-          </div>
-          <div class="snapshot-tile">
-            <span>Nächster Trigger</span>
-            <strong>${esc(nextEvent ? nextEvent.type : "Watchlist")}</strong>
-            <p>${esc(nextEvent ? `${nextEvent.title} am ${nextEvent.date.toLocaleDateString("de-DE")}` : "Kein Event im lokalen Kalender.")}</p>
+          <div class="research-score-panel">
+            <span class="score-pill ${technical.tone}">${esc(technical.rating)}</span>
+            <strong>${snapshot.score}/100</strong>
+            <small>Research-Score · ${esc(snapshot.dataQuality.label)}</small>
           </div>
         </div>
-        <div class="grid two">
-          <div class="insight-row"><span class="pill">Chance</span><p>${esc(asset.thesis)}</p></div>
-          <div class="insight-row"><span class="pill">Risiko</span><p>${esc(asset.risks)}</p></div>
+
+        <div class="research-identity-grid">
+          <div class="snapshot-tile research-tile">
+            <span>Asset-Charakter</span>
+            <strong>${esc(snapshot.identity.character)}</strong>
+            <p>${esc(snapshot.identity.text)}</p>
+          </div>
+          <div class="snapshot-tile research-tile">
+            <span>Bewertung / Struktur</span>
+            <strong class="${snapshot.valuation.tone}">${esc(snapshot.valuation.label)}</strong>
+            <p>${esc(snapshot.valuation.text)}</p>
+          </div>
+          <div class="snapshot-tile research-tile">
+            <span>Technisches Kurzbild</span>
+            <strong class="${technical.tone}">${esc(snapshot.technical.label)}</strong>
+            <p>${esc(snapshot.technical.text)}</p>
+          </div>
+          <div class="snapshot-tile research-tile">
+            <span>Datenqualität</span>
+            <strong>${esc(snapshot.dataQuality.label)}</strong>
+            <p>${esc(snapshot.dataQuality.text)}</p>
+          </div>
+        </div>
+
+        <div class="research-snapshot-grid">
+          <section class="research-list-card">
+            <div class="mini-section-head">
+              <span class="card-label">Top-Chancen</span>
+              <strong>Was spricht dafür?</strong>
+            </div>
+            ${renderResearchBulletList(snapshot.opportunities)}
+          </section>
+          <section class="research-list-card">
+            <div class="mini-section-head">
+              <span class="card-label">Top-Risiken</span>
+              <strong>Was kann schiefgehen?</strong>
+            </div>
+            ${renderResearchBulletList(snapshot.risks)}
+          </section>
+          <section class="research-list-card">
+            <div class="mini-section-head">
+              <span class="card-label">Was jetzt wichtig ist</span>
+              <strong>Nächste Trigger</strong>
+            </div>
+            ${renderResearchTriggerList(snapshot.triggers)}
+          </section>
+          <section class="research-list-card">
+            <div class="mini-section-head">
+              <span class="card-label">Kurzbild</span>
+              <strong>Bewertung & Technik</strong>
+            </div>
+            ${renderResearchMetricList(snapshot.valuation.metrics)}
+            ${renderResearchMetricList(snapshot.technical.metrics)}
+          </section>
+        </div>
+
+        <div class="research-conclusion">
+          <span class="pill">Kurzfazit</span>
+          <p>${esc(snapshot.conclusion)}</p>
+        </div>
+
+        <div class="row-actions asset-next-actions">
+          <button class="ghost-button" type="button" data-compare-open="${escAttr(symbol)}">Vergleichen</button>
+          <button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>
+          <button class="ghost-button" type="button" data-route="events">Events prüfen</button>
+          <button class="ghost-button" type="button" data-route="data-health">Datenqualität ansehen</button>
         </div>
       </article>
     `;
+  }
+
+  function buildAssetResearchSnapshot(context) {
+    const { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events } = context;
+    const analysis = analysisFor(symbol);
+    const etf = etfDataForSymbol(symbol);
+    const fundamental = fundamentalInterpretation(asset, fundamentals);
+    const dataStatus = bestDataStatus([
+      quote.meta?.status,
+      profile.meta?.status,
+      fundamentals.meta?.status,
+      news.meta?.status,
+      technical.meta?.status,
+      events[0]?.meta?.status
+    ]);
+    const identity = assetIdentitySnapshot(asset, profile, analysis, technical, etf);
+    const valuation = assetValuationSnapshot(asset, fundamentals, analysis, etf);
+    const technicalSnapshot = assetTechnicalSnapshot(technical, analysis);
+    const dataQuality = assetDataQualitySnapshot(dataStatus, context);
+    const opportunities = assetOpportunityItems(context, { analysis, etf, fundamental, valuation, technicalSnapshot }).slice(0, 3);
+    const risks = assetRiskItems(context, { analysis, etf, valuation, technicalSnapshot, dataStatus }).slice(0, 3);
+    const triggers = assetTriggerItems(symbol, events, news).slice(0, 4);
+    const score = Math.round(clamp(
+      technical.score * 0.42 +
+      analysis.quality * 0.18 +
+      analysis.value * 0.15 +
+      analysis.growth * 0.15 +
+      sentiment.score * 0.10,
+      0,
+      100
+    ));
+    const headline = assetResearchHeadline(asset, identity, valuation, technicalSnapshot);
+    const summary = assetResearchSummary(asset, quote, valuation, technicalSnapshot, triggers, etf);
+    const conclusion = assetResearchConclusion(asset, valuation, technicalSnapshot, dataQuality, triggers, etf);
+    return {
+      symbol,
+      identity,
+      valuation,
+      technical: technicalSnapshot,
+      dataQuality,
+      opportunities,
+      risks,
+      triggers,
+      score,
+      headline,
+      summary,
+      conclusion,
+      dataStatus
+    };
+  }
+
+  function renderResearchBulletList(items) {
+    return `
+      <div class="research-bullet-list">
+        ${items.map((item) => `
+          <div class="research-bullet">
+            <span class="pill ${escAttr(item.tone || "")}">${esc(item.label)}</span>
+            <p>${esc(item.text)}</p>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderResearchTriggerList(items) {
+    return `
+      <div class="research-trigger-list">
+        ${items.map((item) => `
+          <button class="research-trigger-row" type="button" ${item.symbol && assetMap.has(item.symbol) ? `data-symbol="${escAttr(item.symbol)}"` : `data-route="${escAttr(item.route || "events")}"`}>
+            <span class="pill ${escAttr(item.tone || "")}">${esc(item.label)}</span>
+            <span>
+              <strong>${esc(item.title)}</strong>
+              <small>${esc(item.text)}</small>
+            </span>
+            ${renderStatusBadge(item.status)}
+          </button>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderResearchMetricList(metrics) {
+    return `
+      <div class="research-metric-list">
+        ${metrics.map((metric) => `
+          <div class="research-metric-row">
+            <span>${esc(metric.label)}</span>
+            <strong class="${escAttr(metric.tone || "")}">${esc(metric.value)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function assetIdentitySnapshot(asset, profile, analysis, technical, etf) {
+    const type = assetTypeLabel(asset);
+    const category = etf
+      ? `${etf.region[0]?.[0] || asset.sector} / ${etf.distribution}`
+      : (profile.sector || asset.sector || "Kategorie offen");
+    let character = "Gemischt";
+    if (etf) {
+      character = etf.ter <= 0.12 ? "Kosteneffizienter Kernbaustein" : etf.region[0]?.[1] >= 90 ? "Konzentrierter ETF" : "Diversifizierter ETF";
+    } else if (asset.type === "Crypto") {
+      character = "Liquiditäts- und Momentum-Proxy";
+    } else if (asset.type === "Commodity") {
+      character = "Makro-/Realzins-Sensitiv";
+    } else if (analysis.growth >= 68 && technical.rating === "BUY") {
+      character = "Growth / Momentum";
+    } else if (analysis.value >= 65) {
+      character = "Value-orientiert";
+    } else if (analysis.volatility <= 42) {
+      character = "Defensiver Qualitätswert";
+    } else if (analysis.volatility >= 68) {
+      character = "Volatiler Chancenwert";
+    } else if (analysis.quality >= 70) {
+      character = "Qualitätswert";
+    }
+    const text = etf
+      ? etf.useCase
+      : `${type} aus ${category}. Die Einordnung kombiniert Sektor, Bewertungsmodell, Momentum und Risiko.`;
+    return { type, category, character, text };
+  }
+
+  function assetValuationSnapshot(asset, fundamentals, analysis, etf) {
+    if (etf) {
+      const topRegion = etf.region[0] ? `${etf.region[0][0]} ${formatNumber(etf.region[0][1])}%` : "Region offen";
+      const concentration = etfHoldingConcentration(etf);
+      const tone = etf.ter <= 0.12 ? "bull" : etf.ter <= 0.25 ? "neutral" : "bear";
+      return {
+        label: `${formatNumber(etf.ter)}% TER`,
+        tone,
+        text: `${etf.distribution}, ${topRegion}. ${etf.structure}`,
+        metrics: [
+          { label: "TER", value: `${formatNumber(etf.ter)}%`, tone },
+          { label: "Ausschüttung", value: etf.distribution },
+          { label: "Top-Region", value: topRegion },
+          { label: "Top-Holdings", value: `${formatNumber(concentration)}%` }
+        ]
+      };
+    }
+    if (asset.type !== "Stock") {
+      return {
+        label: "klassisch nicht bewertbar",
+        tone: "neutral",
+        text: "Für dieses Asset sind klassische Aktienkennzahlen nur eingeschränkt sinnvoll. Preis, Trend und Makroumfeld sind wichtiger.",
+        metrics: [
+          { label: "Asset-Typ", value: assetTypeLabel(asset) },
+          { label: "Kategorie", value: asset.sector },
+          { label: "Value-Score", value: `${formatNumber(analysis.value)} / 100` },
+          { label: "Growth-Score", value: `${formatNumber(analysis.growth)} / 100` }
+        ]
+      };
+    }
+    const pe = firstNumber(fundamentals.pe, asset.fallback.pe);
+    const eps = firstNumber(fundamentals.eps, asset.fallback.eps);
+    const revenue = firstNumber(fundamentals.revenue, asset.fallback.revenue);
+    const margin = firstNumber(fundamentals.margin, analysis.margin);
+    let label = "Daten eingeschränkt";
+    let tone = "neutral";
+    if (pe !== null) {
+      label = pe <= 18 ? "eher günstig" : pe >= 40 ? "ambitioniert bewertet" : "neutral bewertet";
+      tone = pe <= 18 ? "bull" : pe >= 40 ? "bear" : "neutral";
+    }
+    const text = pe !== null
+      ? `KGV ${formatNumber(pe, "x")}; Value-Score ${formatNumber(analysis.value)} / 100. Kennzahlen bleiben je nach Datenstatus zu prüfen.`
+      : "KGV und volle Fundamentaldaten sind aktuell nicht belastbar verfügbar.";
+    return {
+      label,
+      tone,
+      text,
+      metrics: [
+        { label: "KGV", value: pe !== null ? formatNumber(pe, "x") : "nicht verfügbar", tone },
+        { label: "EPS", value: eps !== null ? formatMoney(eps, asset.currency) : "nicht verfügbar" },
+        { label: "Umsatz", value: revenue !== null ? formatCompactMoney(revenue, asset.currency) : "nicht verfügbar" },
+        { label: "Marge", value: margin !== null ? `${formatNumber(margin)}%` : "nicht verfügbar" }
+      ]
+    };
+  }
+
+  function assetTechnicalSnapshot(technical, analysis) {
+    const volatility = Number(analysis.volatility || 0);
+    const volatilityText = volatility >= 70 ? "erhöht" : volatility <= 42 ? "ruhig" : "normal";
+    const trendText = analysis.trend >= 65 ? "konstruktiv" : analysis.trend <= 42 ? "angeschlagen" : "gemischt";
+    return {
+      label: `${technical.rating} · ${technical.probability}%`,
+      tone: technical.tone,
+      text: `${trendText}er Trend, Momentum ${formatNumber(analysis.momentum)} / 100, Volatilität ${volatilityText}.`,
+      metrics: [
+        { label: "Momentum", value: `${formatNumber(analysis.momentum)} / 100`, tone: analysis.momentum >= 65 ? "bull" : analysis.momentum <= 42 ? "bear" : "neutral" },
+        { label: "Trend", value: `${formatNumber(analysis.trend)} / 100`, tone: analysis.trend >= 65 ? "bull" : analysis.trend <= 42 ? "bear" : "neutral" },
+        { label: "Volatilität", value: `${formatNumber(volatility)} / 100`, tone: volatility >= 70 ? "bear" : volatility <= 42 ? "bull" : "neutral" },
+        { label: "RSI", value: `${formatNumber(analysis.rsi)} · ${rsiText(analysis.rsi)}` }
+      ]
+    };
+  }
+
+  function assetDataQualitySnapshot(status, context) {
+    const statuses = [
+      context.quote.meta?.status,
+      context.profile.meta?.status,
+      context.fundamentals.meta?.status,
+      context.news.meta?.status,
+      context.events[0]?.meta?.status
+    ];
+    const liveCount = statuses.filter((item) => item === "live").length;
+    const fallbackCount = statuses.filter((item) => item === "fallback").length;
+    if (status === "live") {
+      return { label: "gute Datenlage", text: `${liveCount} Baustein${liveCount === 1 ? "" : "e"} live; Research bleibt als Produktlogik verdichtet.` };
+    }
+    if (status === "stale") {
+      return { label: "hybrid / Cache", text: "Ein Teil der Daten stammt aus Cache oder leicht verzögerten Abrufen." };
+    }
+    if (fallbackCount >= 3) {
+      return { label: "teilweise Fallback", text: "Mehrere Bausteine nutzen lokale oder fallback-basierte Daten. Die Seite bleibt transparent nutzbar." };
+    }
+    return { label: "hybrid", text: "Live-, lokale und modellierte Inputs werden klar getrennt und nicht als reine API-Wahrheit verkauft." };
+  }
+
+  function assetOpportunityItems(context, helpers) {
+    const { asset, quote, news, events } = context;
+    const { analysis, etf, fundamental, valuation, technicalSnapshot } = helpers;
+    const items = [];
+    if (etf) {
+      items.push({ label: "ETF-Struktur", text: etf.useCase, tone: "bull" });
+      if (etf.ter <= 0.12) {
+        items.push({ label: "Kosten", text: `Sehr niedrige TER von ${formatNumber(etf.ter)}% stärkt den langfristigen Kernbaustein.`, tone: "bull" });
+      }
+      items.push({ label: "Diversifikation", text: `${etf.region[0]?.[0] || "Region"} dominiert, Top-Holdings liegen bei ${formatNumber(etfHoldingConcentration(etf))}%.`, tone: "neutral" });
+    } else {
+      if (technicalSnapshot.tone === "bull") {
+        items.push({ label: "Momentum", text: `Technik wirkt konstruktiv: ${technicalSnapshot.text}`, tone: "bull" });
+      }
+      if (fundamental.label === "Positiv" || valuation.tone === "bull") {
+        items.push({ label: "Fundamental", text: fundamental.text, tone: "bull" });
+      }
+      if (analysis.growth >= 65) {
+        items.push({ label: "Wachstum", text: `Growth-Score ${formatNumber(analysis.growth)} / 100; struktureller Rückenwind im Modell sichtbar.`, tone: "bull" });
+      }
+    }
+    const nextEvent = events.find((eventItem) => eventItem.date >= startOfToday());
+    if (nextEvent && eventRelevance(nextEvent) >= 60) {
+      items.push({ label: "Trigger", text: `${nextEvent.title} (${eventTimingLabel(nextEvent)}) kann die nächste Neueinschätzung auslösen.`, tone: "neutral" });
+    }
+    if (news.items[0] && String(news.items[0].sentiment || "").toLowerCase() === "bullish") {
+      items.push({ label: "News", text: news.items[0].headline, tone: "bull" });
+    }
+    if (Number(quote.changePct || 0) > 1.5) {
+      items.push({ label: "Tagesstärke", text: `Tagesbewegung ${formatPercent(quote.changePct)} zeigt kurzfristige Nachfrage.`, tone: "bull" });
+    }
+    items.push({ label: "These", text: asset.thesis, tone: "neutral" });
+    return uniqueResearchItems(items);
+  }
+
+  function assetRiskItems(context, helpers) {
+    const { asset, fundamentals, events } = context;
+    const { analysis, etf, valuation, technicalSnapshot, dataStatus } = helpers;
+    const items = [];
+    if (etf) {
+      items.push({ label: "Struktur", text: etf.risk, tone: "bear" });
+      items.push({ label: "Währung", text: etf.fxRisk, tone: "neutral" });
+      if (etfHoldingConcentration(etf) >= 25 || etf.region[0]?.[1] >= 90) {
+        items.push({ label: "Klumpen", text: "Top-Holdings oder Regionen sind spürbar konzentriert; kein voll global neutrales Exposure.", tone: "bear" });
+      }
+    } else {
+      const pe = firstNumber(fundamentals.pe, asset.fallback.pe);
+      if (pe !== null && pe >= 40) {
+        items.push({ label: "Bewertung", text: `KGV ${formatNumber(pe, "x")} lässt wenig Raum für Enttäuschungen.`, tone: "bear" });
+      }
+      if (analysis.volatility >= 68) {
+        items.push({ label: "Volatilität", text: `Volatilitätswert ${formatNumber(analysis.volatility)} / 100; Positionsgröße und Stops brauchen Disziplin.`, tone: "bear" });
+      }
+      if (technicalSnapshot.tone === "bear") {
+        items.push({ label: "Technik", text: technicalSnapshot.text, tone: "bear" });
+      }
+    }
+    const soonEvent = events.find((eventItem) => eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(14));
+    if (soonEvent) {
+      items.push({ label: "Event", text: `${soonEvent.title} kann kurzfristig Volatilität oder Erwartungsdruck erhöhen.`, tone: "neutral" });
+    }
+    if (["fallback", "missing", "error"].includes(dataStatus)) {
+      items.push({ label: "Datenlage", text: "Ein Teil des Research-Bilds ist fallback-basiert; harte Kennzahlen vorher prüfen.", tone: "neutral" });
+    }
+    items.push({ label: "Asset-Risiko", text: asset.risks, tone: "bear" });
+    return uniqueResearchItems(items);
+  }
+
+  function assetTriggerItems(symbol, events, news) {
+    const eventItems = events
+      .filter((eventItem) => eventItem.date >= startOfToday())
+      .slice(0, 3)
+      .map((eventItem) => ({
+        label: eventTypeLabel(eventItem),
+        title: eventItem.title,
+        text: `${eventTimingLabel(eventItem)} · ${formatEventDate(eventItem.date)} · ${eventSourceLabel(eventItem)}`,
+        status: eventItem.meta?.status || "fallback",
+        tone: eventRelevance(eventItem) >= 80 ? "bull" : "neutral",
+        symbol: eventItem.symbol
+      }));
+    const alertItems = state.alerts
+      .map(normalizeAlertRecord)
+      .filter((alert) => alert.symbol === symbol && normalizeAlertStatus(alert) !== "done")
+      .slice(0, 2)
+      .map((alert) => ({
+        label: "Alert",
+        title: alertTypeLabel(alert.type),
+        text: `${alertStatusLabel(alert)} · ${priorityLabel(alert.priority)} · ${alertLabel(alert)}`,
+        status: "local",
+        tone: alert.priority === "high" ? "bull" : "neutral",
+        route: "alerts"
+      }));
+    const newsItem = news.items[0] ? [{
+      label: "News",
+      title: news.items[0].headline,
+      text: `${news.items[0].source || "News"} · ${formatRelativeTime(news.items[0].datetime)} · ${news.items[0].sentiment || "Neutral"}`,
+      status: news.meta.status,
+      tone: String(news.items[0].sentiment || "").toLowerCase() === "bullish" ? "bull" : String(news.items[0].sentiment || "").toLowerCase() === "bearish" ? "bear" : "neutral",
+      symbol
+    }] : [];
+    const items = [...eventItems, ...alertItems, ...newsItem];
+    return items.length ? items : [{
+      label: "Trigger offen",
+      title: "Kein harter Termin im aktuellen Fenster",
+      text: "Watchlist, Event-Hub und Alerts bleiben die nächsten sinnvollen Prüfpunkte.",
+      status: "fallback",
+      tone: "neutral",
+      route: "events"
+    }];
+  }
+
+  function assetResearchHeadline(asset, identity, valuation, technicalSnapshot) {
+    if (asset.type === "ETF") {
+      return `${asset.symbol}: ${identity.character} mit ${valuation.label}`;
+    }
+    return `${asset.symbol}: ${identity.character}, ${valuation.label}, Technik ${technicalSnapshot.label}`;
+  }
+
+  function assetResearchSummary(asset, quote, valuation, technicalSnapshot, triggers, etf) {
+    if (etf) {
+      return `${asset.name} ist vor allem ein Struktur- und Kostenbaustein. Aktuell wichtig: ${valuation.text}`;
+    }
+    const move = `Tagesbewegung ${formatPercent(quote.changePct)}`;
+    const trigger = triggers[0] ? ` Nächster Prüfpunkt: ${triggers[0].title}.` : "";
+    return `${move}; ${valuation.text} Technisch: ${technicalSnapshot.text}${trigger}`;
+  }
+
+  function assetResearchConclusion(asset, valuation, technicalSnapshot, dataQuality, triggers, etf) {
+    if (etf) {
+      return `${asset.symbol} eignet sich im aktuellen Modell eher über Struktur, Kosten und Einsatzbereich als über ein kurzfristiges Signal. Prüfe TER, Top-Holdings und Währungsrisiko vor dem Vergleich.`;
+    }
+    if (technicalSnapshot.tone === "bull" && valuation.tone !== "bear") {
+      return `Konstruktives Setup, solange Datenlage und nächster Trigger sauber geprüft bleiben. ${triggers[0] ? `Besonders wichtig: ${triggers[0].title}.` : "Kein einzelner Termin dominiert aktuell."}`;
+    }
+    if (technicalSnapshot.tone === "bear" || valuation.tone === "bear") {
+      return `Erhöhte Vorsicht: ${valuation.label} und ${technicalSnapshot.text} Erst Trigger, Bewertung und Datenqualität prüfen; keine Anlageberatung.`;
+    }
+    return `Gemischtes Bild: weder klarer Druck noch klares Kaufsignal. Für ${asset.symbol} zählen jetzt Trigger, Watchlist-Regeln und Datenqualität stärker als ein Einzelwert.`;
+  }
+
+  function uniqueResearchItems(items) {
+    const seen = new Set();
+    return items.filter((item) => {
+      const key = `${item.label}-${item.text}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return Boolean(item.text);
+    });
+  }
+
+  function assetTypeLabel(asset) {
+    const labels = {
+      Stock: "Aktie",
+      ETF: "ETF",
+      Index: "Index",
+      Commodity: "Rohstoff",
+      Crypto: "Krypto"
+    };
+    return labels[asset.type] || asset.type || "Asset";
+  }
+
+  function etfDataForSymbol(symbol) {
+    return ETF_DATA.find((item) => item.symbol === symbol) || null;
   }
 
   function renderThesisJournalCard(symbol) {
@@ -4190,14 +5354,15 @@
     ensureHomeData();
     const portfolio = activePortfolio();
     const analysis = portfolioAnalysis(portfolio);
+    const scenario = portfolioScenarioAnalysis(portfolio, analysis);
 
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Portfolio Analyse 2C</p>
-            <h1>Lokale Portfolios mit Exposure und Rebalancing.</h1>
-            <p>Mehrere Echtgeld- und Testportfolios laufen lokal im Browser. Cash, Sektor-, Land- und Währungs-Exposure werden transparent berechnet.</p>
+            <p class="eyebrow">Portfolio / Risiko / Exposure V2</p>
+            <h1>Portfolio-Kontrollzentrum.</h1>
+            <p>Mehrere lokale Portfolios mit Risiko, Exposure, Performance-Beitrag, Rebalancing-Hinweisen und ehrlicher Live-/Hybrid-/Fallback-Kennzeichnung.</p>
           </div>
           <div class="row-actions">
             <button class="ghost-button" type="button" data-report="portfolio">Portfolio Report</button>
@@ -4210,82 +5375,157 @@
           `).join("")}
         </div>
       </section>
+
+      <section class="section">
+        <article class="card portfolio-control-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">${portfolio.type === "real" ? "Echtgeld" : "Testportfolio"} · lokal gespeichert</span>
+              <h3>${esc(portfolio.name)}</h3>
+              <p>${esc(analysis.health.summary)}</p>
+            </div>
+            ${renderDataMeta(analysis.meta, true)}
+          </div>
+          <div class="portfolio-hero-grid">
+            ${renderMiniMetric("Gesamtwert", formatMoney(analysis.totalValue, "USD"))}
+            ${renderMiniMetric("Gesamt-Performance", `${formatMoney(analysis.performanceAbs, "USD")} / ${formatPercent(analysis.performancePct)}`)}
+            ${renderMiniMetric("Cash", `${formatMoney(analysis.cashValue, "USD")} (${formatNumber(analysis.cashPct)}%)`)}
+            ${renderMiniMetric("Positionen", String(portfolio.positions.length))}
+            ${renderMiniMetric("Risiko-Level", `${analysis.riskLevel.label} · ${formatNumber(analysis.riskScore)} / 100`)}
+            ${renderMiniMetric("Größte Position", analysis.topPosition ? `${analysis.topPosition.symbol} ${formatNumber(analysis.topPosition.weight)}%` : "n/a")}
+          </div>
+          <div class="portfolio-health-band">
+            <span class="score-pill ${analysis.riskLevel.tone}">${esc(analysis.riskLevel.label)}</span>
+            <div>
+              <strong>${esc(analysis.health.label)}</strong>
+              <p>${esc(analysis.priorityHint)}</p>
+            </div>
+          </div>
+          ${portfolio.notes ? `<p class="small portfolio-note-preview">${esc(portfolio.notes)}</p>` : ""}
+        </article>
+      </section>
+
       <section class="section">
         <div class="grid two">
-          <article class="card">
+          ${renderPortfolioFocusCard(analysis)}
+          ${renderPortfolioPerformanceCard(analysis)}
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="grid two">
+          <article class="card portfolio-exposure-card">
             <div class="card-topline">
               <div>
-                <span class="card-label">${portfolio.type === "real" ? "Echtgeld" : "Testportfolio"}</span>
-                <h3>${esc(portfolio.name)}</h3>
+                <span class="card-label">Exposure</span>
+                <h3>Wo bist du übergewichtet?</h3>
+                <p>Sektor, Region/Land, Währung und Asset-Typ werden aus Positionen, Cash und vorhandenen Stammdaten abgeleitet.</p>
               </div>
-              ${renderDataMeta(makeMeta("Lokaler Portfolio-Speicher", "live", Date.now()), true)}
+              ${renderStatusBadge(analysis.dataStatus)}
             </div>
-            <div class="metric-grid">
-              ${renderMiniMetric("Gesamtwert", formatMoney(analysis.totalValue, "USD"))}
-              ${renderMiniMetric("Performance", `${formatMoney(analysis.performanceAbs, "USD")} / ${formatPercent(analysis.performancePct)}`)}
-              ${renderMiniMetric("Cash", `${formatMoney(portfolio.cash, "USD")} (${formatNumber(analysis.cashPct)}%)`)}
-              ${renderMiniMetric("Positionen", String(portfolio.positions.length))}
-              ${renderMiniMetric("Risiko-Score", `${formatNumber(analysis.riskScore)} / 100`)}
+            <div class="portfolio-exposure-grid">
+              ${renderExposureBlock("Sektor", analysis.sectorExposure)}
+              ${renderExposureBlock("Land / Region", analysis.countryExposure)}
+              ${renderExposureBlock("Währung", analysis.currencyExposure)}
+              ${renderExposureBlock("Asset-Typ", analysis.assetTypeExposure)}
             </div>
-            <div class="insight-row"><span class="pill">Klarblick</span><p>${esc(analysis.priorityHint)}</p></div>
-            <div class="portfolio-positions">
-              ${portfolio.positions.map((position) => renderPortfolioPosition(position)).join("") || renderEmptyState("Noch kein Portfolio angelegt oder keine Positionen vorhanden.")}
+            <div class="portfolio-style-strip">
+              ${renderMiniMetric("Tech-Anteil", `${formatNumber(analysis.style.techPct)}%`)}
+              ${renderMiniMetric("USA-Anteil", `${formatNumber(analysis.style.usPct)}%`)}
+              ${renderMiniMetric("ETF-Anteil", `${formatNumber(analysis.style.etfPct)}%`)}
+              ${renderMiniMetric("Growth-Nähe", analysis.style.growthLabel)}
             </div>
           </article>
-          <article class="card">
-            <h3>Exposure & Hinweise</h3>
-            ${renderExposureBlock("Sektor", analysis.sectorExposure)}
-            ${renderExposureBlock("Land", analysis.countryExposure)}
-            ${renderExposureBlock("Währung", analysis.currencyExposure)}
-            <div class="insight-row"><span class="pill">Klumpenrisiko</span><p>${esc(analysis.concentrationHint)}</p></div>
-            <div class="insight-row"><span class="pill">Diversifikation</span><p>${esc(analysis.diversificationHint)}</p></div>
-            <div class="insight-row"><span class="pill">Rebalancing</span><p>${esc(analysis.rebalanceHint)}</p></div>
-            <div class="insight-row"><span class="pill">Priorität</span><p>${esc(analysis.priorityHint)}</p></div>
-            ${renderDataMeta(makeMeta("Lokale Portfolio Engine", "live", Date.now()))}
+
+          <article class="card portfolio-risk-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Risiko & Rebalancing</span>
+                <h3>Klumpen, Cash und Balance</h3>
+                <p>Klare Heuristik statt Pseudo-Quant: Positionen, Sektoren, Länder, Währungen, Cash und Diversifikation.</p>
+              </div>
+              <span class="score-pill ${analysis.riskLevel.tone}">${formatNumber(analysis.riskScore)}</span>
+            </div>
+            <div class="portfolio-risk-list">
+              ${analysis.riskItems.map(renderPortfolioInsightRow).join("")}
+            </div>
+            <h4>Rebalancing-Hinweise</h4>
+            <div class="portfolio-risk-list">
+              ${analysis.rebalancingHints.map(renderPortfolioInsightRow).join("")}
+            </div>
           </article>
         </div>
       </section>
+
+      <section class="section">
+        <article class="card portfolio-positions-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Positionen</span>
+              <h3>Rendite- und Risikotreiber</h3>
+              <p>Jede Position zeigt Gewicht, Performance, Beitrag, Rolle, nächsten Termin und sinnvolle nächste Schritte.</p>
+            </div>
+            ${renderStatusBadge(analysis.dataStatus)}
+          </div>
+          <div class="portfolio-position-list">
+            ${analysis.positions.map((row) => renderPortfolioPosition(row, analysis)).join("") || renderEmptyState("Noch kein Portfolio angelegt oder keine Positionen vorhanden.")}
+          </div>
+        </article>
+      </section>
+
       <section class="section">
         <div class="grid two">
-          <article class="card">
-            <h3>Portfolio anlegen</h3>
+          <article class="card portfolio-scenario-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Was-wäre-wenn</span>
+                <h3>Einfaches Szenario testen</h3>
+                <p>Simuliert lokal, wie sich Zusatzposition, Cash und Marktschock auf Wert, Exposure und Risiko auswirken würden.</p>
+              </div>
+              ${renderDataMeta(makeMeta("Lokale Portfolio-Simulation", "local", Date.now(), "Keine Orderlogik, kein Backend, keine Anlageberatung."), true)}
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>Symbol hinzufügen</span><input data-portfolio-scenario name="symbol" value="${escAttr(state.portfolioScenario.symbol || "SPY")}" placeholder="SPY oder NVDA"></label>
+              <label class="field"><span>Anzahl</span><input data-portfolio-scenario name="quantity" type="number" step="0.0001" value="${escAttr(state.portfolioScenario.quantity || 0)}"></label>
+              <label class="field"><span>Kaufkurs</span><input data-portfolio-scenario name="avgPrice" type="number" step="0.01" value="${escAttr(state.portfolioScenario.avgPrice || "")}"></label>
+              <label class="field"><span>Cash-Veränderung</span><input data-portfolio-scenario name="cashChange" type="number" value="${escAttr(state.portfolioScenario.cashChange || 0)}"></label>
+              <label class="field"><span>Marktschock %</span><input data-portfolio-scenario name="shock" type="number" value="${escAttr(state.portfolioScenario.shock)}"></label>
+              <label class="field"><span>Monatlicher Beitrag</span><input data-portfolio-scenario name="contribution" type="number" value="${escAttr(state.portfolioScenario.contribution)}"></label>
+            </div>
+            ${renderScenarioResult(analysis, scenario)}
+          </article>
+
+          <article class="card portfolio-management-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Portfolios & Notizen</span>
+                <h3>Mehrere Portfolios sauber trennen</h3>
+                <p>Echtgeld, Test, ETF-Kern oder Trading-Ideen bleiben lokal getrennt.</p>
+              </div>
+              ${state.portfolios.length > 1 ? `<button class="tiny-button" type="button" data-portfolio-delete="${escAttr(portfolio.id)}">Aktuelles löschen</button>` : ""}
+            </div>
             <form class="form-grid" data-portfolio-form>
-              <label class="field"><span>Name</span><input name="name" placeholder="z. B. Dividenden Depot"></label>
+              <label class="field"><span>Name</span><input name="name" placeholder="z. B. ETF-Kern oder Trading"></label>
               <label class="field"><span>Typ</span><select name="type"><option value="real">Echtgeld</option><option value="test">Testportfolio</option></select></label>
-              <label class="field"><span>Cash</span><input name="cash" type="number" placeholder="5000"></label>
+              <label class="field"><span>Start-Cash</span><input name="cash" type="number" placeholder="5000"></label>
+              <label class="field"><span>Ziel-Cash %</span><input name="targetCash" type="number" placeholder="10"></label>
+              <label class="field full-field"><span>Kommentar</span><textarea name="notes" placeholder="Wofür ist dieses Portfolio gedacht?"></textarea></label>
               <button class="primary-button" type="submit">Portfolio speichern</button>
             </form>
-          </article>
-          <article class="card">
-            <h3>Position hinzufügen</h3>
-            <form class="form-grid" data-position-form>
+            <form class="form-grid compact-section" data-position-form>
               <label class="field"><span>Symbol</span><input name="symbol" placeholder="NVDA"></label>
               <label class="field"><span>Anzahl</span><input name="quantity" type="number" step="0.0001"></label>
               <label class="field"><span>Kaufkurs</span><input name="avgPrice" type="number" step="0.01"></label>
               <button class="primary-button" type="submit">Position speichern</button>
             </form>
-          </article>
-        </div>
-      </section>
-      <section class="section">
-        <div class="grid two">
-          <article class="card">
-            <h3>Was-wäre-wenn Simulation</h3>
-            <div class="form-grid">
-              <label class="field"><span>Marktschock %</span><input data-portfolio-scenario name="shock" type="number" value="${escAttr(state.portfolioScenario.shock)}"></label>
-              <label class="field"><span>Monatlicher Beitrag</span><input data-portfolio-scenario name="contribution" type="number" value="${escAttr(state.portfolioScenario.contribution)}"></label>
-            </div>
-            ${renderScenarioResult(analysis)}
-          </article>
-          <article class="card">
-            <h3>Portfolio-Kommentare</h3>
-            <form data-portfolio-notes-form>
-              <label class="field"><span>Notiz / These</span><textarea name="notes">${esc(portfolio.notes || "")}</textarea></label>
+            <form class="compact-section" data-portfolio-notes-form>
+              <label class="field"><span>Notiz / These zum aktiven Portfolio</span><textarea name="notes">${esc(portfolio.notes || "")}</textarea></label>
               <button class="primary-button" type="submit">Notiz speichern</button>
             </form>
           </article>
         </div>
       </section>
+
       <section class="section">
         <article class="card">
           <div class="card-topline">
@@ -4310,6 +5550,88 @@
     `;
   }
 
+  function renderPortfolioFocusCard(analysis) {
+    return `
+      <article class="card portfolio-focus-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Was ist jetzt wichtig?</span>
+            <h3>Prioritäten für dieses Portfolio</h3>
+            <p>Risiken, Events, Alerts, Bewegungen und Rebalancing werden lokal priorisiert.</p>
+          </div>
+          ${renderStatusBadge(analysis.dataStatus)}
+        </div>
+        <div class="portfolio-focus-list">
+          ${analysis.focusItems.map((item) => `
+            <button class="portfolio-focus-row" type="button" ${item.symbol && assetMap.has(item.symbol) ? `data-symbol="${escAttr(item.symbol)}"` : `data-route="${escAttr(item.route || "portfolio")}"`}>
+              <span class="pill ${escAttr(item.tone || "")}">${esc(item.label)}</span>
+              <span>
+                <strong>${esc(item.title)}</strong>
+                <small>${esc(item.text)}</small>
+              </span>
+            </button>
+          `).join("") || renderEmptyState("Keine dringenden Portfolio-Hinweise.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderPortfolioPerformanceCard(analysis) {
+    const performance = analysis.performance;
+    return `
+      <article class="card portfolio-performance-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Performance</span>
+            <h3>Beitrag statt nur Prozentzahl</h3>
+            <p>Tageswert ist kursnah; Woche, Monat und Jahr sind modellierte Näherungen aus verfügbaren Zeitreihen/Fallbacks.</p>
+          </div>
+          ${renderDataMeta(analysis.meta, true)}
+        </div>
+        <div class="portfolio-performance-grid">
+          ${renderMiniMetric("Heute", `${formatMoney(performance.daily.abs, "USD")} / ${formatPercent(performance.daily.pct)}`)}
+          ${renderMiniMetric("Woche", `${formatMoney(performance.week.abs, "USD")} / ${formatPercent(performance.week.pct)}`)}
+          ${renderMiniMetric("Monat", `${formatMoney(performance.month.abs, "USD")} / ${formatPercent(performance.month.pct)}`)}
+          ${renderMiniMetric("Jahr", `${formatMoney(performance.year.abs, "USD")} / ${formatPercent(performance.year.pct)}`)}
+          ${renderMiniMetric("Gesamt", `${formatMoney(analysis.performanceAbs, "USD")} / ${formatPercent(analysis.performancePct)}`)}
+        </div>
+        <div class="grid two">
+          <div>
+            <h4>Größte Gewinner</h4>
+            ${renderPortfolioContributionList(performance.winners, "Keine Gewinner im aktuellen Portfolio.")}
+          </div>
+          <div>
+            <h4>Größte Verlierer</h4>
+            ${renderPortfolioContributionList(performance.losers, "Keine Verlierer im aktuellen Portfolio.")}
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderPortfolioContributionList(rows, emptyText) {
+    return `
+      <div class="portfolio-contribution-list">
+        ${rows.map((row) => `
+          <button class="portfolio-contribution-row" type="button" data-symbol="${escAttr(row.symbol)}">
+            <span><strong>${esc(row.symbol)}</strong><small>${esc(row.asset.name)}</small></span>
+            <span class="${toneClass(row.performanceAbs)}">${formatMoney(row.performanceAbs, row.asset.currency)}</span>
+            <span class="${toneClass(row.contributionPct)}">${formatPercent(row.contributionPct)}</span>
+          </button>
+        `).join("") || renderEmptyState(emptyText)}
+      </div>
+    `;
+  }
+
+  function renderPortfolioInsightRow(item) {
+    return `
+      <div class="insight-row portfolio-insight-row">
+        <span class="pill ${escAttr(item.tone || "")}">${esc(item.label)}</span>
+        <p>${esc(item.text)}</p>
+      </div>
+    `;
+  }
+
   function renderWatchlistManageRow(symbol) {
     const asset = getAsset(symbol);
     const quote = quoteFor(symbol);
@@ -4330,59 +5652,40 @@
   }
 
   function renderSettingsPage() {
-    const keys = { ...state.apiKeys };
     const publicProviders = visibleProviders();
-    const keyBasedCount = publicProviders.filter((provider) => provider.keyMode !== "none").length;
+    const serverSideCount = publicProviders.filter((provider) => provider.keyMode === "serverEnv").length;
     const openDataCount = publicProviders.filter((provider) => provider.keyMode === "none").length;
-    const browserCriticalCount = publicProviders.filter((provider) => provider.security === "browser-critical").length;
+    const hybridCount = publicProviders.filter((provider) => provider.security === "backend-ready" || provider.security === "browser-critical").length;
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Data Providers / API Keys</p>
-            <h1>Öffentlicher Kernstack für MH Analytics.</h1>
-            <p>Die aktive Provider-Seite zeigt nur noch die elf sinnvollen Kernquellen für den öffentlichen Start. Alte Free-Plan- oder Backend-only-Slots werden hier nicht mehr als Pflichtanbieter beworben.</p>
+            <p class="eyebrow">Datenquellen</p>
+            <h1>Quellenstatus statt öffentlicher API-Key-Verwaltung.</h1>
+            <p>Normale Nutzer sehen hier keine editierbaren Schlüssel mehr. MH Analytics zeigt nur noch, welche Quellen welche Module bedienen, ob sie serverseitig, als Open Data oder hybrid eingeordnet sind und ob gerade Live-, Fallback- oder Teilstatus aktiv ist.</p>
           </div>
           <div class="row-actions">
-            <button class="ghost-button" type="button" data-test-all-providers>Konfigurierte testen</button>
             <button class="ghost-button" type="button" data-clear-cache>Daten-Cache leeren</button>
-            <button class="ghost-button" type="button" data-route="data-health">Data Health öffnen</button>
+            <button class="ghost-button" type="button" data-route="data-health">Datenstatus öffnen</button>
           </div>
         </div>
         <div class="provider-summary-grid">
-          ${renderProviderSummary("Kernquellen", publicProviders.length, "Aktive öffentliche Providerliste")}
-          ${renderProviderSummary("Key-basiert", keyBasedCount, "Finnhub, Alpha Vantage, FRED, EIA")}
+          ${renderProviderSummary("Kernquellen", publicProviders.length, "Öffentliche Quellenübersicht ohne Key-Felder")}
+          ${renderProviderSummary("Serverseitig", serverSideCount, "FRED, Finnhub, Alpha Vantage und EIA laufen mit Environment Variables")}
           ${renderProviderSummary("Open Data", openDataCount, "Kein Key-Feld nötig")}
-          ${renderProviderSummary("Browserkritisch", browserCriticalCount, "Nicht als Live-Frontendquelle versprechen")}
+          ${renderProviderSummary("Hybrid / später", hybridCount, "Eingeordnet, aber nicht als öffentliche Key-Konfiguration")}
         </div>
-        ${renderApiOnboardingGuide()}
         ${renderProviderHealthPreview()}
         <article class="card provider-warning-card">
           <div>
-            <h3>Browser-sicher vs. Backend</h3>
-            <p>Für private lokale Tests ist localStorage okay. Produktiv gehören geheime Provider-Keys in ein Backend, Proxy oder Edge Functions. Service-Role-Keys niemals im Browser speichern.</p>
+            <h3>Warum keine öffentlichen Key-Felder mehr?</h3>
+            <p>API-Keys gehören nicht in eine öffentliche Oberfläche. Sensible Quellen laufen deshalb serverseitig über Vercel Functions; Open-Data-Quellen werden zentral normalisiert. Das Frontend erhält nur Daten und Statushinweise.</p>
           </div>
-          ${renderDataMeta(makeMeta("Lokaler Browser-Speicher", "live", BOOT_TIME), true)}
+          ${renderDataMeta(makeMeta("Vercel Environment Variables", "fallback", BOOT_TIME), true)}
         </article>
       </section>
       <section class="section">
-        ${PROVIDER_GROUPS.map((group) => renderProviderGroup(group, keys)).join("")}
-      </section>
-      <section class="section">
-        <article class="card">
-          <div class="card-topline">
-            <div>
-              <span class="card-label">Provider-Konfiguration</span>
-              <h3>Alle API Keys speichern</h3>
-            </div>
-            ${renderStatusBadge(getConfiguredProviderCount() ? "fallback" : "missing")}
-          </div>
-          <p>Die aktiven Key-Felder sind bewusst begrenzt: Finnhub, Alpha Vantage, FRED und EIA. Open-Data-Quellen erhalten kein sinnloses Key-Feld und werden erst nach echtem Abruf als live markiert.</p>
-          <div class="card-actions settings-actions">
-            <button class="primary-button" type="button" data-save-api-keys>Alle API Keys speichern</button>
-            <button class="ghost-button" type="button" data-test-all-providers>Konfigurierte Provider testen</button>
-          </div>
-        </article>
+        ${PROVIDER_GROUPS.map((group) => renderProviderGroup(group)).join("")}
       </section>
     `;
   }
@@ -4390,58 +5693,112 @@
   function renderDataHealthPage() {
     ensureHomeData();
     ensureEventData();
-    const summary = providerHealthSummary();
-    const rows = DATA_HEALTH_PROVIDER_IDS
-      .map(providerById)
-      .filter(Boolean);
+    const snapshot = dataHealthSnapshot();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
             <p class="eyebrow">Data Health</p>
-            <h1>Provider, Fallbacks und Live-Abrufe im Blick.</h1>
-            <p>Dieses Dashboard zeigt transparent, welche Datenquellen aktiv genutzt werden, wo Keys fehlen und welche Module gerade mit Fallbacks arbeiten.</p>
+            <h1>Quellen, Frische und Modulstatus transparent.</h1>
+            <p>Diese Seite zeigt f\u00fcr normale Nutzer, woher Daten kommen, wie belastbar sie gerade sind und welche Module live, hybrid oder fallback-gest\u00fctzt arbeiten. Keine Keys, keine Testbuttons, keine \u00f6ffentliche Konfiguration.</p>
           </div>
           <div class="row-actions">
-            <button class="ghost-button" type="button" data-test-all-providers>Konfigurierte testen</button>
-            <button class="ghost-button" type="button" data-route="settings">API Keys verwalten</button>
+            <button class="ghost-button" type="button" data-route="settings">Datenquellen ansehen</button>
           </div>
         </div>
-        <div class="provider-summary-grid">
-          ${renderProviderSummary("Live erfolgreich", summary.live, "Provider mit erfolgreichem Abruf")}
-          ${renderProviderSummary("Fallback/Vorbereitet", summary.fallback, "Sicherheitsnetz oder Slot")}
-          ${renderProviderSummary("Veralteter Cache", summary.stale, "Cache statt frischer API")}
-          ${renderProviderSummary("Fehler/fehlend", summary.error + summary.missing, "Handlungsbedarf")}
-        </div>
-        ${renderDataHealthSourcesOverview()}
+        ${renderDataHealthOverview(snapshot)}
+        ${renderDataHealthLegend()}
+        ${renderDataHealthSourcesOverview(snapshot.modules)}
         <article class="card">
           <div class="card-topline">
             <div>
-              <span class="card-label">Provider Health Matrix</span>
-              <h3>Welche Quelle bedient welches Modul?</h3>
+              <span class="card-label">Quellen\u00fcbersicht pro Provider</span>
+              <h3>Welche Quelle bedient welchen Bereich?</h3>
             </div>
-            ${renderDataMeta(makeMeta("Lokaler Provider-Health-Status", getOverallDataStatus(), Date.now()), true)}
+            ${renderDataMeta(makeMeta("Provider-Registry + Laufzeitstatus", snapshot.overall.status, snapshot.lastGlobalUpdate), true)}
           </div>
-          <div class="health-table">
-            ${rows.map(renderProviderHealthRow).join("")}
+          <div class="health-provider-grid">
+            ${snapshot.providers.map(renderProviderHealthRow).join("")}
           </div>
         </article>
       </section>
     `;
   }
 
-  function renderDataHealthSourcesOverview() {
-    const rows = dataHealthModuleRows();
+  function renderDataHealthOverview(snapshot) {
+    return `
+      <article class="card data-health-summary-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Systemgesundheit</span>
+            <h3>${esc(snapshot.overall.label)}</h3>
+            <p>${esc(snapshot.overall.text)}</p>
+          </div>
+          ${renderStatusBadge(snapshot.overall.status)}
+        </div>
+        <div class="provider-summary-grid">
+          ${renderProviderSummary("Aktive Quellen", snapshot.counts.active, "Im \u00f6ffentlichen Kernstack sichtbar")}
+          ${renderProviderSummary("Live", snapshot.counts.live, "Erfolgreiche Abrufe in dieser Sitzung")}
+          ${renderProviderSummary("Hybrid/Fallback", snapshot.counts.hybridFallback, "Eingeschr\u00e4nkt oder fallback-gest\u00fctzt")}
+          ${renderProviderSummary("Problematisch", snapshot.counts.problematic, "Offline, Fehler oder fehlend")}
+          ${renderProviderSummary("Module gesund", snapshot.counts.healthyModules, "Gute oder belastbare Datenlage")}
+          ${renderProviderSummary("Module eingeschr\u00e4nkt", snapshot.counts.limitedModules, "Hybrid, fallback oder lokal")}
+        </div>
+        <div class="data-health-meta health-summary-meta">
+          <span><strong>Letzter Statuscheck:</strong> ${esc(formatTimestamp(snapshot.lastGlobalUpdate))}</span>
+          <span><strong>Einordnung:</strong> heuristisch aus echten Provider-Statuswerten, Cache-Zeiten und Modulzuordnungen abgeleitet.</span>
+          <span><strong>Sicherheit:</strong> API-Keys bleiben serverseitig; normale Nutzer sehen nur Transparenzinformationen.</span>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderDataHealthLegend() {
+    const statusItems = [
+      ["Live", "Frische Antwort einer Quelle oder frischer Cache aus erfolgreichem Abruf."],
+      ["Hybrid", "Mindestens eine Quelle liefert, andere Teile nutzen Fallback oder lokale Logik."],
+      ["Fallback", "Kein erfolgreicher Live-Abruf in dieser Sitzung; strukturierte lokale Daten sichern das Modul."],
+      ["Offline", "Quelle meldet Fehler, fehlt oder ist bewusst nicht erreichbar."],
+      ["Unbekannt", "Noch kein belastbarer Laufzeitstatus ableitbar."]
+    ];
+    const healthItems = [
+      ["Gesund", "Datenlage wirkt belastbar."],
+      ["Eingeschr\u00e4nkt", "Nutzbar, aber teilweise Cache, Hybrid oder nur Zusatzquelle."],
+      ["Degradiert", "Fallback steht im Vordergrund."],
+      ["Gest\u00f6rt", "Fehler, fehlende Konfiguration oder offline."]
+    ];
+    return `
+      <article class="card data-health-legend">
+        <div>
+          <span class="card-label">Statuslogik</span>
+          <h3>Einheitliche Begriffe</h3>
+          <p>Die Begriffe gelten f\u00fcr Quellen und Module. Sie sind bewusst nutzerorientiert und keine rohe Debug-Konsole.</p>
+        </div>
+        <div class="health-legend-grid">
+          <div>
+            <span class="filter-label">Datenstatus</span>
+            ${statusItems.map(([label, text]) => `<p><strong>${esc(label)}:</strong> ${esc(text)}</p>`).join("")}
+          </div>
+          <div>
+            <span class="filter-label">Health</span>
+            ${healthItems.map(([label, text]) => `<p><strong>${esc(label)}:</strong> ${esc(text)}</p>`).join("")}
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderDataHealthSourcesOverview(rows = dataHealthModuleRows()) {
     return `
       <article class="card data-health-overview-card">
         <div class="card-topline">
           <div>
-            <span class="card-label">Quellenübersicht</span>
-            <h3>Module, Provider und Datenstatus</h3>
+            <span class="card-label">Modulstatus</span>
+            <h3>Welche Bereiche sind datenstark?</h3>
           </div>
-          ${renderDataMeta(makeMeta("Lokale Quellenmatrix + Provider Health", getOverallDataStatus(), Date.now()), true)}
+          ${renderDataMeta(makeMeta("Zentrale Modul-/Quellenmatrix", aggregateModuleStatus(rows.map((row) => row.status)), Date.now()), true)}
         </div>
-        <p>Diese Übersicht trennt bewusst Live-Daten, Fallback-Daten und Hybrid-Logik. Ein Modul wird nur als live markiert, wenn mindestens eine zugeordnete Quelle in dieser Sitzung erfolgreich geliefert hat.</p>
+        <p>Diese Übersicht trennt Live-Daten, Hybrid-Logik, lokale Produktlogik und Fallbacks. Ein Modul wird nur als belastbar markiert, wenn seine zugeordneten Quellen oder stabilen lokalen Daten das seriös tragen.</p>
         <div class="source-overview-grid">
           ${rows.map(renderDataHealthSourceCard).join("")}
         </div>
@@ -4454,7 +5811,7 @@
       <div class="source-overview-card">
         <div class="card-topline compact-topline">
           <div>
-            <span class="card-label">${esc(row.mode)}</span>
+            <span class="card-label">${esc(row.mode)} · ${esc(row.healthLabel)}</span>
             <h4>${esc(row.module)}</h4>
           </div>
           ${renderStatusBadge(row.status)}
@@ -4468,7 +5825,9 @@
         </div>
         <p>${esc(row.note)}</p>
         <div class="data-health-meta">
-          <span><strong>Letzter Abruf:</strong> ${esc(formatTimestamp(row.timestamp))}</span>
+          <span><strong>Datenbasis:</strong> ${esc(row.dataBasis)}</span>
+          <span><strong>Frische:</strong> ${esc(row.freshness.label)} - ${esc(row.freshness.text)}</span>
+          <span><strong>Letzter sinnvoller Abruf:</strong> ${esc(row.lastSuccessText)}</span>
           <span><strong>Status:</strong> ${esc(row.statusText)}</span>
         </div>
       </div>
@@ -4476,32 +5835,141 @@
   }
 
   function dataHealthModuleRows() {
-    return [
-      dataHealthModuleRow("Screener", ["finnhub", "alphaVantage"], "Hybrid", "Quotes und Profile kommen bevorzugt live; Scoring bleibt Produktlogik mit Fallback-Sicherheitsnetz."),
-      dataHealthModuleRow("Asset-Seiten", ["finnhub", "sec", "alphaVantage"], "Hybrid", "Preis, Profil, News und Events nutzen Live-Daten, sofern verfügbar; Research-Snapshot bleibt kuratiert."),
-      dataHealthModuleRow("Events / Earnings", ["finnhub", "alphaVantage"], "Live/Fallback", "Earnings und IPOs werden providerbasiert geladen; lokaler Kalender bleibt Backup."),
-      dataHealthModuleRow("Makro / Geldmengen", ["fred", "bls", "treasury"], "Live/Fallback", "US-Makro, Geldmengen, CPI, Arbeitsmarkt und Renditen laufen über offizielle Quellen mit Fallback."),
-      dataHealthModuleRow("Euro-Makro", ["ecb"], "Open Data", "ECB ist als offene Quelle ohne Key vorgesehen und wird nur nach erfolgreichem Abruf live gezählt."),
-      dataHealthModuleRow("Energie / Rohstoffe / FX", ["eia", "alphaVantage"], "Live/Fallback", "EIA liefert Energiedaten, Alpha Vantage ergänzt Rohstoffe und Währungen."),
-      dataHealthModuleRow("Globale Länderdaten", ["worldBank", "imf", "oecd"], "Open Data", "World Bank ist Primärpfad; IMF/OECD sind ergänzende offene Makroquellen."),
-      dataHealthModuleRow("Portfolio / Journal / Reports", ["finnhub"], "Hybrid", "Nutzer- und App-Logik bleibt lokal; Marktdaten werden soweit möglich aus Live-Quotes gespeist.")
-    ];
+    return DATA_HEALTH_MODULES.map(dataHealthModuleRow);
   }
 
-  function dataHealthModuleRow(moduleName, providerIds, mode, note) {
+  function dataHealthModuleRow(module) {
+    const providerIds = module.providers || [];
     const healthItems = providerIds.map(providerHealthFor);
     const statuses = healthItems.map((health) => health.status);
     const status = aggregateHealthStatus(statuses);
+    const lastSuccess = Math.max(...healthItems.map((health) => Number(health.lastSuccess || 0)), 0);
     const timestamp = Math.max(...healthItems.map((health) => Number(health.lastSuccess || health.timestamp || BOOT_TIME)), BOOT_TIME);
+    const freshness = freshnessForHealth({ status, timestamp, lastSuccess });
+    const healthState = healthStateForStatus(status);
     return {
-      module: moduleName,
+      module: module.name,
       providers: providerIds,
-      mode,
-      note,
+      mode: module.mode,
+      note: module.description,
       status,
       timestamp,
+      freshness,
+      dataBasis: module.quality === "hoch" ? "belastbar / breit abgestützt" : module.mode,
+      lastSuccessText: lastSuccess ? formatTimestamp(lastSuccess) : "kein exakter Live-Timestamp verfügbar",
+      healthLabel: healthState.label,
       statusText: moduleStatusText(statuses)
     };
+  }
+
+  function dataHealthSnapshot() {
+    const providers = DATA_HEALTH_PROVIDER_IDS
+      .map(providerById)
+      .filter(Boolean)
+      .map((provider) => ({
+        provider,
+        health: providerHealthFor(provider.id),
+        source: sourceRegistryFor(provider.id)
+      }));
+    const modules = dataHealthModuleRows();
+    const live = providers.filter((item) => item.health.status === "live").length;
+    const stale = providers.filter((item) => item.health.status === "stale").length;
+    const fallback = providers.filter((item) => ["fallback", "prepared", "mapped", "notUsed"].includes(item.health.status)).length;
+    const problematic = providers.filter((item) => ["error", "missing", "disabled"].includes(item.health.status)).length;
+    const healthyModules = modules.filter((row) => ["live", "hybrid"].includes(normalizedDataStatus(row.status)) || row.healthLabel === "Gesund").length;
+    const limitedModules = modules.length - healthyModules;
+    const lastGlobalUpdate = Math.max(
+      ...providers.map((item) => Number(item.health.lastSuccess || item.health.timestamp || BOOT_TIME)),
+      ...modules.map((row) => Number(row.timestamp || BOOT_TIME)),
+      BOOT_TIME
+    );
+    const overallStatus = live ? "hybrid" : problematic ? "fallback" : "fallback";
+    const overall = {
+      status: overallStatus,
+      label: live ? "Datenlage überwiegend hybrid belastbar" : "Fallback-Sicherheitsnetz aktiv",
+      text: live
+        ? "Mehrere Kernbereiche nutzen echte Abrufe oder frischen Cache; lokale Fallbacks bleiben als Schutzschicht sichtbar."
+        : "Die Plattform bleibt nutzbar, aber viele Bereiche arbeiten aktuell fallback- oder lokal gestützt. Das wird bewusst offengelegt."
+    };
+    return {
+      providers,
+      modules,
+      lastGlobalUpdate,
+      overall,
+      counts: {
+        active: providers.length,
+        live,
+        stale,
+        hybridFallback: stale + fallback,
+        problematic,
+        healthyModules,
+        limitedModules
+      }
+    };
+  }
+
+  function sourceRegistryFor(providerId) {
+    return DATA_SOURCE_REGISTRY.find((entry) => entry.id === providerId) || {
+      id: providerId,
+      role: "Zugeordnet",
+      type: "Unbekannt",
+      category: "Weitere Quelle",
+      description: "Quelle ist im Provider-Stack vorhanden.",
+      fallback: "Fallback-Status wird aus der Laufzeit abgeleitet."
+    };
+  }
+
+  function aggregateModuleStatus(statuses) {
+    if (statuses.includes("live")) return "hybrid";
+    if (statuses.includes("stale")) return "stale";
+    if (statuses.includes("error") || statuses.includes("missing")) return "fallback";
+    return "fallback";
+  }
+
+  function normalizedDataStatus(status) {
+    if (status === "live") return "live";
+    if (status === "stale") return "hybrid";
+    if (["fallback", "prepared", "mapped", "notUsed"].includes(status)) return "fallback";
+    if (["error", "missing", "disabled"].includes(status)) return "offline";
+    return "unknown";
+  }
+
+  function healthStateForStatus(status) {
+    const normalized = normalizedDataStatus(status);
+    if (normalized === "live") {
+      return { label: "Gesund", status: "live" };
+    }
+    if (normalized === "hybrid") {
+      return { label: "Eingeschränkt", status: "hybrid" };
+    }
+    if (normalized === "fallback") {
+      return { label: "Degradiert", status: "fallback" };
+    }
+    if (normalized === "offline") {
+      return { label: "Gestört", status: "offline" };
+    }
+    return { label: "Unbekannt", status: "unknown" };
+  }
+
+  function freshnessForHealth(health) {
+    const status = health.status || "unknown";
+    if (status === "live") {
+      const ageMinutes = Math.max(0, Math.round((Date.now() - Number(health.lastSuccess || health.timestamp || Date.now())) / 60000));
+      if (ageMinutes <= 30) {
+        return { label: "Frisch", status: "live", text: `vor ${ageMinutes} Min.` };
+      }
+      return { label: "Leicht verzögert", status: "hybrid", text: formatTimestamp(health.lastSuccess || health.timestamp) };
+    }
+    if (status === "stale") {
+      return { label: "Veraltet / stale", status: "stale", text: "Cache statt frischer Antwort" };
+    }
+    if (["fallback", "prepared", "mapped", "notUsed"].includes(status)) {
+      return { label: "Nur Fallback", status: "fallback", text: "kein erfolgreicher Live-Timestamp in dieser Sitzung" };
+    }
+    if (["error", "missing", "disabled"].includes(status)) {
+      return { label: "Unbekannt", status: "offline", text: "Quelle meldet Fehler, fehlt oder ist deaktiviert" };
+    }
+    return { label: "Unbekannt", status: "unknown", text: "keine belastbare Aktualitätsinformation" };
   }
 
   function aggregateHealthStatus(statuses) {
@@ -4534,7 +6002,7 @@
       return "Fallback aktiv, Live-Abruf fehlt oder ist noch nicht erfolgt.";
     }
     if (statuses.includes("missing")) {
-      return "Für mindestens eine Key-Quelle fehlt noch ein Key.";
+      return "Für mindestens eine Quelle fehlt die serverseitige Konfiguration oder ein erfolgreicher Abruf.";
     }
     if (statuses.includes("error")) {
       return "Mindestens ein Abruf ist fehlgeschlagen.";
@@ -4550,29 +6018,33 @@
       prepared: "zugeordnet",
       mapped: "zugeordnet",
       notUsed: "nicht genutzt",
-      missing: "Key fehlt",
+      missing: "Quelle fehlt",
       error: "Fehler",
       disabled: "deaktiviert"
     };
     return labels[status] || status || "unklar";
   }
 
-  function renderProviderHealthRow(provider) {
-    const health = providerHealthFor(provider.id);
-    const test = providerTestFor(provider.id);
+  function renderProviderHealthRow(entry) {
+    const provider = entry.provider || entry;
+    const health = entry.health || providerHealthFor(provider.id);
+    const source = entry.source || sourceRegistryFor(provider.id);
     const keyState = providerKeyState(provider);
     const modules = PROVIDER_MODULE_USAGE[provider.id] || provider.categories;
-    const lastSuccess = health.lastSuccess ? formatTimestamp(health.lastSuccess) : "Noch kein erfolgreicher Live-Abruf";
+    const freshness = freshnessForHealth(health);
+    const healthState = healthStateForStatus(health.status);
+    const lastSuccess = health.lastSuccess ? formatTimestamp(health.lastSuccess) : "kein exakter Live-Timestamp verfügbar";
     return `
-      <div class="health-row">
+      <div class="health-row provider-health-card">
         <div>
-          <span class="card-label">${esc(provider.categories.join(" / "))}</span>
+          <span class="card-label">${esc(source.category)} · ${esc(source.role)}</span>
           <strong>${esc(provider.name)}</strong>
-          <p>${esc(provider.description)}</p>
+          <p>${esc(source.description || provider.description)}</p>
         </div>
         <div class="provider-readiness">
+          <span class="status-badge status-hybrid">${esc(source.type || providerSourceType(provider))}</span>
+          <span class="status-badge status-${escAttr(healthState.status)}">${esc(healthState.label)}</span>
           ${renderProviderKeyBadge(keyState)}
-          ${renderProviderTestBadge(test)}
           ${renderProviderLiveBadge(health)}
         </div>
         <div class="module-chip-row">
@@ -4580,8 +6052,10 @@
         </div>
         <div class="data-health-meta">
           <span><strong>Letzter Erfolg:</strong> ${esc(lastSuccess)}</span>
+          <span><strong>Frische:</strong> ${esc(freshness.label)} - ${esc(freshness.text)}</span>
           <span><strong>Status:</strong> ${esc(health.message || "Noch keine Abrufhistorie.")}</span>
           <span><strong>Letzter Check:</strong> ${esc(formatTimestamp(health.timestamp))}</span>
+          <span><strong>Fallback:</strong> ${esc(source.fallback || "Fallback wird aus Modulstatus abgeleitet.")}</span>
         </div>
       </div>
     `;
@@ -4593,38 +6067,6 @@
         <strong>${esc(value)}</strong>
         <span>${esc(label)}</span>
         <small>${esc(hint)}</small>
-      </article>
-    `;
-  }
-
-  function renderApiOnboardingGuide() {
-    return `
-      <article class="card api-onboarding-card">
-        <div class="card-topline">
-          <div>
-            <span class="card-label">API-Key Einstieg</span>
-            <h3>Welche Keys lohnen sich zuerst?</h3>
-          </div>
-          ${renderStatusBadge(getConfiguredProviderCount() ? "fallback" : "missing")}
-        </div>
-        <p>MH Analytics funktioniert ohne Keys mit Fallback-Daten. Diese Reihenfolge hilft Anfängern, schnell sichtbare Verbesserungen zu bekommen.</p>
-        <div class="onboarding-steps">
-          ${API_ONBOARDING_GUIDE.map((item) => {
-            const provider = providerById(item.providerId);
-            const keyState = providerKeyState(provider);
-            return `
-              <div class="onboarding-step">
-                <strong>${esc(item.title)}</strong>
-                <p>${esc(item.text)}</p>
-                <div class="chip-row">
-                  <span class="pill">${esc(provider ? provider.name : item.providerId)}</span>
-                  ${renderProviderKeyBadge(keyState)}
-                  ${renderProviderLiveBadge(providerHealthFor(item.providerId))}
-                </div>
-              </div>
-            `;
-          }).join("")}
-        </div>
       </article>
     `;
   }
@@ -4651,7 +6093,7 @@
     `;
   }
 
-  function renderProviderGroup(group, keys) {
+  function renderProviderGroup(group) {
     const providers = visibleProviders().filter((provider) => provider.group === group.id);
     if (!providers.length) {
       return "";
@@ -4665,17 +6107,18 @@
           </div>
         </div>
         <div class="provider-grid">
-          ${providers.map((provider) => renderProviderCard(provider, providerKeyValue(provider.id, keys))).join("")}
+          ${providers.map(renderProviderCard).join("")}
         </div>
       </div>
     `;
   }
 
-  function renderProviderCard(provider, keyValue) {
+  function renderProviderCard(provider) {
     const test = providerTestFor(provider.id);
     const security = providerSecurityLabel(provider.security);
     const keyState = providerKeyState(provider);
     const health = providerHealthFor(provider.id);
+    const sourceType = providerSourceType(provider);
     return `
       <article class="card provider-card">
         <div class="card-topline">
@@ -4691,25 +6134,14 @@
         <p>${esc(provider.description)}</p>
         <p class="small"><strong>Nutzung:</strong> ${esc(provider.usage)}</p>
         <div class="provider-readiness">
+          <span class="status-badge status-fallback">${esc(sourceType)}</span>
           ${renderProviderKeyBadge(keyState)}
-          ${renderProviderTestBadge(test)}
           ${renderProviderLiveBadge(health)}
         </div>
         <div class="provider-module-row">
           ${(PROVIDER_MODULE_USAGE[provider.id] || provider.categories).map((moduleName) => `<span class="module-chip">${esc(moduleName)}</span>`).join("")}
         </div>
-        <div class="provider-key-row">
-          ${renderProviderKeyField(provider, keyValue)}
-        </div>
-        <div class="provider-test-row">
-          <span class="provider-test-status ${test.className}">${esc(test.label)}</span>
-          <span class="small">${esc(test.message || provider.testHint)}</span>
-        </div>
         ${renderProviderDebugDetails(provider, test)}
-        <div class="card-actions provider-actions">
-          <button class="ghost-button" type="button" data-test-provider="${escAttr(provider.id)}">Testen</button>
-          ${provider.keyMode !== "none" ? `<button class="ghost-button" type="button" data-delete-provider-key="${escAttr(provider.id)}">Key löschen</button>` : ""}
-        </div>
         <div class="provider-security-note">
           <strong>${esc(security.label)}</strong>
           <span>${esc(security.text)}</span>
@@ -4723,32 +6155,30 @@
       return "";
     }
     const details = test.details;
+    if (details.kind === "fred-vercel-function") {
+      return renderFredProxyDebugDetails(details);
+    }
+    return "";
+  }
+
+  function renderFredProxyDebugDetails(details) {
     const rows = [
       ["Codepfad", details.codePath],
-      ["Endpoint", details.endpoint],
-      ["HTTP-Methode", details.method],
-      ["Pfad", details.path],
-      ["Seiten-Origin", details.pageOrigin],
-      ["Browser online", details.browserOnline],
-      ["api_key gesetzt", details.apiKeyParamPresent ? "ja" : "nein"],
-      ["file_type", details.fileTypeJson ? "json gesetzt" : `nicht json (${details.fileType || "fehlt"})`],
-      ["Key im Feld", keyShapeText(details.inputKey)],
-      ["Key gespeichert", keyShapeText(details.savedKey)],
-      ["Key aus Storage", keyShapeText(details.storageKey)],
-      ["Key gesendet", keyShapeText(details.sentKey)],
-      ["Gespeichert = gesendet", details.savedEqualsSent ? "ja" : "nein"],
-      ["Storage = gespeichert", details.storageEqualsSaved ? "ja" : "nein"],
+      ["Frontend-Endpoint", details.frontendEndpoint],
+      ["Browser-Origin", details.pageOrigin],
+      ["Server-Key im Frontend", details.frontendKeyExposure],
       ["Stage", details.stage],
       ["HTTP-Status", details.httpStatus],
       ["Content-Type", details.contentType],
       ["Response-Format", details.responseFormat],
       ["Parsing", details.parseStatus],
-      ["Browser-Fetch-Fehler", details.browserFetchError || "kein Browser-Fetch-Fehler"],
-      ["FRED-Fehler", details.fredError || "kein FRED-error_message Feld"]
+      ["Function-Fehler", details.functionError || "kein Function-Fehler"],
+      ["FRED-Fehler", details.fredError || "kein FRED-error_message Feld"],
+      ["Hinweis", details.note]
     ];
     return `
       <details class="provider-debug">
-        <summary>FRED Diagnose anzeigen</summary>
+        <summary>FRED Vercel-Function-Diagnose anzeigen</summary>
         <div class="provider-debug-grid">
           ${rows.map(([label, value]) => `
             <span>${esc(label)}</span>
@@ -4760,28 +6190,12 @@
     `;
   }
 
-  function keyShapeText(shape) {
-    if (!shape) {
-      return "nicht verfügbar";
-    }
-    return `${shape.mask}; roh ${shape.rawLength}, getrimmt ${shape.trimmedLength}; trim ${shape.trimChanged ? "ja" : "nein"}; Whitespace ${shape.hasWhitespace ? "ja" : "nein"}; 32 Kleinbuchstaben/Zahlen ${shape.lowercaseAlnum32 ? "ja" : "nein"}`;
-  }
-
   function renderProviderKeyField(provider, keyValue) {
-    if (provider.keyMode === "none") {
-      return `
-        <div class="keyless-provider">
-          <span class="pill">Kein Key nötig</span>
-          <span class="small">Offizielle Open-Data-Quelle. Kein API-Key-Feld erforderlich.</span>
-        </div>
-      `;
-    }
-    const placeholder = provider.keyMode === "optional" ? "Optionaler API Key / Demo Key" : provider.keyMode === "oauth" ? "OAuth Client/Token später via Backend" : provider.keyMode === "anon" ? "Anon/Public Key oder URL" : `${provider.name} API Key`;
     return `
-      <label class="field provider-field">
-        <span>${esc(keyModeLabel(provider.keyMode))}</span>
-        <input data-api-key="${escAttr(provider.id)}" type="password" value="${escAttr(keyValue)}" placeholder="${escAttr(placeholder)}">
-      </label>
+      <div class="keyless-provider">
+        <span class="pill">${esc(keyModeLabel(provider.keyMode))}</span>
+        <span class="small">Keine öffentliche Key-Konfiguration. Sensible Schlüssel liegen serverseitig oder sind für diese Quelle nicht nötig.</span>
+      </div>
     `;
   }
 
@@ -4791,10 +6205,6 @@
 
   function providersBySecurity(security) {
     return visibleProviders().filter((provider) => provider.security === security);
-  }
-
-  function getConfiguredProviderCount() {
-    return visibleProviders().filter((provider) => provider.keyMode !== "none" && cleanKey(providerKeyValue(provider.id))).length;
   }
 
   function visibleProviders() {
@@ -4848,23 +6258,37 @@
     if (provider.keyMode === "none") {
       return "none";
     }
-    return cleanKey(providerKeyValue(provider.id)) ? "present" : "missing";
+    if (provider.keyMode === "serverEnv") {
+      return "serverEnv";
+    }
+    return "notPublic";
   }
 
-  function providerKeyValue(providerId, keySource = state.apiKeys) {
-    if (providerId === "finnhubNews") {
-      return keySource.finnhubNews || keySource.finnhub || "";
+  function providerSourceType(provider) {
+    if (!provider) {
+      return "Unklar";
     }
-    return keySource[providerId] || "";
+    if (provider.keyMode === "serverEnv") {
+      return "Serverseitig";
+    }
+    if (provider.security === "server-normalized") {
+      return "Serverseitig normalisiert";
+    }
+    if (provider.security === "backend-ready" || provider.security === "browser-critical") {
+      return "Hybrid";
+    }
+    return "Open Data";
   }
 
   function renderProviderKeyBadge(stateName) {
     const labels = {
       none: "Kein Key nötig",
-      present: "Key vorhanden",
-      missing: "Key fehlt"
+      serverEnv: "Server-Env",
+      notPublic: "Kein öffentliches Key-Feld",
+      present: "Konfiguriert",
+      missing: "Quelle fehlt"
     };
-    const status = stateName === "present" || stateName === "none" ? "fallback" : "missing";
+    const status = ["present", "none", "serverEnv", "notPublic"].includes(stateName) ? "fallback" : "missing";
     return `<span class="status-badge status-${status}">${esc(labels[stateName] || "Key unklar")}</span>`;
   }
 
@@ -4876,14 +6300,14 @@
   function renderProviderLiveBadge(health) {
     const status = health.status || "notUsed";
     const labels = {
-      live: "Aktuell live genutzt",
-      stale: "Cache veraltet",
+      live: "Live",
+      stale: "Teilweise / Cache",
       fallback: "Fallback aktiv",
       prepared: "Zugeordnet",
       mapped: "Zugeordnet",
-      notUsed: "Aktuell nicht genutzt",
-      missing: "Key fehlt",
-      error: "Live-Abruf fehlgeschlagen",
+      notUsed: "Teilweise / nicht aktiv",
+      missing: "Offline / nicht konfiguriert",
+      error: "Offline / Fehler",
       disabled: "Nicht öffentlich aktiv"
     };
     const badgeStatus = status === "live" ? "live" : status === "stale" || status === "fallback" || status === "prepared" || status === "mapped" || status === "notUsed" ? "fallback" : "missing";
@@ -4894,9 +6318,6 @@
     const provider = providerById(providerId);
     if (!provider) {
       return { status: "missing", timestamp: BOOT_TIME, message: "Provider nicht gefunden." };
-    }
-    if (provider.keyMode !== "none" && !cleanKey(providerKeyValue(providerId)) && provider.keyMode !== "optional") {
-      return { status: "missing", timestamp: BOOT_TIME, message: "Noch kein Key hinterlegt." };
     }
     const health = state.providerHealth[providerId];
     if (health) {
@@ -4969,10 +6390,11 @@
       "browser-critical": "Browserkritisch",
       "backend-recommended": "Backend empfohlen",
       "backend-only": "Backend-only",
+      "server-normalized": "Serverseitig normalisiert",
       "proxy-recommended": "Proxy empfohlen",
       "backend-ready": "Backend-ready"
     };
-    const className = security === "backend-only" || security === "browser-critical" ? "status-stale" : security.includes("recommended") ? "status-fallback" : "status-live";
+    const className = security === "backend-only" || security === "browser-critical" ? "status-stale" : security === "server-normalized" || security.includes("recommended") ? "status-fallback" : "status-live";
     return `<span class="status-badge ${className}">${esc(labels[security] || security)}</span>`;
   }
 
@@ -4998,6 +6420,10 @@
         label: "Backend-only",
         text: "Nicht direkt aus dem Browser aufrufen. Key/OAuth gehört später serverseitig geschützt."
       },
+      "server-normalized": {
+        label: "Serverseitig normalisiert",
+        text: "Die Quelle braucht kein öffentliches Key-Feld. Das Frontend nutzt eine eigene /api/... Route mit einheitlicher Fehlerbehandlung."
+      },
       "proxy-recommended": {
         label: "Proxy empfohlen",
         text: "Public/Demo kann lokal funktionieren; produktionsnah besser per Key und Proxy/Backend."
@@ -5011,6 +6437,9 @@
   }
 
   function keyModeLabel(mode) {
+    if (mode === "none") {
+      return "Kein Key nötig";
+    }
     if (mode === "optional") {
       return "Optionaler Key";
     }
@@ -5020,7 +6449,10 @@
     if (mode === "anon") {
       return "Anon/Public Key Slot";
     }
-    return "API Key";
+    if (mode === "serverEnv") {
+      return "Vercel Environment Variable";
+    }
+    return "Kein öffentliches Key-Feld";
   }
 
   async function ensureHomeData(force = false) {
@@ -5168,7 +6600,7 @@
         if (commodityQuote) {
           return commodityQuote;
         }
-        return fallbackQuote(symbol, "Kein Rohstoff-Key oder API-Fehler. Lokaler Commodity-Fallback aktiv.");
+        return fallbackQuote(symbol, "Rohstoff-Livequelle nicht erreichbar. Lokaler Commodity-Fallback aktiv.");
       }
 
       if (asset.type === "Index") {
@@ -5179,10 +6611,9 @@
         return fallbackQuote(symbol, "Index-Livequelle nicht sauber verfügbar. Lokaler Index-Fallback aktiv.");
       }
 
-      const finnhubKey = cleanKey(state.apiKeys.finnhub);
-      if (finnhubKey) {
+      if (serverApiAvailable()) {
         try {
-          const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(finnhubKey)}`;
+          const url = finnhubProxyUrl({ endpoint: "quote", symbol });
           const result = await cachedJson(`finnhub:quote:${symbol}`, url, CACHE_TTL.quote, "finnhub");
           const data = result.data || {};
           if (!Number(data.c)) {
@@ -5202,13 +6633,12 @@
           logError(error);
         }
       } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("finnhub", "missing", "Kein Finnhub Key hinterlegt. Quotes nutzen Fallback oder Alpha Vantage.");
+        recordProviderHealth("finnhub", "fallback", "Finnhub läuft über /api/finnhub und ist im lokalen Datei-Modus nicht verfügbar.");
       }
 
-      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
-      if (alphaKey) {
+      if (serverApiAvailable()) {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(alphaKey)}`;
+          const url = alphaProxyUrl({ endpoint: "quote", symbol });
           const result = await cachedJson(`alpha:quote:${symbol}`, url, CACHE_TTL.quote, "alphaVantage");
           const quote = result.data && result.data["Global Quote"];
           if (!quote || !quote["05. price"]) {
@@ -5225,19 +6655,19 @@
           logError(error);
         }
       } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key hinterlegt. Quote-Fallback bleibt lokal.");
+        recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage läuft über /api/alphavantage und ist im lokalen Datei-Modus nicht verfügbar.");
       }
 
-      return fallbackQuote(symbol, "Kein Quote-Key oder API-Fehler.");
+      return fallbackQuote(symbol, "Quote-Livequelle nicht erreichbar oder serverseitig nicht konfiguriert.");
     },
 
     async getAlphaQuote(symbol) {
-      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
-      if (!alphaKey) {
+      if (!serverApiAvailable()) {
+        recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage Vercel Function im lokalen Datei-Modus nicht verfügbar.");
         return null;
       }
       try {
-        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(alphaKey)}`;
+        const url = alphaProxyUrl({ endpoint: "quote", symbol });
         const result = await cachedJson(`alpha:quote:${symbol}`, url, CACHE_TTL.quote, "alphaVantage");
         const quote = result.data && result.data["Global Quote"];
         if (!quote || !quote["05. price"]) {
@@ -5257,43 +6687,66 @@
     },
 
     async getCommodityQuote(symbol) {
-      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
-      if (alphaKey) {
-        const alphaQuote = await this.getAlphaCommodityQuote(symbol, alphaKey);
+      if (symbol === "OIL") {
+        const eiaQuote = await this.getEiaEnergyQuote("oil");
+        if (eiaQuote) {
+          return eiaQuote;
+        }
+      }
+
+      if (serverApiAvailable()) {
+        const alphaQuote = await this.getAlphaCommodityQuote(symbol);
         if (alphaQuote) {
           return alphaQuote;
         }
       } else {
-        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key für Gold/Silber/WTI hinterlegt.");
+        recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage Rohstoffdaten laufen über /api/alphavantage und sind im lokalen Datei-Modus nicht verfügbar.");
       }
-
-      if (symbol === "OIL") {
-        const eiaKey = cleanKey(state.apiKeys.eia);
-        if (eiaKey) {
-          const eiaQuote = await this.getEiaOilQuote(eiaKey);
-          if (eiaQuote) {
-            return eiaQuote;
-          }
-        } else {
-          recordProviderHealth("eia", "missing", "Kein EIA Key für Öl/Energie hinterlegt.");
-        }
+      if (symbol !== "OIL") {
+        recordProviderHealth("eia", "notUsed", "EIA ist für Öl/Gas/Energie zuständig; dieses Rohstoffsymbol nutzt primär Alpha Vantage.");
       }
       return null;
     },
 
-    async getAlphaCommodityQuote(symbol, key) {
+    async getEiaEnergyQuote(dataset) {
+      if (!serverApiAvailable()) {
+        recordProviderHealth("eia", "fallback", "EIA läuft über /api/eia und ist im lokalen Datei-Modus nicht verfügbar.");
+        return null;
+      }
+      try {
+        const url = eiaProxyUrl({ dataset });
+        const result = await cachedJson(`eia:${dataset}`, url, CACHE_TTL.quote, "eia");
+        const rows = Array.isArray(result.data?.data) ? result.data.data : [];
+        const row = rows.find((item) => item && item.value !== null && item.value !== undefined);
+        const price = row ? Number(row.value) : NaN;
+        if (!Number.isFinite(price)) {
+          throw new Error("EIA-Antwort ohne nutzbaren Preis");
+        }
+        return {
+          symbol: "OIL",
+          price,
+          changePct: commodityChangeFromFallback("OIL", price),
+          changeAbs: 0,
+          meta: makeMeta(result.data?.meta?.source || "EIA APIv2 via Vercel Function", result.status, result.timestamp)
+        };
+      } catch (error) {
+        logError(error);
+        recordProviderHealth("eia", "fallback", error.message || "EIA Energy API nicht erreichbar.");
+        return null;
+      }
+    },
+
+    async getAlphaCommodityQuote(symbol) {
       const config = {
-        GOLD: { fn: "GOLD_SILVER_SPOT", symbol: "GOLD", source: "Alpha Vantage GOLD_SILVER_SPOT" },
-        SILVER: { fn: "GOLD_SILVER_SPOT", symbol: "SILVER", source: "Alpha Vantage GOLD_SILVER_SPOT" },
+        GOLD: { source: "Alpha Vantage XAU/USD via Vercel Function" },
+        SILVER: { source: "Alpha Vantage XAG/USD via Vercel Function" },
         OIL: { fn: "WTI", source: "Alpha Vantage WTI" }
       }[symbol];
       if (!config) {
         return null;
       }
       try {
-        const url = config.fn === "WTI"
-          ? `https://www.alphavantage.co/query?function=WTI&interval=daily&apikey=${encodeURIComponent(key)}`
-          : `https://www.alphavantage.co/query?function=GOLD_SILVER_SPOT&symbol=${encodeURIComponent(config.symbol)}&apikey=${encodeURIComponent(key)}`;
+        const url = alphaProxyUrl({ endpoint: "commodity", symbol });
         const result = await cachedJson(`alpha:commodity:${symbol}`, url, CACHE_TTL.quote, "alphaVantage");
         const price = extractAlphaCommodityPrice(result.data);
         if (!Number.isFinite(price)) {
@@ -5312,37 +6765,20 @@
       }
     },
 
-    async getEiaOilQuote(key) {
-      try {
-        const url = `https://api.eia.gov/v2/petroleum/pri/spt/data/?frequency=daily&data[0]=value&facets[series][]=RWTC&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1&api_key=${encodeURIComponent(key)}`;
-        const result = await cachedJson("eia:oil:wti", url, CACHE_TTL.quote, "eia");
-        const row = result.data && Array.isArray(result.data.response?.data) ? result.data.response.data[0] : null;
-        const price = row ? Number(row.value) : NaN;
-        if (!Number.isFinite(price)) {
-          throw new Error("EIA Ölantwort ohne Preis");
-        }
-        return {
-          symbol: "OIL",
-          price,
-          changePct: commodityChangeFromFallback("OIL", price),
-          changeAbs: 0,
-          meta: makeMeta("EIA APIv2 WTI Spot", result.status, result.timestamp)
-        };
-      } catch (error) {
-        logError(error);
-        return null;
-      }
-    },
-
     async getCryptoQuote(symbol) {
       const asset = getAsset(symbol);
       if (!asset.coingeckoId) {
         return fallbackQuote(symbol, "Kein CoinGecko Mapping.");
       }
+      if (!serverApiAvailable()) {
+        recordProviderHealth("coingecko", "fallback", "CoinGecko läuft über /api/coingecko und ist im lokalen Datei-Modus nicht verfügbar.");
+        return fallbackQuote(symbol, "CoinGecko Vercel Function lokal nicht verfügbar. Krypto-Fallback aktiv.");
+      }
       try {
-        const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(asset.coingeckoId)}&vs_currencies=usd&include_market_cap=true&include_24hr_change=true`;
+        const url = coingeckoProxyUrl({ ids: asset.coingeckoId, vs_currencies: "usd" });
         const result = await cachedJson(`coingecko:quote:${symbol}`, url, CACHE_TTL.quote, "coingecko");
-        const data = result.data && result.data[asset.coingeckoId];
+        const payload = result.data?.data || result.data;
+        const data = payload && payload[asset.coingeckoId];
         if (!data || !Number(data.usd)) {
           throw new Error("CoinGecko Quote ohne Preis");
         }
@@ -5351,26 +6787,25 @@
           price: Number(data.usd),
           changePct: Number(data.usd_24h_change || 0),
           marketCap: numberOrNull(data.usd_market_cap),
-          meta: makeMeta("CoinGecko Simple Price API (Public/Demo)", result.status, result.timestamp, "Public/Demo nutzbar; produktionsnah besser mit Key oder Proxy.")
+          meta: makeMeta(result.data?.meta?.source || "CoinGecko via Vercel Function", result.status, result.timestamp)
         };
       } catch (error) {
         logError(error);
-        recordProviderHealth("coingecko", "fallback", "CoinGecko nicht erreichbar, Rate Limit oder CORS.");
-        return fallbackQuote(symbol, "CoinGecko Public/Demo nicht erreichbar, Rate Limit oder CORS. Produktionsnah besser Key/Proxy nutzen.");
+        recordProviderHealth("coingecko", "fallback", "CoinGecko Function nicht erreichbar, Rate Limit oder Provider-Fehler.");
+        return fallbackQuote(symbol, "CoinGecko Function nicht erreichbar. Krypto-Fallback aktiv.");
       }
     },
 
     async getProfile(symbol) {
       const asset = getAsset(symbol);
-      const base = fallbackProfile(symbol, "Kein Profil-Key oder API-Fehler.");
+      const base = fallbackProfile(symbol, "Profil-Livequelle nicht erreichbar oder serverseitig nicht konfiguriert.");
       if (!["Stock", "ETF"].includes(asset.type)) {
         return base;
       }
 
-      const finnhubKey = cleanKey(state.apiKeys.finnhub);
-      if (finnhubKey) {
+      if (serverApiAvailable()) {
         try {
-          const url = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(finnhubKey)}`;
+          const url = finnhubProxyUrl({ endpoint: "profile", symbol });
           const result = await cachedJson(`finnhub:profile:${symbol}`, url, CACHE_TTL.profile, "finnhub");
           const data = result.data || {};
           if (!data.name && !data.ticker) {
@@ -5390,7 +6825,7 @@
           logError(error);
         }
       } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Profil/Asset-Seite hinterlegt.");
+        recordProviderHealth("finnhub", "fallback", "Finnhub Profile laufen über /api/finnhub und sind im lokalen Datei-Modus nicht verfügbar.");
       }
 
       return base;
@@ -5402,10 +6837,9 @@
         return fallbackFundamentals(symbol, "Fundamentals für diesen Asset-Typ lokal gemappt.");
       }
 
-      const finnhubKey = cleanKey(state.apiKeys.finnhub);
-      if (finnhubKey) {
+      if (serverApiAvailable()) {
         try {
-          const url = `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${encodeURIComponent(finnhubKey)}`;
+          const url = finnhubProxyUrl({ endpoint: "metrics", symbol });
           const result = await cachedJson(`finnhub:metric:${symbol}`, url, CACHE_TTL.fundamentals, "finnhub");
           const metric = result.data && result.data.metric ? result.data.metric : {};
           if (!Object.keys(metric).length) {
@@ -5432,10 +6866,10 @@
           logError(error);
         }
       } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Basic Financials hinterlegt.");
+        recordProviderHealth("finnhub", "fallback", "Finnhub Basic Financials laufen über /api/finnhub und sind im lokalen Datei-Modus nicht verfügbar.");
       }
 
-      return fallbackFundamentals(symbol, "Kein Fundamentals-Key oder API-Fehler.");
+      return fallbackFundamentals(symbol, "Fundamentals-Livequelle nicht erreichbar oder serverseitig nicht konfiguriert.");
     },
 
     async getCompanyNews(symbol) {
@@ -5444,12 +6878,11 @@
         return fallbackNews(symbol, "Company News für diesen Asset-Typ lokal gemappt.");
       }
 
-      const finnhubKey = cleanKey(state.apiKeys.finnhub);
-      if (finnhubKey) {
+      if (serverApiAvailable()) {
         try {
           const to = toIsoDate(new Date());
           const from = toIsoDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000));
-          const url = `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${encodeURIComponent(finnhubKey)}`;
+          const url = finnhubProxyUrl({ endpoint: "news", symbol, from, to });
           const result = await cachedJson(`finnhub:news:${symbol}`, url, CACHE_TTL.news, "finnhub");
           const rows = Array.isArray(result.data) ? result.data : [];
           if (!rows.length) {
@@ -5471,10 +6904,10 @@
           logError(error);
         }
       } else if (["Stock", "ETF"].includes(asset.type)) {
-        recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Company News hinterlegt.");
+        recordProviderHealth("finnhub", "fallback", "Finnhub Company News laufen über /api/finnhub und sind im lokalen Datei-Modus nicht verfügbar.");
       }
 
-      return fallbackNews(symbol, "Kein Finnhub News-Key oder API-Fehler.");
+      return fallbackNews(symbol, "Finnhub News-Livequelle nicht erreichbar oder serverseitig nicht konfiguriert.");
     },
 
     async getDailyStats(symbol) {
@@ -5482,13 +6915,12 @@
       if (!["Stock", "ETF"].includes(asset.type)) {
         return null;
       }
-      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
-      if (!alphaKey) {
-        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key für Zeitreihen/Performance hinterlegt.");
+      if (!serverApiAvailable()) {
+        recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage Zeitreihen laufen über /api/alphavantage und sind im lokalen Datei-Modus nicht verfügbar.");
         return null;
       }
       try {
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${encodeURIComponent(alphaKey)}`;
+        const url = alphaProxyUrl({ endpoint: "daily", symbol });
         const result = await cachedJson(`alpha:daily:${symbol}`, url, CACHE_TTL.series, "alphaVantage");
         const series = result.data && result.data["Time Series (Daily)"] ? result.data["Time Series (Daily)"] : {};
         const rows = Object.entries(series)
@@ -5507,23 +6939,23 @@
 
     async getMacro() {
       const rows = [];
-      const fredKey = cleanKey(state.apiKeys.fred);
 
-      if (fredKey) {
+      if (serverApiAvailable()) {
         try {
-          const fredRows = await Promise.all(FRED_MACRO_SERIES.map((item) => fetchFredSeries(item, fredKey)));
+          const fredRows = await Promise.all(FRED_MACRO_SERIES.map((item) => fetchFredSeries(item)));
           rows.push(...fredRows);
         } catch (error) {
           logError(error);
           recordProviderHealth("fred", "fallback", error.message || "FRED Live-Abruf fehlgeschlagen.");
         }
       } else {
-        recordProviderHealth("fred", "missing", "Kein FRED Key hinterlegt. Makro nutzt BLS/Treasury/Open-Data und Fallbacks.");
+        recordProviderHealth("fred", "fallback", "FRED Vercel Function ist im lokalen Datei-Modus nicht verfügbar. Makro nutzt BLS/Treasury/Open-Data und Fallbacks.");
       }
 
       const openDataRows = await Promise.allSettled([
         fetchBlsMacroRows(),
-        fetchTreasuryRows()
+        fetchTreasuryRows(),
+        fetchFxMacroRows()
       ]);
       openDataRows.forEach((result) => {
         if (result.status === "fulfilled") {
@@ -5550,10 +6982,9 @@
       const from = toIsoDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
       const to = toIsoDate(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000));
 
-      const finnhubKey = cleanKey(state.apiKeys.finnhub);
-      if (finnhubKey) {
+      if (serverApiAvailable()) {
         try {
-          const url = `https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${encodeURIComponent(finnhubKey)}`;
+          const url = finnhubProxyUrl({ endpoint: "earnings", from, to });
           const result = await cachedJson("finnhub:events:earnings", url, CACHE_TTL.events, "finnhub");
           const rows = Array.isArray(result.data && result.data.earningsCalendar) ? result.data.earningsCalendar : [];
           rows.slice(0, 18).forEach((row) => {
@@ -5575,15 +7006,14 @@
           recordProviderHealth("finnhub", "fallback", "Finnhub Earnings Calendar nicht erreichbar.");
         }
       } else {
-        recordProviderHealth("finnhub", "missing", "Kein Finnhub Key für Earnings Calendar hinterlegt.");
+        recordProviderHealth("finnhub", "fallback", "Finnhub Earnings laufen über /api/finnhub und sind im lokalen Datei-Modus nicht verfügbar.");
       }
 
-      const alphaKey = cleanKey(state.apiKeys.alphaVantage);
-      if (alphaKey) {
-        const alphaEvents = await fetchAlphaCalendarEvents(alphaKey);
+      if (serverApiAvailable()) {
+        const alphaEvents = await fetchAlphaCalendarEvents();
         liveEvents.push(...alphaEvents);
       } else {
-        recordProviderHealth("alphaVantage", "missing", "Kein Alpha Vantage Key für Earnings-/IPO-Kalender hinterlegt.");
+        recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage Kalender laufen über /api/alphavantage und sind im lokalen Datei-Modus nicht verfügbar.");
       }
 
       const fallback = fallbackEvents(liveEvents.length ? "Fallback ergänzt Live-Kalender für Dividenden, Splits und Makrotermine." : "Kein Live-Event-Feed aktiv. Lokaler Kalender aktiv.");
@@ -5591,11 +7021,12 @@
     }
   };
 
-  async function fetchFredSeries(item, key) {
+  async function fetchFredSeries(item) {
     const seriesId = item.seriesId || item.id;
-    const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(seriesId)}&api_key=${encodeURIComponent(key)}&file_type=json&sort_order=desc&limit=24`;
+    const url = fredProxyUrl({ series_id: seriesId, limit: "24" });
     const result = await cachedJson(`fred:${seriesId}`, url, CACHE_TTL.macro, "fred");
-    const observations = (result.data.observations || [])
+    const payload = result.data && result.data.data ? result.data.data : result.data;
+    const observations = (payload.observations || [])
       .filter((row) => row.value && row.value !== ".")
       .map((row) => ({ date: row.date, value: Number(row.value) }))
       .filter((row) => Number.isFinite(row.value));
@@ -5625,17 +7056,15 @@
       value: displayValue,
       display: `${formatNumber(displayValue)}${item.suffix}`,
       trend: trendText(trend),
-      meta: makeMeta(`FRED ${seriesId}`, result.status, result.timestamp || Date.parse(latest.date))
+      meta: makeMeta(`FRED ${seriesId} via Vercel Function`, result.status, result.timestamp || Date.parse(latest.date))
     };
   }
 
   async function fetchBlsMacroRows() {
-    const currentYear = new Date().getFullYear();
     const rows = [];
     try {
-      const cpiUrl = `https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0?startyear=${currentYear - 2}&endyear=${currentYear}`;
-      const cpiResult = await cachedJson("bls:cpi:history", cpiUrl, CACHE_TTL.openData, "bls");
-      const cpiRows = parseBlsSeries(cpiResult.data);
+      const cpiResult = await cachedJson("opendata:bls:cpi", openDataProxyUrl({ source: "bls-cpi" }), CACHE_TTL.openData, "bls");
+      const cpiRows = Array.isArray(cpiResult.data?.data) ? cpiResult.data.data : [];
       const latest = cpiRows[0];
       const yearAgo = latest ? yearAgoObservation(cpiRows, latest) : null;
       if (latest && yearAgo) {
@@ -5645,8 +7074,8 @@
           label: "US CPI / Inflation",
           value: inflation,
           display: `${formatNumber(inflation)}%`,
-          trend: "Live aus BLS CPI-Serie berechnet",
-          meta: makeMeta("BLS CPI Public API", cpiResult.status, cpiResult.timestamp || Date.now())
+          trend: "Serverseitig aus BLS CPI-Serie berechnet",
+          meta: makeMeta(cpiResult.data?.meta?.source || "BLS via Vercel Open-Data-Normalisierung", cpiResult.status, cpiResult.timestamp || Date.now())
         });
       }
     } catch (error) {
@@ -5655,17 +7084,16 @@
     }
 
     try {
-      const unrateUrl = "https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000?latest=true";
-      const unrateResult = await cachedJson("bls:unrate:latest", unrateUrl, CACHE_TTL.openData, "bls");
-      const latest = parseBlsSeries(unrateResult.data)[0];
+      const unrateResult = await cachedJson("opendata:bls:unrate", openDataProxyUrl({ source: "bls-unrate" }), CACHE_TTL.openData, "bls");
+      const latest = Array.isArray(unrateResult.data?.data) ? unrateResult.data.data[0] : null;
       if (latest) {
         rows.push({
           id: "UNRATE",
           label: "Arbeitslosenquote",
           value: latest.value,
           display: `${formatNumber(latest.value)}%`,
-          trend: "Live aus BLS Labor-Serie",
-          meta: makeMeta("BLS Labor Public API", unrateResult.status, unrateResult.timestamp || Date.now())
+          trend: "Serverseitig aus BLS Labor-Serie",
+          meta: makeMeta(unrateResult.data?.meta?.source || "BLS via Vercel Open-Data-Normalisierung", unrateResult.status, unrateResult.timestamp || Date.now())
         });
       }
     } catch (error) {
@@ -5677,11 +7105,10 @@
 
   async function fetchTreasuryRows() {
     try {
-      const url = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/daily_treasury_rates?sort=-record_date&page[size]=1";
-      const result = await cachedJson("treasury:daily-rates", url, CACHE_TTL.openData, "treasury");
-      const row = result.data && Array.isArray(result.data.data) ? result.data.data[0] : null;
-      const y2 = firstNumber(row?.bc_2year, row?.tc_2year);
-      const y10 = firstNumber(row?.bc_10year, row?.tc_10year);
+      const result = await cachedJson("opendata:treasury:daily-rates", openDataProxyUrl({ source: "treasury-rates" }), CACHE_TTL.openData, "treasury");
+      const row = result.data?.data || null;
+      const y2 = firstNumber(row?.y2);
+      const y10 = firstNumber(row?.y10);
       const rows = [];
       if (y10 !== null) {
         rows.push({
@@ -5689,8 +7116,8 @@
           label: "US 10Y Yield",
           value: y10,
           display: `${formatNumber(y10)}%`,
-          trend: "Live aus Treasury Daily Rates",
-          meta: makeMeta("U.S. Treasury Fiscal Data", result.status, result.timestamp)
+          trend: "Serverseitig aus Treasury Daily Rates",
+          meta: makeMeta(result.data?.meta?.source || "U.S. Treasury via Vercel Open-Data-Normalisierung", result.status, result.timestamp)
         });
       }
       if (y10 !== null && y2 !== null) {
@@ -5701,7 +7128,7 @@
           value: spread,
           display: `${formatNumber(spread)}%`,
           trend: spread < 0 ? "Treasury-Kurve invers" : "Treasury-Kurve positiv",
-          meta: makeMeta("U.S. Treasury Daily Rates", result.status, result.timestamp)
+          meta: makeMeta(result.data?.meta?.source || "U.S. Treasury via Vercel Open-Data-Normalisierung", result.status, result.timestamp)
         });
       }
       return rows;
@@ -5712,11 +7139,44 @@
     }
   }
 
+  async function fetchFxMacroRows() {
+    try {
+      const result = await cachedJson("fx:usd:core", fxProxyUrl({ base: "USD", quotes: "EUR,JPY,GBP" }), CACHE_TTL.openData, "frankfurter");
+      const rates = result.data?.rates || {};
+      const rows = [];
+      if (Number.isFinite(Number(rates.EUR)) && Number(rates.EUR) !== 0) {
+        const eurUsd = 1 / Number(rates.EUR);
+        rows.push({
+          id: "EURUSD",
+          label: "EUR/USD",
+          value: eurUsd,
+          display: formatNumber(eurUsd),
+          trend: "Serverseitig aus Frankfurter FX berechnet",
+          meta: makeMeta(result.data?.meta?.source || "Frankfurter FX via Vercel Function", result.status, result.timestamp)
+        });
+      }
+      if (Number.isFinite(Number(rates.JPY))) {
+        rows.push({
+          id: "USDJPY",
+          label: "USD/JPY",
+          value: Number(rates.JPY),
+          display: formatNumber(Number(rates.JPY)),
+          trend: "Serverseitig aus Frankfurter FX",
+          meta: makeMeta(result.data?.meta?.source || "Frankfurter FX via Vercel Function", result.status, result.timestamp)
+        });
+      }
+      return rows;
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("frankfurter", "fallback", "FX-Route nicht erreichbar, lokale Währungslogik bleibt aktiv.");
+      return [];
+    }
+  }
+
   async function fetchWorldBankGrowthRows() {
     try {
-      const url = "https://api.worldbank.org/v2/country/US;DE;CN/indicator/NY.GDP.MKTP.KD.ZG?format=json&per_page=60";
-      const result = await cachedJson("worldbank:gdp-growth", url, CACHE_TTL.openData, "worldBank");
-      const rows = Array.isArray(result.data) && Array.isArray(result.data[1]) ? result.data[1] : [];
+      const result = await cachedJson("opendata:worldbank:gdp-growth", openDataProxyUrl({ source: "worldbank-growth" }), CACHE_TTL.openData, "worldBank");
+      const rows = Array.isArray(result.data?.data) ? result.data.data : [];
       const latestByCountry = {};
       rows
         .filter((row) => row.value !== null && row.country?.value)
@@ -5731,9 +7191,9 @@
         indicator: "BIP-Wachstum",
         value: Number(row.value),
         display: `${formatPercent(Number(row.value))}`,
-        source: "World Bank Indicators API",
+        source: result.data?.meta?.source || "World Bank via Vercel Open-Data-Normalisierung",
         status: result.status,
-        meta: makeMeta("World Bank Indicators API", result.status, result.timestamp)
+        meta: makeMeta(result.data?.meta?.source || "World Bank via Vercel Open-Data-Normalisierung", result.status, result.timestamp)
       }));
     } catch (error) {
       logError(error);
@@ -5744,9 +7204,8 @@
 
   async function fetchImfGrowthRows() {
     try {
-      const url = "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH/USA/DEU/CHN";
-      const result = await cachedJson("imf:ngdp-rpch", url, CACHE_TTL.openData, "imf");
-      const values = result.data?.values?.NGDP_RPCH || {};
+      const result = await cachedJson("opendata:imf:ngdp-rpch", openDataProxyUrl({ source: "imf-growth" }), CACHE_TTL.openData, "imf");
+      const values = result.data?.data || {};
       const labels = { USA: "USA", DEU: "Deutschland", CHN: "China" };
       return Object.entries(values).map(([code, series]) => {
         const years = Object.keys(series || {}).sort((a, b) => Number(b) - Number(a));
@@ -5756,9 +7215,9 @@
           indicator: "IMF reales BIP-Wachstum",
           value: Number(series[year]),
           display: `${formatPercent(Number(series[year]))}`,
-          source: "IMF DataMapper API",
+          source: result.data?.meta?.source || "IMF via Vercel Open-Data-Normalisierung",
           status: result.status,
-          meta: makeMeta("IMF DataMapper API", result.status, result.timestamp)
+          meta: makeMeta(result.data?.meta?.source || "IMF via Vercel Open-Data-Normalisierung", result.status, result.timestamp)
         };
       }).filter((row) => Number.isFinite(row.value));
     } catch (error) {
@@ -5768,10 +7227,10 @@
     }
   }
 
-  async function fetchAlphaCalendarEvents(key) {
+  async function fetchAlphaCalendarEvents() {
     const events = [];
     try {
-      const earningsText = await cachedText("alpha:events:earnings", `https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey=${encodeURIComponent(key)}`, CACHE_TTL.events, "alphaVantage");
+      const earningsText = await cachedText("alpha:events:earnings", alphaProxyUrl({ endpoint: "earnings" }), CACHE_TTL.events, "alphaVantage");
       parseCsv(earningsText.data).slice(0, 24).forEach((row) => {
         const symbol = normalizeSymbol(row.symbol || "");
         if (!symbol || !assetMap.has(symbol)) {
@@ -5792,7 +7251,7 @@
     }
 
     try {
-      const ipoText = await cachedText("alpha:events:ipo", `https://www.alphavantage.co/query?function=IPO_CALENDAR&apikey=${encodeURIComponent(key)}`, CACHE_TTL.events, "alphaVantage");
+      const ipoText = await cachedText("alpha:events:ipo", alphaProxyUrl({ endpoint: "ipo" }), CACHE_TTL.events, "alphaVantage");
       parseCsv(ipoText.data).slice(0, 10).forEach((row) => {
         const symbol = normalizeSymbol(row.symbol || "");
         if (!symbol) {
@@ -5907,6 +7366,10 @@
     const direct = firstNumber(data.price, data.value, data["05. price"]);
     if (direct !== null) {
       return direct;
+    }
+    if (data["Realtime Currency Exchange Rate"]) {
+      const fx = data["Realtime Currency Exchange Rate"];
+      return firstNumber(fx["5. Exchange Rate"], fx["5. exchange rate"], fx.rate) ?? NaN;
     }
     const nested = Object.values(data).find((value) => value && typeof value === "object" && !Array.isArray(value));
     return nested ? firstNumber(nested.price, nested.value, nested["05. price"]) : NaN;
@@ -6529,6 +7992,7 @@
     const avgMove = moves.length ? moves.reduce((sum, item) => sum + item.changePct, 0) / moves.length : 0;
     const upcomingEvents = eventsForView()
       .filter((eventItem) => eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(7))
+      .sort(sortEventsForHub)
       .slice(0, 5);
     const unusualAssets = ASSETS
       .map((asset) => snapshotFor(asset.symbol))
@@ -6547,22 +8011,229 @@
 
   function dailyRecapForView() {
     const briefing = dailyBriefingForView();
-    const todayEvents = eventsForView()
-      .filter((eventItem) => matchesEventWindow(eventItem, "today"))
-      .sort((a, b) => eventRelevance(b) - eventRelevance(a))
-      .slice(0, 4);
-    const news = unique([...state.watchlist, ...dashboardPrefs().favorites, state.activeSymbol])
-      .flatMap((symbol) => newsFor(symbol).items.slice(0, 1).map((item) => ({ ...item, symbol })))
-      .sort((a, b) => Number(b.relevance || 0) - Number(a.relevance || 0))
-      .slice(0, 4);
-    const watchlistItems = watchlistNewsForView();
+    const moves = recapMarketMoves(briefing);
+    const events = recapEventsForView(briefing);
+    const news = recapNewsForView();
+    const alerts = recapAlertsForView();
+    const watchlistItems = recapWatchlistItems({ moves, events, news, alerts });
+    const priorityItems = recapPriorityItems({ moves, events, news, watchlistItems, alerts });
+    const todayEventCount = eventsForView().filter((eventItem) => matchesEventWindow(eventItem, "today")).length;
+    const status = recapDataStatus({ moves, events, news });
     return {
-      moves: briefing.marketMoves.slice(0, 4),
+      dateLabel: new Date().toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit" }),
+      moves,
       news,
-      events: todayEvents.length ? todayEvents : briefing.upcomingEvents.slice(0, 4),
+      events,
       watchlistItems,
-      watchlistTone: recapWatchlistTone(watchlistItems)
+      alerts,
+      priorityItems,
+      todayEventCount,
+      status,
+      newsStatus: recapNewsStatus(news),
+      watchlistStatus: watchlistItems.some((item) => item.status === "live" || item.status === "hybrid") ? "hybrid" : "local",
+      moveMode: moves.some((item) => Math.abs(item.changePct) >= 3) ? "Auffällig" : "Selektiv",
+      watchlistTone: recapWatchlistTone(watchlistItems),
+      conclusion: recapConclusion({ priorityItems, moves, events, watchlistItems, news, briefing })
     };
+  }
+
+  function recapMarketMoves(briefing) {
+    return briefing.marketMoves
+      .map((item) => {
+        const isWatchlist = state.watchlist.includes(item.symbol) || dashboardPrefs().favorites.includes(item.symbol);
+        const score = clamp(Math.abs(Number(item.changePct || 0)) * 14 + (isWatchlist ? 28 : 0) + (item.status === "live" ? 8 : 0), 0, 100);
+        const direction = Number(item.changePct || 0) >= 0 ? "stark" : "unter Druck";
+        return {
+          ...item,
+          score,
+          reason: `${isWatchlist ? "Watchlist-relevant. " : ""}${item.symbol} bewegt sich heute ${direction}; wichtig für Momentum, Risiko und mögliche Follow-up-Checks.`
+        };
+      })
+      .filter((item, index) => index < 5 || item.score >= 55)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }
+
+  function recapEventsForView(briefing) {
+    const today = eventsForView()
+      .filter((eventItem) => matchesEventWindow(eventItem, "today"))
+      .sort(sortEventsForHub);
+    const fallback = briefing.upcomingEvents
+      .filter((eventItem) => eventItem.date >= startOfToday())
+      .sort(sortEventsForHub);
+    return (today.length ? today : fallback).slice(0, 5);
+  }
+
+  function recapNewsForView() {
+    const symbols = unique([...state.watchlist, ...dashboardPrefs().favorites, state.activeSymbol, ...HOME_TICKER]).slice(0, 14);
+    const seen = new Set();
+    return symbols
+      .flatMap((symbol) => {
+        const news = newsFor(symbol);
+        return news.items.slice(0, 2).map((item) => ({
+          ...item,
+          symbol,
+          status: news.meta?.status || "fallback",
+          score: recapNewsScore(item, symbol)
+        }));
+      })
+      .filter((item) => {
+        const key = `${item.symbol}-${item.headline}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }
+
+  function recapNewsScore(item, symbol) {
+    const watchlistBoost = state.watchlist.includes(symbol) || dashboardPrefs().favorites.includes(symbol) ? 20 : 0;
+    const ageHours = Math.max(0, (Date.now() - Number(item.datetime || Date.now())) / (60 * 60 * 1000));
+    const freshness = Math.max(0, 12 - ageHours);
+    return clamp(Number(item.relevance || 50) + watchlistBoost + freshness, 0, 100);
+  }
+
+  function recapAlertsForView() {
+    const byId = new Map(state.alerts.map((alert) => [alert.id, normalizeAlertRecord(alert)]));
+    return alertInboxForView()
+      .map((item) => ({
+        ...item,
+        alert: byId.get(item.alertId)
+      }))
+      .filter((item) => item.status === "triggered" || item.alert?.priority === "high")
+      .slice(0, 4);
+  }
+
+  function recapWatchlistItems(context) {
+    const alertItems = context.alerts
+      .filter((item) => item.alert && state.watchlist.includes(item.alert.symbol))
+      .map((item) => ({
+        symbol: item.alert.symbol,
+        kind: "Alert",
+        priority: item.alert.priority || "medium",
+        status: "local",
+        text: item.message || alertLabel(item.alert)
+      }));
+    const moveItems = context.moves
+      .filter((item) => state.watchlist.includes(item.symbol))
+      .map((item) => ({
+        symbol: item.symbol,
+        kind: "Move",
+        priority: item.score >= 70 ? "high" : "medium",
+        status: item.status,
+        text: `${formatPercent(item.changePct)} heute. ${item.reason}`
+      }));
+    const eventItems = context.events
+      .filter(isWatchlistRelevantEvent)
+      .map((eventItem) => ({
+        symbol: eventItem.symbol,
+        kind: eventTypeLabel(eventItem),
+        priority: eventRelevance(eventItem) >= 80 ? "high" : "medium",
+        status: eventItem.meta?.status || "fallback",
+        text: `${eventItem.title} · ${eventTimingLabel(eventItem)}`
+      }));
+    const newsItems = context.news
+      .filter((item) => state.watchlist.includes(item.symbol))
+      .slice(0, 2)
+      .map((item) => ({
+        symbol: item.symbol,
+        kind: "News",
+        priority: item.score >= 80 ? "high" : "medium",
+        status: item.status,
+        text: item.headline
+      }));
+    return [...alertItems, ...moveItems, ...eventItems, ...newsItems].slice(0, 6);
+  }
+
+  function recapPriorityItems(context) {
+    const moveItems = context.moves.map((item) => ({
+      kind: "Markt",
+      symbol: item.symbol,
+      title: `${item.symbol}: ${formatPercent(item.changePct)}`,
+      text: item.reason,
+      score: item.score
+    }));
+    const eventItems = context.events.map((eventItem) => ({
+      kind: eventTypeLabel(eventItem),
+      symbol: assetMap.has(eventItem.symbol) ? eventItem.symbol : "",
+      route: "events",
+      title: eventItem.title,
+      text: `${eventTimingLabel(eventItem)} · ${eventAreaLabel(eventItem)} · Quelle: ${eventSourceLabel(eventItem)}`,
+      score: eventRelevance(eventItem)
+    }));
+    const watchItems = context.watchlistItems.map((item) => ({
+      kind: "Watchlist",
+      symbol: item.symbol,
+      route: "alerts",
+      title: item.symbol ? `${item.symbol}: ${item.kind}` : item.kind,
+      text: item.text,
+      score: item.priority === "high" ? 88 : 68
+    }));
+    const newsItems = context.news.map((item) => ({
+      kind: "News",
+      symbol: item.symbol,
+      title: item.headline,
+      text: `${item.symbol} · ${item.source} · ${item.summary || "Kuratiertes News-Signal."}`,
+      score: item.score
+    }));
+    return [...watchItems, ...eventItems, ...moveItems, ...newsItems]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+  }
+
+  function recapConclusion(context) {
+    const first = context.priorityItems[0];
+    const hasWatchlist = context.watchlistItems.length > 0;
+    if (first && first.score >= 82) {
+      return {
+        label: hasWatchlist ? "Heute zuerst Watchlist prüfen" : "Heute gibt es klare Prioritäten",
+        text: `${first.title} ist der stärkste Punkt im Recap. Danach Events und News prüfen, bevor neue Setups bewertet werden.`
+      };
+    }
+    if (Math.abs(context.briefing.avgMove) >= 0.45) {
+      return {
+        label: context.briefing.regime.label,
+        text: context.briefing.regime.text
+      };
+    }
+    return {
+      label: "Selektiver Tag",
+      text: "Keine einzelne Meldung dominiert. Relevanter sind Watchlist-Bezug, kommende Events und die stärksten Einzelbewegungen."
+    };
+  }
+
+  function recapDataStatus(context) {
+    const statuses = [
+      ...context.moves.map((item) => item.status),
+      ...context.events.map((item) => item.meta?.status),
+      ...context.news.map((item) => item.status)
+    ];
+    if (statuses.includes("live") || statuses.includes("stale")) {
+      return "hybrid";
+    }
+    return "fallback";
+  }
+
+  function recapNewsStatus(news) {
+    if (news.some((item) => item.status === "live" || item.status === "stale")) {
+      return "hybrid";
+    }
+    return "fallback";
+  }
+
+  function recapScoreTone(score) {
+    if (score >= 80) return "bull";
+    if (score < 55) return "neutral";
+    return "";
+  }
+
+  function recapRelevanceLabel(score) {
+    if (score >= 80) return "hoch";
+    if (score >= 60) return "mittel";
+    return "beobachten";
   }
 
   function recapWatchlistTone(items) {
@@ -6607,6 +8278,7 @@
   function fallbackEvents(message = "Lokaler Kalender aktiv.") {
     return FALLBACK_EVENTS.map((eventItem) => {
       const date = new Date(Date.now() + eventItem.dateOffset * 24 * 60 * 60 * 1000);
+      date.setHours(12, 0, 0, 0);
       return {
         ...eventItem,
         date,
@@ -6616,14 +8288,22 @@
   }
 
   function eventsForSymbol(symbol) {
-    return eventsForView().filter((eventItem) => eventItem.symbol === symbol || eventItem.symbol === "Macro").slice(0, 6);
+    return eventsForView()
+      .filter((eventItem) => eventItem.symbol === symbol || eventItem.symbol === "Macro")
+      .filter((eventItem) => eventItem.date >= startOfToday() || eventItem.symbol === symbol)
+      .sort(sortEventsForHub)
+      .slice(0, 8);
   }
 
   function filteredEventHubEvents(events) {
     return events
       .filter((eventItem) => matchesEventType(eventItem, state.eventHub.type))
       .filter((eventItem) => matchesEventWindow(eventItem, state.eventHub.window))
-      .sort((a, b) => eventRelevance(b) - eventRelevance(a) || a.date - b.date);
+      .filter((eventItem) => matchesEventScope(eventItem, state.eventHub.scope))
+      .filter((eventItem) => matchesEventRelevance(eventItem, state.eventHub.relevance))
+      .filter((eventItem) => matchesEventSource(eventItem, state.eventHub.source))
+      .filter((eventItem) => matchesEventSearch(eventItem, state.eventHub.search))
+      .sort(sortEventsForHub);
   }
 
   function matchesEventType(eventItem, filter) {
@@ -6648,6 +8328,53 @@
     return date >= start && date < daysFromNow(7);
   }
 
+  function matchesEventScope(eventItem, filter) {
+    if (!filter || filter === "all") return true;
+    if (filter === "watchlist") return isWatchlistRelevantEvent(eventItem);
+    if (filter === "stock") return assetMap.get(eventItem.symbol)?.type === "Stock";
+    if (filter === "macro") return matchesEventType(eventItem, "macro") || eventItem.symbol === "Macro";
+    return true;
+  }
+
+  function matchesEventRelevance(eventItem, filter) {
+    if (!filter || filter === "all") return true;
+    const relevance = eventRelevance(eventItem);
+    if (filter === "high") return relevance >= 80;
+    if (filter === "medium") return relevance >= 60;
+    return true;
+  }
+
+  function matchesEventSource(eventItem, filter) {
+    if (!filter || filter === "all") return true;
+    const source = String(eventItem.meta?.source || "").toLowerCase();
+    const status = String(eventItem.meta?.status || "").toLowerCase();
+    if (filter === "live") return status === "live" || status === "stale";
+    if (filter === "fallback") return status === "fallback";
+    if (filter === "finnhub") return source.includes("finnhub");
+    if (filter === "alpha") return source.includes("alpha");
+    if (filter === "local") return source.includes("lokal") || source.includes("local") || source.includes("mh");
+    return true;
+  }
+
+  function matchesEventSearch(eventItem, search) {
+    const term = String(search || "").trim().toLowerCase();
+    if (!term) return true;
+    return [
+      eventItem.title,
+      eventItem.type,
+      eventItem.symbol,
+      eventItem.detail,
+      eventItem.meta?.source
+    ].some((value) => String(value || "").toLowerCase().includes(term));
+  }
+
+  function sortEventsForHub(a, b) {
+    const aPast = new Date(a.date) < startOfToday();
+    const bPast = new Date(b.date) < startOfToday();
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return eventRelevance(b) - eventRelevance(a) || new Date(a.date) - new Date(b.date);
+  }
+
   function eventHubCounts(events) {
     const windowed = events.filter((eventItem) => matchesEventWindow(eventItem, state.eventHub.window));
     return {
@@ -6657,6 +8384,44 @@
       macro: windowed.filter((eventItem) => matchesEventType(eventItem, "macro")).length,
       ipo: windowed.filter((eventItem) => matchesEventType(eventItem, "ipo")).length
     };
+  }
+
+  function eventHubSummary(events) {
+    const today = events.filter((eventItem) => matchesEventWindow(eventItem, "today")).length;
+    const week = events.filter((eventItem) => matchesEventWindow(eventItem, "week")).length;
+    const next = events.filter((eventItem) => matchesEventWindow(eventItem, "next")).length;
+    const watchlist = events.filter(isWatchlistRelevantEvent).length;
+    const focus = importantEventsForHub(events);
+    const first = focus[0];
+    return {
+      today,
+      week,
+      next,
+      watchlist,
+      focusTitle: first ? `${eventTimingLabel(first)}: ${first.title}` : "Keine kritischen Termine im aktuellen Fenster",
+      focusText: first
+        ? `${eventTypeLabel(first)} für ${eventAreaLabel(first)}. Relevanz ${eventRelevanceLabel(first)}; Quelle: ${eventSourceLabel(first)}.`
+        : "Der Kalender bleibt sichtbar, auch wenn Live-Provider gerade keine Termine liefern."
+    };
+  }
+
+  function importantEventsForHub(events) {
+    return events
+      .filter((eventItem) => eventItem.date >= startOfToday() && eventItem.date < daysFromNow(14))
+      .sort(sortEventsForHub);
+  }
+
+  function eventHubModeText(events) {
+    const statuses = events.map((eventItem) => eventItem.meta?.status);
+    const hasLive = statuses.includes("live") || statuses.includes("stale");
+    const hasFallback = statuses.includes("fallback");
+    if (hasLive && hasFallback) {
+      return "Hybrid: Live-Kalender werden genutzt, lokale Termine sichern Dividenden, Makro und Corporate Actions ab.";
+    }
+    if (hasLive) {
+      return "Live-Kalender aktiv. Fallbacks bleiben als Sicherheitsnetz im Datenlayer.";
+    }
+    return "Fallback aktiv: Der Hub bleibt nutzbar, bis serverseitige Event-Provider liefern.";
   }
 
   function isWatchlistRelevantEvent(eventItem) {
@@ -6696,35 +8461,144 @@
     return [...movers, ...eventItems].slice(0, 5);
   }
 
+  function eventTypeLabel(eventItem) {
+    const type = String(eventItem.type || "");
+    if (type.toLowerCase().includes("dividend") || type.toLowerCase().includes("dividende")) return "Dividende";
+    if (type.toLowerCase().includes("makro")) return "Makro";
+    if (type.toLowerCase().includes("ipo")) return "IPO";
+    if (type.toLowerCase().includes("split")) return "Split";
+    if (type.toLowerCase().includes("earnings")) return "Earnings";
+    return type || "Event";
+  }
+
+  function eventAreaLabel(eventItem) {
+    if (eventItem.symbol === "Macro") return "Makro / Gesamtmarkt";
+    const asset = assetMap.get(eventItem.symbol);
+    if (asset) {
+      return `${eventItem.symbol} · ${asset.name}`;
+    }
+    return eventItem.symbol || "Markt";
+  }
+
+  function eventTimingLabel(eventItem) {
+    const date = new Date(eventItem.date);
+    const start = startOfToday();
+    const day = 24 * 60 * 60 * 1000;
+    const tomorrow = new Date(start.getTime() + day);
+    const week = new Date(start.getTime() + 7 * day);
+    const nextWeek = new Date(start.getTime() + 14 * day);
+    if (date < start) return "Vorbei";
+    if (date < tomorrow) return "Heute";
+    if (date < new Date(start.getTime() + 2 * day)) return "Morgen";
+    if (date < week) return "Diese Woche";
+    if (date < nextWeek) return "Nächste Woche";
+    return "Später";
+  }
+
+  function formatEventDate(dateValue) {
+    const date = new Date(dateValue);
+    return `${date.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })} · Uhrzeit offen`;
+  }
+
+  function eventRelevanceLabel(eventItem) {
+    const relevance = eventRelevance(eventItem);
+    if (relevance >= 80) return "hoch";
+    if (relevance >= 60) return "mittel";
+    return "Basis";
+  }
+
+  function eventRelevanceTone(eventItem) {
+    const relevance = eventRelevance(eventItem);
+    if (relevance >= 80) return "bull";
+    if (relevance >= 60) return "neutral";
+    return "";
+  }
+
+  function eventSourceLabel(eventItem) {
+    const source = eventItem.meta?.source || "Quelle offen";
+    if (eventItem.meta?.status === "fallback") {
+      return `${source} · Fallback`;
+    }
+    if (eventItem.meta?.status === "stale") {
+      return `${source} · Cache`;
+    }
+    return source;
+  }
+
+  function renderEventFocusRow(eventItem) {
+    const symbolButton = assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : `data-route="events"`;
+    return `
+      <button class="event-focus-row" type="button" ${symbolButton}>
+        <span class="score-pill ${eventRelevanceTone(eventItem)}">${eventRelevance(eventItem)}</span>
+        <span>
+          <strong>${esc(eventItem.title)}</strong>
+          <small>${esc(eventTimingLabel(eventItem))} · ${esc(eventTypeLabel(eventItem))} · ${esc(eventAreaLabel(eventItem))}</small>
+        </span>
+        ${isWatchlistRelevantEvent(eventItem) ? `<span class="pill bull">Watchlist</span>` : renderStatusBadge(eventItem.meta?.status)}
+      </button>
+    `;
+  }
+
   function renderEventCard(eventItem) {
-    const symbolButton = assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : "";
     const relevance = eventRelevance(eventItem);
     const watchlistBadge = isWatchlistRelevantEvent(eventItem) ? `<span class="pill bull">Watchlist</span>` : "";
     return `
-      <button class="event-card" type="button" ${symbolButton}>
-        <span class="pill">${esc(eventItem.type)}</span>
-        ${watchlistBadge}
+      <article class="event-card">
+        <div class="event-card-head">
+          <span class="pill">${esc(eventTypeLabel(eventItem))}</span>
+          ${watchlistBadge}
+          ${renderStatusBadge(eventItem.meta?.status)}
+        </div>
         <strong>${esc(eventItem.title)}</strong>
-        <span class="small">${eventItem.date.toLocaleDateString("de-DE")} ${eventItem.date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} | ${esc(eventItem.symbol)} | Relevanz ${relevance}/100</span>
-        <p>${esc(eventItem.detail)}</p>
+        <div class="event-meta-line">
+          <span>${esc(eventTimingLabel(eventItem))}</span>
+          <span>${formatEventDate(eventItem.date)}</span>
+          <span>${esc(eventAreaLabel(eventItem))}</span>
+        </div>
+        <p>${esc(eventItem.detail || "Kein zusätzlicher Detailtext verfügbar.")}</p>
+        <div class="event-card-footer">
+          <span>Relevanz: <strong>${relevance}/100</strong> · ${esc(eventRelevanceLabel(eventItem))}</span>
+          <span>${esc(eventSourceLabel(eventItem))}</span>
+        </div>
+        <div class="row-actions event-card-actions">
+          ${assetMap.has(eventItem.symbol) ? `<button class="tiny-button" type="button" data-symbol="${escAttr(eventItem.symbol)}">Asset öffnen</button>` : ""}
+          <button class="tiny-button" type="button"
+            data-alert-event-title="${escAttr(eventItem.title)}"
+            data-alert-event-symbol="${escAttr(eventItem.symbol)}"
+            data-alert-event-type="${escAttr(eventItem.type)}"
+            data-alert-event-date="${escAttr(eventItem.date.toISOString())}"
+            data-alert-event-priority="${escAttr(inferEventPriority(eventItem))}">Alert setzen</button>
+        </div>
         ${renderDataMeta(eventItem.meta, true)}
-      </button>
+      </article>
     `;
   }
 
   function renderAssetEventsCard(symbol, events) {
     const status = events.some((eventItem) => eventItem.meta.status === "live") ? "live" : events.some((eventItem) => eventItem.meta.status === "stale") ? "stale" : "fallback";
+    const nextEvent = events.find((eventItem) => eventItem.date >= startOfToday());
     return `
       <article class="card">
         <div class="card-topline">
           <div>
-            <span class="card-label">Events</span>
-              <h3>${esc(symbol)} Termine</h3>
+            <span class="card-label">Asset-Termine</span>
+            <h3>${esc(symbol)} Event- und Earnings-Kalender</h3>
+            <p>Nächste Earnings, Dividenden, Corporate Actions und relevante Makrotermine für diese Asset-Seite.</p>
             </div>
           ${renderStatusBadge(status)}
         </div>
+        ${nextEvent ? `
+          <div class="event-next-callout">
+            <span class="pill">${esc(eventTimingLabel(nextEvent))}</span>
+            <strong>${esc(nextEvent.title)}</strong>
+            <p>${esc(nextEvent.detail)}</p>
+          </div>
+        ` : ""}
         <div class="event-list">
-          ${events.map(renderEventCard).join("") || renderEmptyState("Keine Events für dieses Asset im lokalen Kalender.")}
+          ${events.map(renderEventCard).join("") || renderEmptyState("Keine Events für dieses Asset im aktuellen Kalender.")}
+        </div>
+        <div class="row-actions event-card-actions">
+          <button class="ghost-button" type="button" data-route="events">Event-Hub öffnen</button>
         </div>
         ${renderDataMeta(events[0] ? events[0].meta : makeMeta("Event-Kalender", "fallback", BOOT_TIME))}
       </article>
@@ -6732,21 +8606,29 @@
   }
 
   function renderAlertRow(alert) {
-    const asset = getAsset(alert.symbol);
-    const quote = quoteFor(alert.symbol);
+    const hasAsset = assetMap.has(alert.symbol);
+    const asset = hasAsset ? getAsset(alert.symbol) : { name: alert.eventTitle || "Markttermin", currency: "USD" };
+    const quote = hasAsset ? quoteFor(alert.symbol) : { price: null, changePct: 0 };
     const status = normalizeAlertStatus(alert);
     const snoozed = isAlertSnoozed(alert);
     const statusLabel = alertStatusLabel(alert);
-    const statusClass = status === "triggered" ? "bull" : status === "done" ? "neutral" : "muted";
+    const statusClass = status === "triggered" ? "bear" : status === "done" || snoozed ? "neutral" : "";
+    const displaySymbol = alert.displaySymbol || alert.symbol;
+    const watchlistBadge = state.watchlist.includes(alert.symbol) ? `<span class="pill bull">Watchlist</span>` : "";
+    const symbolAction = hasAsset ? `data-symbol="${escAttr(alert.symbol)}"` : "disabled";
     return `
-      <div class="alert-row">
-        <button class="symbol-button" type="button" data-symbol="${escAttr(alert.symbol)}">
-          <strong>${esc(alert.symbol)} - ${esc(asset.name)}</strong>
+      <div class="alert-row alert-row-v2">
+        <button class="symbol-button" type="button" ${symbolAction}>
+          <strong>${esc(displaySymbol)} - ${esc(asset.name)}</strong>
           <span>${esc(alertLabel(alert))}</span>
+          <span class="alert-row-badges">
+            <span class="pill">${esc(alertTypeLabel(alert.type))}</span>
+            ${watchlistBadge}
+          </span>
         </button>
         <span class="right-cell">
-          <strong>${formatMoney(quote.price, asset.currency)}</strong>
-          <span class="${statusClass}">${esc(statusLabel)}</span>
+          <strong>${hasAsset ? formatMoney(quote.price, asset.currency) : "Termin"}</strong>
+          <span class="pill ${statusClass}">${esc(statusLabel)}</span>
         </span>
         <span class="right-cell">
           <strong>${esc(priorityLabel(alert.priority))}</strong>
@@ -6756,7 +8638,11 @@
           <strong>${alert.lastCheckedAt ? formatTimestamp(alert.lastCheckedAt) : "noch offen"}</strong>
           <span class="small">${snoozed ? `Pausiert bis ${formatTimestamp(alert.snoozedUntil)}` : "Letzter Check"}</span>
         </span>
-        <button class="tiny-button" type="button" data-alert-snooze="${escAttr(alert.id)}">Snooze</button>
+        <div class="alert-snooze-actions">
+          <button class="tiny-button" type="button" data-alert-snooze="${escAttr(alert.id)}" data-alert-snooze-duration="later">später</button>
+          <button class="tiny-button" type="button" data-alert-snooze="${escAttr(alert.id)}" data-alert-snooze-duration="tomorrow">morgen</button>
+          <button class="tiny-button" type="button" data-alert-snooze="${escAttr(alert.id)}" data-alert-snooze-duration="week">1 Woche</button>
+        </div>
         <button class="tiny-button" type="button" data-alert-done="${escAttr(alert.id)}">Erledigt</button>
         <button class="icon-button danger-button" type="button" data-alert-delete="${escAttr(alert.id)}" aria-label="Alert löschen">X</button>
       </div>
@@ -6862,7 +8748,77 @@
       return;
     }
     state.compare[name] = symbol;
-    if (state.route === "home") {
+    if (["home", "compare"].includes(state.route)) {
+      render();
+    }
+  }
+
+  function openCompareWith(symbol) {
+    const normalized = normalizeSymbol(symbol);
+    if (!assetMap.has(normalized)) {
+      toast("Asset nicht gefunden.");
+      return;
+    }
+    state.compare.left = normalized;
+    if (!assetMap.has(state.compare.right) || state.compare.right === normalized) {
+      const asset = getAsset(normalized);
+      state.compare.right = asset.type === "ETF" ? "QQQ" : "MSFT";
+      if (state.compare.right === normalized) {
+        state.compare.right = "NVDA";
+      }
+    }
+    navigate("compare");
+  }
+
+  function openComparePair(left, right) {
+    const leftSymbol = normalizeSymbol(left);
+    const rightSymbol = normalizeSymbol(right);
+    if (assetMap.has(leftSymbol)) {
+      state.compare.left = leftSymbol;
+    }
+    if (assetMap.has(rightSymbol)) {
+      state.compare.right = rightSymbol;
+    }
+    navigate("compare");
+  }
+
+  function swapCompareAssets() {
+    const left = state.compare.left;
+    state.compare.left = state.compare.right;
+    state.compare.right = left;
+    render();
+  }
+
+  function updateEventHubState(input) {
+    const name = input.name;
+    if (!name) {
+      return;
+    }
+    state.eventHub[name] = input.value;
+    const target = document.getElementById("eventHubResults");
+    const count = document.getElementById("eventHubCount");
+    if (target) {
+      const filtered = filteredEventHubEvents(eventsForView());
+      target.innerHTML = renderEventHubResults(filtered);
+      if (count) {
+        count.textContent = String(filtered.length);
+      }
+    } else if (state.route === "events") {
+      render();
+    }
+  }
+
+  function updateAlertFilterState(input) {
+    const name = input.name;
+    if (!name) {
+      return;
+    }
+    state.alertFilters[name] = input.value;
+    const target = document.getElementById("alertResults");
+    if (target) {
+      const filteredAlerts = alertsForView();
+      target.innerHTML = filteredAlerts.map(renderAlertRow).join("") || renderEmptyState("Keine Alerts in diesem Filter.");
+    } else if (state.route === "alerts") {
       render();
     }
   }
@@ -6889,8 +8845,8 @@
       name,
       type: String(data.get("type") || "test"),
       cash: Number(data.get("cash") || 0),
-      targetCash: 10,
-      notes: "",
+      targetCash: Number(data.get("targetCash") || 10),
+      notes: String(data.get("notes") || "").trim(),
       positions: []
     };
     state.portfolios = [...state.portfolios, portfolio];
@@ -6951,31 +8907,118 @@
 
   function portfolioAnalysis(portfolio) {
     const positions = portfolio.positions || [];
-    const invested = positions.reduce((sum, position) => sum + position.quantity * position.avgPrice, 0);
-    const current = positions.reduce((sum, position) => sum + position.quantity * quoteFor(position.symbol).price, 0);
-    const totalValue = current + Number(portfolio.cash || 0);
+    const cashValue = Number(portfolio.cash || 0);
+    const positionRows = positions.map(portfolioPositionAnalysis);
+    const invested = positionRows.reduce((sum, row) => sum + row.invested, 0);
+    const current = positionRows.reduce((sum, row) => sum + row.value, 0);
+    const totalValue = current + cashValue;
     const performanceAbs = current - invested;
     const performancePct = invested ? performanceAbs / invested * 100 : 0;
-    const cashPct = totalValue ? Number(portfolio.cash || 0) / totalValue * 100 : 0;
-    const sectorExposure = exposureBy(positions, totalValue, (position) => getAsset(position.symbol).sector);
-    const countryExposure = exposureBy(positions, totalValue, (position) => position.country || countryFor(position.symbol));
-    const currencyExposure = exposureBy(positions, totalValue, (position) => getAsset(position.symbol).currency);
+    const cashPct = totalValue ? cashValue / totalValue * 100 : 0;
+    const targetCash = Number(portfolio.targetCash ?? 10);
+    const rowsWithWeights = positionRows.map((row) => ({
+      ...row,
+      weight: totalValue ? row.value / totalValue * 100 : 0,
+      contributionPct: totalValue ? row.performanceAbs / totalValue * 100 : 0
+    })).sort((a, b) => b.weight - a.weight);
+    const sectorExposure = exposureByRows(rowsWithWeights, totalValue, (row) => row.asset.sector);
+    const countryExposure = exposureByRows(rowsWithWeights, totalValue, (row) => row.country);
+    const currencyExposure = exposureByRows(rowsWithWeights, totalValue, (row) => row.asset.currency, [{ label: "USD Cash", value: cashValue }]);
+    const assetTypeExposure = exposureByRows(rowsWithWeights, totalValue, (row) => assetTypeLabel(row.asset), [{ label: "Cash", value: cashValue }]);
     const maxSector = maxExposure(sectorExposure);
     const maxCountry = maxExposure(countryExposure);
-    const riskScore = clamp((maxSector.value * 0.75) + (maxCountry.value * 0.2) + Math.max(0, 12 - cashPct) + (positions.length < 4 ? 12 : 0), 0, 100);
+    const maxCurrency = maxExposure(currencyExposure);
+    const maxPosition = rowsWithWeights[0] || null;
+    const style = portfolioStyleSnapshot(rowsWithWeights, totalValue, assetTypeExposure, countryExposure);
+    const riskScore = portfolioRiskScore({
+      maxPosition,
+      maxSector,
+      maxCountry,
+      maxCurrency,
+      cashPct,
+      targetCash,
+      positionCount: rowsWithWeights.length,
+      etfPct: style.etfPct
+    });
+    const riskLevel = portfolioRiskLevel(riskScore);
+    const performance = portfolioPerformanceSnapshot(rowsWithWeights, totalValue, performanceAbs, performancePct);
+    const riskItems = portfolioRiskItems({ rows: rowsWithWeights, maxPosition, maxSector, maxCountry, maxCurrency, cashPct, targetCash });
+    const rebalancingHints = portfolioRebalancingHints({ rows: rowsWithWeights, maxPosition, maxSector, maxCountry, maxCurrency, cashPct, targetCash, style });
+    const focusItems = portfolioFocusItems({ rows: rowsWithWeights, riskItems, rebalancingHints });
+    const dataStatus = portfolioDataStatus(rowsWithWeights);
+    const health = portfolioHealthSnapshot({ riskScore, riskLevel, cashPct, style, rows: rowsWithWeights, maxSector, maxPosition });
+    const meta = makeMeta("Portfolio: lokale Positionen + Kurs-/Eventdaten", dataStatus, Date.now(), "Portfolio-Werte sind lokal gespeichert; Kurse, Events und Research-Inputs können live, hybrid oder fallback sein.");
     return {
       totalValue,
+      current,
+      invested,
+      cashValue,
       performanceAbs,
       performancePct,
       cashPct,
+      targetCash,
+      positions: rowsWithWeights,
       sectorExposure,
       countryExposure,
       currencyExposure,
+      assetTypeExposure,
+      maxSector,
+      maxCountry,
+      maxCurrency,
+      topPosition: maxPosition,
+      style,
+      performance,
       riskScore,
+      riskLevel,
+      riskItems,
+      rebalancingHints,
+      focusItems,
+      health,
+      dataStatus,
+      meta,
       concentrationHint: maxSector.value > 45 ? `Klumpenrisiko: ${maxSector.label} liegt bei ${formatNumber(maxSector.value)}%.` : "Kein extremes Sektor-Klumpenrisiko im lokalen Modell.",
-      diversificationHint: positions.length < 4 ? "Diversifikation ist noch gering; weitere Bausteine prüfen." : "Diversifikation wirkt für ein lokales Modell solide.",
-      rebalanceHint: cashPct > (portfolio.targetCash + 8) ? "Cash liegt über Ziel: Reinvestition oder Zielquote prüfen." : cashPct < Math.max(0, portfolio.targetCash - 5) ? "Cash liegt unter Ziel: Liquiditätspuffer prüfen." : "Cash-Anteil nahe Zielallokation.",
-      priorityHint: riskScore >= 65 ? "Erste Priorität: Klumpenrisiko oder Cash-Puffer prüfen." : riskScore >= 40 ? "Portfolio wirkt nutzbar, sollte aber regelmäßig gegen Zielallokation geprüft werden." : "Risiko wirkt im lokalen Modell kontrolliert."
+      diversificationHint: rowsWithWeights.length < 4 ? "Diversifikation ist noch gering; weitere Bausteine prüfen." : "Diversifikation wirkt für ein lokales Modell solide.",
+      rebalanceHint: rebalancingHints[0]?.text || "Cash, Sektor- und Positionsgewichte liegen nahe der lokalen Zielzone.",
+      priorityHint: focusItems[0]?.text || "Portfolio wirkt im lokalen Modell kontrolliert; regelmäßig gegen Zielallokation prüfen."
+    };
+  }
+
+  function portfolioPositionAnalysis(position) {
+    const asset = getAsset(position.symbol);
+    const quote = quoteFor(position.symbol);
+    const analysis = analysisFor(position.symbol);
+    const etf = etfDataForSymbol(position.symbol);
+    const quantity = Number(position.quantity || 0);
+    const avgPrice = Number(position.avgPrice || 0);
+    const value = quantity * Number(quote.price || 0);
+    const invested = quantity * avgPrice;
+    const performanceAbs = value - invested;
+    const performancePct = avgPrice ? ((Number(quote.price || 0) / avgPrice) - 1) * 100 : 0;
+    const previousValue = value / (1 + Number(quote.changePct || 0) / 100);
+    const dailyAbs = Number.isFinite(previousValue) ? value - previousValue : 0;
+    const nextEvent = eventsForSymbol(position.symbol).find((eventItem) => eventItem.date >= startOfToday());
+    const alerts = state.alerts.map(normalizeAlertRecord).filter((alert) => alert.symbol === position.symbol && normalizeAlertStatus(alert) !== "done");
+    const dataStatus = bestDataStatus([quote.meta?.status, analysis.meta?.status, nextEvent?.meta?.status]);
+    return {
+      ...position,
+      asset,
+      quote,
+      analysis,
+      etf,
+      country: position.country || countryFor(position.symbol),
+      value,
+      invested,
+      performanceAbs,
+      performancePct,
+      dailyAbs,
+      dailyPct: Number(quote.changePct || 0),
+      monthlyPct: Number(analysis.performance1m || 0),
+      yearlyPct: clamp(Number(analysis.performance6m || 0) * 2, -85, 180),
+      nextEvent,
+      alerts,
+      dataStatus,
+      role: portfolioPositionRole(asset, etf, analysis),
+      riskHint: portfolioPositionRiskHint(asset, etf, analysis, nextEvent)
     };
   }
 
@@ -6989,20 +9032,320 @@
     return Object.entries(map).map(([label, value]) => ({ label, value: totalValue ? value / totalValue * 100 : 0 }));
   }
 
+  function exposureByRows(rows, totalValue, resolver, extras = []) {
+    const map = {};
+    rows.forEach((row) => {
+      const label = resolver(row) || "Sonstiges";
+      map[label] = (map[label] || 0) + row.value;
+    });
+    extras.forEach((item) => {
+      if (item.value) {
+        map[item.label] = (map[item.label] || 0) + Number(item.value || 0);
+      }
+    });
+    return Object.entries(map)
+      .map(([label, value]) => ({ label, value: totalValue ? value / totalValue * 100 : 0, amount: value }))
+      .sort((a, b) => b.value - a.value);
+  }
+
   function maxExposure(items) {
     return items.reduce((max, item) => item.value > max.value ? item : max, { label: "n/a", value: 0 });
   }
 
-  function renderPortfolioPosition(position) {
-    const asset = getAsset(position.symbol);
-    const quote = quoteFor(position.symbol);
-    const value = position.quantity * quote.price;
-    const perf = position.avgPrice ? ((quote.price / position.avgPrice) - 1) * 100 : 0;
+  function portfolioStyleSnapshot(rows, totalValue, assetTypeExposure, countryExposure) {
+    const techSectors = ["Technology", "Software", "Semiconductors", "Nasdaq 100", "Communication Services"];
+    const techValue = rows
+      .filter((row) => techSectors.includes(row.asset.sector))
+      .reduce((sum, row) => sum + row.value, 0);
+    const usValue = rows
+      .filter((row) => row.country === "USA" || row.asset.sector === "US Large Caps" || row.asset.sector === "Nasdaq 100")
+      .reduce((sum, row) => sum + row.value, 0);
+    const etfValue = rows.filter((row) => row.asset.type === "ETF" || row.asset.type === "Index").reduce((sum, row) => sum + row.value, 0);
+    const stockValue = rows.filter((row) => row.asset.type === "Stock").reduce((sum, row) => sum + row.value, 0);
+    const growthScore = rows.reduce((sum, row) => sum + row.value * Number(row.analysis.growth || 0), 0) / Math.max(rows.reduce((sum, row) => sum + row.value, 0), 1);
+    const defensiveValue = rows
+      .filter((row) => ["Healthcare", "Consumer Staples", "Utilities", "Precious Metals"].includes(row.asset.sector) || row.asset.type === "Commodity")
+      .reduce((sum, row) => sum + row.value, 0);
+    return {
+      techPct: totalValue ? techValue / totalValue * 100 : 0,
+      usPct: totalValue ? usValue / totalValue * 100 : 0,
+      etfPct: totalValue ? etfValue / totalValue * 100 : 0,
+      stockPct: totalValue ? stockValue / totalValue * 100 : 0,
+      defensivePct: totalValue ? defensiveValue / totalValue * 100 : 0,
+      growthScore,
+      growthLabel: growthScore >= 66 ? "wachstumsnah" : growthScore <= 45 ? "defensiver" : "gemischt",
+      assetTypeExposure,
+      countryExposure
+    };
+  }
+
+  function portfolioRiskScore(context) {
+    const maxPositionWeight = Number(context.maxPosition?.weight || 0);
+    const maxSectorWeight = Number(context.maxSector.value || 0);
+    const maxCountryWeight = Number(context.maxCountry.value || 0);
+    const maxCurrencyWeight = Number(context.maxCurrency.value || 0);
+    const cashGap = Math.max(0, Number(context.targetCash || 0) - Number(context.cashPct || 0));
+    const diversificationPenalty = context.positionCount < 4 ? 13 : context.positionCount < 7 ? 6 : 0;
+    const etfPenalty = context.etfPct < 15 && context.positionCount > 2 ? 6 : 0;
+    return Math.round(clamp(
+      maxPositionWeight * 0.45 +
+      maxSectorWeight * 0.32 +
+      maxCountryWeight * 0.14 +
+      maxCurrencyWeight * 0.10 +
+      cashGap * 1.1 +
+      diversificationPenalty +
+      etfPenalty,
+      0,
+      100
+    ));
+  }
+
+  function portfolioRiskLevel(score) {
+    if (score >= 75) {
+      return { label: "hoch", tone: "bear" };
+    }
+    if (score >= 56) {
+      return { label: "erhöht", tone: "bear" };
+    }
+    if (score >= 36) {
+      return { label: "mittel", tone: "neutral" };
+    }
+    return { label: "kontrolliert", tone: "bull" };
+  }
+
+  function portfolioPerformanceSnapshot(rows, totalValue, totalAbs, totalPct) {
+    const dailyAbs = rows.reduce((sum, row) => sum + row.dailyAbs, 0);
+    const monthAbs = rows.reduce((sum, row) => sum + row.value * Number(row.monthlyPct || 0) / 100, 0);
+    const weekAbs = monthAbs / 4.3;
+    const yearAbs = rows.reduce((sum, row) => sum + row.value * Number(row.yearlyPct || 0) / 100, 0);
+    const sortedByAbs = [...rows].sort((a, b) => b.performanceAbs - a.performanceAbs);
+    return {
+      daily: { abs: dailyAbs, pct: totalValue ? dailyAbs / totalValue * 100 : 0 },
+      week: { abs: weekAbs, pct: totalValue ? weekAbs / totalValue * 100 : 0 },
+      month: { abs: monthAbs, pct: totalValue ? monthAbs / totalValue * 100 : 0 },
+      year: { abs: yearAbs, pct: totalValue ? yearAbs / totalValue * 100 : 0 },
+      total: { abs: totalAbs, pct: totalPct },
+      winners: sortedByAbs.filter((row) => row.performanceAbs > 0).slice(0, 3),
+      losers: [...rows].sort((a, b) => a.performanceAbs - b.performanceAbs).filter((row) => row.performanceAbs < 0).slice(0, 3),
+      contribution: [...rows].sort((a, b) => Math.abs(b.contributionPct) - Math.abs(a.contributionPct)).slice(0, 5)
+    };
+  }
+
+  function portfolioRiskItems(context) {
+    const items = [];
+    if (context.maxPosition) {
+      items.push({
+        label: "Top-Position",
+        tone: context.maxPosition.weight >= 25 ? "bear" : context.maxPosition.weight >= 16 ? "neutral" : "bull",
+        text: `${context.maxPosition.symbol} macht ${formatNumber(context.maxPosition.weight)}% des Portfolios aus. ${context.maxPosition.weight >= 25 ? "Das ist ein klares Einzeltitel-Klumpenrisiko." : "Gewichtung wirkt im lokalen Modell beobachtbar."}`
+      });
+    }
+    items.push({
+      label: "Sektor",
+      tone: context.maxSector.value >= 45 ? "bear" : context.maxSector.value >= 32 ? "neutral" : "bull",
+      text: `${context.maxSector.label} liegt bei ${formatNumber(context.maxSector.value)}%.`
+    });
+    items.push({
+      label: "Land / Region",
+      tone: context.maxCountry.value >= 72 ? "bear" : context.maxCountry.value >= 58 ? "neutral" : "bull",
+      text: `${context.maxCountry.label} liegt bei ${formatNumber(context.maxCountry.value)}%.`
+    });
+    items.push({
+      label: "Cash",
+      tone: context.cashPct < Math.max(0, context.targetCash - 5) ? "bear" : "neutral",
+      text: `Cash liegt bei ${formatNumber(context.cashPct)}%, Zielzone ungefähr ${formatNumber(context.targetCash)}%.`
+    });
+    return items;
+  }
+
+  function portfolioRebalancingHints(context) {
+    const hints = [];
+    if (context.maxPosition && context.maxPosition.weight >= 25) {
+      hints.push({ label: "prüfen", tone: "bear", text: `${context.maxPosition.symbol} dominiert das Portfolio. Teilrebalancing oder Absicherung prüfen.` });
+    }
+    if (context.maxSector.value >= 45) {
+      hints.push({ label: "Sektor", tone: "bear", text: `${context.maxSector.label}-Anteil wirkt hoch. Gegenpol über andere Sektoren oder breitere ETFs prüfen.` });
+    }
+    if (context.maxCountry.value >= 70) {
+      hints.push({ label: "Region", tone: "neutral", text: `${context.maxCountry.label} ist sehr dominant. Europa, Welt-ETF oder andere Regionen als Diversifikation prüfen.` });
+    }
+    if (context.maxCurrency.value >= 75) {
+      hints.push({ label: "Währung", tone: "neutral", text: `${context.maxCurrency.label} ist stark vertreten. Währungsrisiko bewusst akzeptieren oder diversifizieren.` });
+    }
+    if (context.cashPct > context.targetCash + 8) {
+      hints.push({ label: "Cash", tone: "neutral", text: "Cash liegt über Zielniveau. Reinvestition, Sparplan oder bewusste Reserve prüfen." });
+    } else if (context.cashPct < Math.max(0, context.targetCash - 5)) {
+      hints.push({ label: "Cash", tone: "bear", text: "Cash-Puffer liegt unter Zielzone. Liquiditätsreserve oder Positionsgröße prüfen." });
+    }
+    if (context.style.etfPct < 15 && context.style.stockPct > 60) {
+      hints.push({ label: "ETF", tone: "neutral", text: "Portfolio ist einzelwertlastig. Ein breiter ETF könnte Konzentrationsrisiko senken." });
+    }
+    if (context.rows.length < 4) {
+      hints.push({ label: "Diversifikation", tone: "bear", text: "Wenige Positionen: Ein einzelnes Event kann das Portfolio stark bewegen." });
+    }
+    return hints.length ? hints.slice(0, 6) : [{ label: "Balance", tone: "bull", text: "Keine harte Übergewichtung im lokalen Modell. Regelmäßig gegen Zielallokation prüfen." }];
+  }
+
+  function portfolioFocusItems(context) {
+    const items = [];
+    context.rebalancingHints.slice(0, 2).forEach((hint) => {
+      items.push({ label: hint.label, title: "Rebalancing prüfen", text: hint.text, tone: hint.tone, route: "portfolio" });
+    });
+    context.rows
+      .filter((row) => Math.abs(row.dailyPct) >= 2)
+      .slice(0, 2)
+      .forEach((row) => {
+        items.push({ label: "Move", title: `${row.symbol} bewegt sich heute ${formatPercent(row.dailyPct)}`, text: `${row.role}; Beitrag heute ungefähr ${formatMoney(row.dailyAbs, row.asset.currency)}.`, tone: row.dailyPct >= 0 ? "bull" : "bear", symbol: row.symbol });
+      });
+    context.rows
+      .filter((row) => row.nextEvent && row.nextEvent.date <= daysFromNow(14))
+      .slice(0, 2)
+      .forEach((row) => {
+        items.push({ label: eventTypeLabel(row.nextEvent), title: `${row.symbol}: ${row.nextEvent.title}`, text: `${eventTimingLabel(row.nextEvent)} · ${eventSourceLabel(row.nextEvent)}`, tone: "neutral", symbol: row.symbol });
+      });
+    context.rows
+      .flatMap((row) => row.alerts.map((alert) => ({ row, alert })))
+      .filter((item) => normalizeAlertStatus(item.alert) === "triggered" || item.alert.priority === "high")
+      .slice(0, 2)
+      .forEach((item) => {
+        items.push({ label: "Alert", title: `${item.row.symbol}: ${alertTypeLabel(item.alert.type)}`, text: alertLabel(item.alert), tone: item.alert.priority === "high" ? "bear" : "neutral", symbol: item.row.symbol });
+      });
+    return items.slice(0, 5);
+  }
+
+  function portfolioDataStatus(rows) {
+    const statuses = rows.map((row) => row.dataStatus);
+    if (statuses.includes("live")) return "hybrid";
+    if (statuses.includes("stale")) return "stale";
+    if (statuses.includes("fallback")) return "local";
+    return "local";
+  }
+
+  function portfolioHealthSnapshot(context) {
+    let label = "Ausgewogen";
+    if (context.riskScore >= 75) {
+      label = "Stark konzentriert";
+    } else if (context.riskScore >= 56) {
+      label = "Leicht konzentriert";
+    } else if (context.style.etfPct >= 50) {
+      label = "ETF-basiert";
+    } else if (context.style.techPct >= 45) {
+      label = "wachstums-/tech-lastig";
+    } else if (context.cashPct < 3) {
+      label = "casharm";
+    } else if (context.style.defensivePct >= 35) {
+      label = "defensiver";
+    }
+    const summary = `${label}: größtes Gewicht ${context.maxPosition ? `${context.maxPosition.symbol} ${formatNumber(context.maxPosition.weight)}%` : "n/a"}, stärkster Sektor ${context.maxSector.label} ${formatNumber(context.maxSector.value)}%, Cash ${formatNumber(context.cashPct)}%.`;
+    return { label, summary };
+  }
+
+  function portfolioPositionRole(asset, etf, analysis) {
+    if (etf) {
+      return etf.region[0]?.[1] >= 90 ? "ETF-Satellit / konzentriert" : "ETF-Kernbaustein";
+    }
+    if (asset.type === "Commodity") return "Hedge / Rohstoff";
+    if (asset.type === "Crypto") return "Krypto-Beta";
+    if (asset.type === "Index") return "Index-Baustein";
+    if (analysis.growth >= 66) return "Growth-Einzeltitel";
+    if (analysis.value >= 65) return "Value-Einzeltitel";
+    if (analysis.volatility <= 42) return "defensiver Einzeltitel";
+    return "Einzeltitel";
+  }
+
+  function portfolioPositionRiskHint(asset, etf, analysis, nextEvent) {
+    if (etf) {
+      const concentration = etfHoldingConcentration(etf);
+      return {
+        label: concentration >= 25 ? "ETF konzentriert" : "ETF diversifiziert",
+        text: `${etf.distribution}, TER ${formatNumber(etf.ter)}%, Top-Holdings ${formatNumber(concentration)}%.`
+      };
+    }
+    if (nextEvent && nextEvent.date <= daysFromNow(14)) {
+      return { label: "Event-Risiko", text: `${eventTimingLabel(nextEvent)}: ${nextEvent.title}.` };
+    }
+    if (analysis.volatility >= 70) {
+      return { label: "volatil", text: "Hohe Schwankung im lokalen Modell; Positionsgröße prüfen." };
+    }
+    if (asset.type === "Crypto") {
+      return { label: "hohes Beta", text: "Krypto reagiert stark auf Liquidität und Risikoappetit." };
+    }
+    return { label: "normal", text: "Kein einzelner Risikotreiber dominiert diese Position." };
+  }
+
+  function portfolioScenarioAnalysis(portfolio, baseAnalysis) {
+    const symbol = findBestSymbol(state.portfolioScenario.symbol || "SPY");
+    const quantity = Number(state.portfolioScenario.quantity || 0);
+    const avgPrice = symbol ? Number(state.portfolioScenario.avgPrice || quoteFor(symbol).price || 0) : 0;
+    const cashChange = Number(state.portfolioScenario.cashChange || 0);
+    const shock = Number(state.portfolioScenario.shock || 0);
+    const contribution = Number(state.portfolioScenario.contribution || 0);
+    const addedCost = symbol && quantity > 0 ? quantity * avgPrice : 0;
+    const scenarioPositions = symbol && quantity > 0
+      ? [...(portfolio.positions || []), { symbol, quantity, avgPrice, country: countryFor(symbol) }]
+      : [...(portfolio.positions || [])];
+    const projectedPortfolio = {
+      ...portfolio,
+      cash: Number(portfolio.cash || 0) + cashChange - addedCost,
+      positions: scenarioPositions
+    };
+    const projected = portfolioAnalysis(projectedPortfolio);
+    const projectedValue = projected.totalValue;
+    const shockedValue = projectedValue * (1 + shock / 100);
+    const oneYearValue = shockedValue + contribution * 12;
+    const riskDelta = projected.riskScore - baseAnalysis.riskScore;
+    const summaryParts = [];
+    if (symbol && quantity > 0) {
+      summaryParts.push(`${symbol} würde mit ${formatMoney(addedCost, "USD")} hinzukommen.`);
+    }
+    if (cashChange) {
+      summaryParts.push(`Cash ändert sich um ${formatMoney(cashChange, "USD")}.`);
+    }
+    summaryParts.push(`Risiko ${riskDelta >= 0 ? "steigt" : "sinkt"} um ${formatNumber(Math.abs(riskDelta))} Punkte.`);
+    if (shock) {
+      summaryParts.push(`Marktschock ${formatPercent(shock)} wäre im Szenario sichtbar.`);
+    }
+    return {
+      projected,
+      projectedValue,
+      shockedValue,
+      oneYearValue,
+      riskDelta,
+      assetTypeExposure: projected.assetTypeExposure,
+      summary: summaryParts.join(" ")
+    };
+  }
+
+  function renderPortfolioPosition(position, analysis) {
+    const eventText = position.nextEvent ? `${eventTimingLabel(position.nextEvent)} · ${position.nextEvent.title}` : "Kein naher Termin";
+    const alertText = position.alerts.length ? `${position.alerts.length} aktive/r Alert` : "kein Alert";
     return `
       <div class="portfolio-position-row">
-        <button class="symbol-button" type="button" data-symbol="${escAttr(position.symbol)}"><strong>${esc(position.symbol)}</strong><span>${esc(asset.name)}</span></button>
-        <span>${formatMoney(value, asset.currency)}</span>
-        <span class="${toneClass(perf)}">${formatPercent(perf)}</span>
+        <button class="symbol-button" type="button" data-symbol="${escAttr(position.symbol)}">
+          <strong>${esc(position.symbol)}</strong>
+          <span>${esc(position.asset.name)} · ${esc(position.role)}</span>
+        </button>
+        <div>
+          <strong>${formatMoney(position.value, position.asset.currency)}</strong>
+          <span class="small">${formatNumber(position.weight)}% vom Portfolio</span>
+        </div>
+        <div>
+          <strong class="${toneClass(position.performancePct)}">${formatPercent(position.performancePct)}</strong>
+          <span class="small">${formatMoney(position.performanceAbs, position.asset.currency)} · Beitrag ${formatPercent(position.contributionPct)}</span>
+        </div>
+        <div>
+          <strong>${esc(position.riskHint.label)}</strong>
+          <span class="small">${esc(position.riskHint.text)}</span>
+        </div>
+        <div>
+          <strong>${esc(eventText)}</strong>
+          <span class="small">${esc(alertText)} · ${statusLabel(position.dataStatus)}</span>
+        </div>
+        <div class="row-actions portfolio-position-actions">
+          <button class="tiny-button" type="button" data-symbol="${escAttr(position.symbol)}">Research</button>
+          <button class="tiny-button" type="button" data-compare-open="${escAttr(position.symbol)}">Compare</button>
+          <button class="tiny-button" type="button" data-alert-quick="${escAttr(position.symbol)}" data-alert-quick-type="price">Alert</button>
+        </div>
       </div>
     `;
   }
@@ -7017,24 +9360,37 @@
   }
 
   function updatePortfolioScenario(input) {
-    state.portfolioScenario[input.name] = Number(input.value || 0);
+    if (input.name === "symbol") {
+      state.portfolioScenario[input.name] = String(input.value || "").trim().toUpperCase();
+    } else {
+      state.portfolioScenario[input.name] = Number(input.value || 0);
+    }
     if (state.route === "portfolio") {
       render();
     }
   }
 
-  function renderScenarioResult(analysis) {
-    const shock = Number(state.portfolioScenario.shock || 0);
-    const contribution = Number(state.portfolioScenario.contribution || 0);
-    const shocked = analysis.totalValue * (1 + shock / 100);
-    const oneYear = shocked + contribution * 12;
+  function renderScenarioResult(analysis, scenario = portfolioScenarioAnalysis(activePortfolio(), analysis)) {
     return `
-      <div class="metric-grid">
-        ${renderMiniMetric("Nach Schock", formatMoney(shocked, "USD"))}
-        ${renderMiniMetric("12M mit Beitrag", formatMoney(oneYear, "USD"))}
-        ${renderMiniMetric("Differenz", formatMoney(oneYear - analysis.totalValue, "USD"))}
+      <div class="portfolio-scenario-result">
+        <div class="metric-grid">
+          ${renderMiniMetric("Szenario-Wert", formatMoney(scenario.projectedValue, "USD"))}
+          ${renderMiniMetric("Nach Schock", formatMoney(scenario.shockedValue, "USD"))}
+          ${renderMiniMetric("12M mit Beitrag", formatMoney(scenario.oneYearValue, "USD"))}
+          ${renderMiniMetric("Risiko-Veränderung", `${scenario.riskDelta >= 0 ? "+" : ""}${formatNumber(scenario.riskDelta)} Punkte`)}
+        </div>
+        <div class="grid two">
+          <div>
+            <span class="card-label">Szenario-Auswirkung</span>
+            <p>${esc(scenario.summary)}</p>
+          </div>
+          <div>
+            <span class="card-label">Exposure nach Änderung</span>
+            ${renderExposureBlock("Asset-Typ", scenario.assetTypeExposure)}
+          </div>
+        </div>
       </div>
-      ${renderDataMeta(makeMeta("Lokale Was-wäre-wenn Simulation", "live", Date.now()))}
+      ${renderDataMeta(makeMeta("Lokale Was-wäre-wenn Simulation", "local", Date.now(), "Szenario ist eine einfache lokale Heuristik ohne Orderlogik."))}
     `;
   }
 
@@ -7359,6 +9715,161 @@
     return "Gemischtes Setup, eher Watchlist-Kandidat als aktiver Pick.";
   }
 
+  function alertTypeOptions(selected = "price") {
+    const options = [
+      ["price", "Preis-Alert"],
+      ["earnings", "Earnings-Reminder"],
+      ["event", "Event-Hinweis"],
+      ["watchlist", "Watchlist-Alert"],
+      ["sentiment", "Research-/Sentiment-Hinweis"]
+    ];
+    return options
+      .map(([value, label]) => `<option value="${escAttr(value)}" ${selected === value ? "selected" : ""}>${esc(label)}</option>`)
+      .join("");
+  }
+
+  function alertTypeLabel(type) {
+    const labels = {
+      price: "Preis",
+      earnings: "Earnings",
+      event: "Event",
+      watchlist: "Watchlist",
+      sentiment: "Research",
+      system: "System"
+    };
+    return labels[type] || "Alert";
+  }
+
+  function alertSummary() {
+    const alerts = state.alerts.map(normalizeAlertRecord);
+    return {
+      open: alerts.filter((alert) => normalizeAlertStatus(alert) === "open" && !isAlertSnoozed(alert)).length,
+      triggered: alerts.filter((alert) => normalizeAlertStatus(alert) === "triggered").length,
+      paused: alerts.filter(isAlertSnoozed).length,
+      done: alerts.filter((alert) => normalizeAlertStatus(alert) === "done").length,
+      watchlist: alerts.filter((alert) => state.watchlist.includes(alert.symbol) || alert.type === "watchlist").length
+    };
+  }
+
+  function alertDataStatus() {
+    const liveQuotes = Object.values(state.quotes).some((quote) => quote.meta?.status === "live");
+    const liveEvents = state.events.some((eventItem) => eventItem.meta?.status === "live");
+    if (liveQuotes || liveEvents) {
+      return "hybrid";
+    }
+    return "local";
+  }
+
+  function priorityTone(priority) {
+    if (priority === "high") {
+      return "bear";
+    }
+    if (priority === "low") {
+      return "neutral";
+    }
+    return "";
+  }
+
+  function inferEventPriority(eventItem) {
+    if (isWatchlistRelevantEvent(eventItem) || matchesEventWindow(eventItem, "today")) {
+      return "high";
+    }
+    return eventRelevance(eventItem) >= 65 ? "medium" : "low";
+  }
+
+  function alertHistoryForView() {
+    return state.alerts
+      .map(normalizeAlertRecord)
+      .flatMap((alert) => (alert.history || []).map((entry) => ({
+        ...entry,
+        symbol: alert.displaySymbol || alert.symbol,
+        type: alert.type,
+        priority: alert.priority || "medium"
+      })))
+      .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+      .slice(0, 18);
+  }
+
+  function alertStatusText(status) {
+    if (status === "triggered") {
+      return "Ausgelöst";
+    }
+    if (status === "done") {
+      return "Erledigt";
+    }
+    if (status === "snoozed" || status === "paused") {
+      return "Pausiert";
+    }
+    return "Offen";
+  }
+
+  function buildAlertRecord(config) {
+    const createdAt = Date.now();
+    const priority = ["high", "medium", "low"].includes(config.priority) ? config.priority : "medium";
+    return {
+      id: `${createdAt}-${Math.random().toString(16).slice(2)}`,
+      symbol: normalizeSymbol(config.symbol),
+      displaySymbol: config.displaySymbol || normalizeSymbol(config.symbol),
+      type: config.type || "price",
+      condition: config.condition || "above",
+      target: Number.isFinite(config.target) ? config.target : null,
+      priority,
+      status: "open",
+      source: config.source || "local",
+      eventTitle: config.eventTitle || "",
+      eventDate: config.eventDate || "",
+      createdAt,
+      lastCheckedAt: null,
+      snoozedUntil: null,
+      history: [
+        {
+          status: "open",
+          message: config.note || "Alert angelegt",
+          timestamp: createdAt
+        }
+      ]
+    };
+  }
+
+  function addAlert(alert, message = "Alert gespeichert.") {
+    state.alerts = [alert, ...state.alerts].slice(0, 60);
+    saveAlerts();
+    toast(message);
+    checkAlerts(false);
+    render();
+  }
+
+  function openAlertDraft(symbol, type = "price") {
+    const normalized = normalizeSymbol(symbol);
+    state.alertDraft = {
+      symbol: assetMap.has(normalized) ? normalized : (assetMap.has(state.activeSymbol) ? state.activeSymbol : "NVDA"),
+      type: ["price", "earnings", "event", "watchlist", "sentiment"].includes(type) ? type : "price"
+    };
+    navigate("alerts");
+  }
+
+  function createEventAlertFromDataset(dataset) {
+    const rawSymbol = dataset.alertEventSymbol || "";
+    const normalized = normalizeSymbol(rawSymbol);
+    const type = eventAlertType(dataset.alertEventType);
+    const symbol = assetMap.has(normalized) ? normalized : "SPY";
+    const alert = buildAlertRecord({
+      symbol,
+      displaySymbol: assetMap.has(normalized) ? normalized : (rawSymbol || "Markt"),
+      type,
+      priority: dataset.alertEventPriority || "medium",
+      source: "event-hub",
+      eventTitle: dataset.alertEventTitle || "Event-Termin",
+      eventDate: dataset.alertEventDate || "",
+      note: `${type === "earnings" ? "Earnings" : "Event"}-Alert aus dem Event-Hub angelegt`
+    });
+    addAlert(alert, "Event-Alert gespeichert.");
+  }
+
+  function eventAlertType(type) {
+    return String(type || "").toLowerCase().includes("earnings") ? "earnings" : "event";
+  }
+
   function createAlertFromForm(form) {
     const formData = new FormData(form);
     const symbol = normalizeSymbol(formData.get("symbol"));
@@ -7367,7 +9878,6 @@
     const rawTarget = String(formData.get("target") ?? "").trim();
     const target = rawTarget === "" ? NaN : Number(rawTarget);
     const priority = String(formData.get("priority") || "medium");
-    const createdAt = Date.now();
 
     if (!assetMap.has(symbol)) {
       toast("Alert konnte nicht gespeichert werden: Asset fehlt.");
@@ -7382,31 +9892,18 @@
       return;
     }
 
-    const alert = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    const alert = buildAlertRecord({
       symbol,
       type,
       condition,
       target: Number.isFinite(target) ? target : null,
-      priority: ["high", "medium", "low"].includes(priority) ? priority : "medium",
-      status: "open",
-      createdAt,
-      lastCheckedAt: null,
-      snoozedUntil: null,
-      history: [
-        {
-          status: "open",
-          message: "Alert angelegt",
-          timestamp: createdAt
-        }
-      ]
-    };
-    state.alerts = [alert, ...state.alerts].slice(0, 40);
-    saveAlerts();
-    toast("Alert gespeichert.");
+      priority,
+      source: "manual",
+      note: `${alertTypeLabel(type)} für ${symbol} angelegt`
+    });
+    state.alertDraft = { symbol: "", type: "price" };
     form.reset();
-    checkAlerts(false);
-    render();
+    addAlert(alert, "Alert gespeichert.");
   }
 
   function deleteAlertById(id) {
@@ -7473,9 +9970,17 @@
 
   function evaluateAlert(alert, quote) {
     if (alert.type === "earnings") {
+      if (alert.eventDate) {
+        const eventDate = new Date(alert.eventDate);
+        return eventDate >= startOfToday() && eventDate <= daysFromNow(14);
+      }
       return eventsForSymbol(alert.symbol).some((eventItem) => eventItem.type === "Earnings" && eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(14));
     }
     if (alert.type === "event") {
+      if (alert.eventDate) {
+        const eventDate = new Date(alert.eventDate);
+        return eventDate >= startOfToday() && eventDate <= daysFromNow(14);
+      }
       return eventsForSymbol(alert.symbol).some((eventItem) => eventItem.date >= startOfToday() && eventItem.date <= daysFromNow(14));
     }
     if (alert.type === "watchlist") {
@@ -7501,10 +10006,10 @@
       return "News-/Sentiment-Hinweis vorbereitet";
     }
     if (alert.type === "earnings") {
-      return "Earnings-/Event-Reminder in den nächsten 14 Tagen";
+      return alert.eventTitle ? `${alert.eventTitle}${alert.eventDate ? ` am ${formatEventDate(alert.eventDate)}` : ""}` : "Earnings-/Event-Reminder in den nächsten 14 Tagen";
     }
     if (alert.type === "event") {
-      return "Event-Hinweis in den nächsten 14 Tagen";
+      return alert.eventTitle ? `${alert.eventTitle}${alert.eventDate ? ` am ${formatEventDate(alert.eventDate)}` : ""}` : "Event-Hinweis in den nächsten 14 Tagen";
     }
     if (alert.condition === "below") {
       return `Preis unter ${formatMoney(alert.target, getAsset(alert.symbol).currency)}`;
@@ -7518,7 +10023,7 @@
   function alertsForView() {
     return state.alerts
       .map(normalizeAlertRecord)
-      .filter((alert) => alertMatchesFilter(alert, state.alertFilter))
+      .filter(alertMatchesFilters)
       .sort((a, b) => alertSortRank(a) - alertSortRank(b));
   }
 
@@ -7575,27 +10080,44 @@
     return labels[priority] || "mittel";
   }
 
-  function alertMatchesFilter(alert, filter) {
-    if (!filter || filter === "all") {
-      return true;
+  function alertMatchesFilters(alert) {
+    const filters = state.alertFilters || {};
+    const status = normalizeAlertStatus(alert);
+    const isPaused = isAlertSnoozed(alert);
+    if (filters.status && filters.status !== "all") {
+      if (filters.status === "paused" && !isPaused) {
+        return false;
+      }
+      if (filters.status !== "paused" && status !== filters.status) {
+        return false;
+      }
     }
-    if (filter === "price") {
-      return alert.type === "price";
+    if (filters.priority && filters.priority !== "all" && (alert.priority || "medium") !== filters.priority) {
+      return false;
     }
-    if (filter === "earnings") {
-      return alert.type === "earnings";
+    if (filters.type && filters.type !== "all" && alert.type !== filters.type) {
+      return false;
     }
-    if (filter === "event") {
-      return alert.type === "event" || alert.type === "sentiment";
+    if (filters.scope === "watchlist" && !state.watchlist.includes(alert.symbol) && alert.type !== "watchlist") {
+      return false;
     }
-    if (filter === "watchlist") {
-      return alert.type === "watchlist";
+    const search = String(filters.search || "").trim().toLowerCase();
+    if (search) {
+      const haystack = [
+        alert.symbol,
+        alert.displaySymbol,
+        alert.eventTitle,
+        alertTypeLabel(alert.type),
+        alertLabel(alert),
+        alert.source
+      ].join(" ").toLowerCase();
+      return haystack.includes(search);
     }
     return true;
   }
 
   function alertSortRank(alert) {
-    const statusRank = { triggered: 0, open: 1, done: 3 };
+    const statusRank = { triggered: 0, open: isAlertSnoozed(alert) ? 2 : 1, done: 3 };
     const priorityRank = { high: 0, medium: 1, low: 2 };
     return (statusRank[normalizeAlertStatus(alert)] ?? 2) * 10 + (priorityRank[alert.priority || "medium"] ?? 1);
   }
@@ -7642,9 +10164,28 @@
     }
   }
 
-  function snoozeAlert(id) {
+  function snoozeUntilFor(duration) {
+    const hours = {
+      later: 6,
+      tomorrow: 24,
+      week: 24 * 7
+    };
+    return Date.now() + (hours[duration] || hours.tomorrow) * 60 * 60 * 1000;
+  }
+
+  function snoozeLabel(duration) {
+    const labels = {
+      later: "später heute",
+      tomorrow: "morgen",
+      week: "in einer Woche"
+    };
+    return labels[duration] || labels.tomorrow;
+  }
+
+  function snoozeAlert(id, duration = "tomorrow") {
     let changed = false;
-    const until = Date.now() + 24 * 60 * 60 * 1000;
+    const until = snoozeUntilFor(duration);
+    const label = snoozeLabel(duration);
     state.alerts = state.alerts.map((alert) => {
       if (alert.id !== id) {
         return alert;
@@ -7655,7 +10196,7 @@
         status: "open",
         snoozedUntil: until,
         history: [
-          { status: "open", message: "Für 24 Stunden pausiert", timestamp: Date.now() },
+          { status: "snoozed", message: `Pausiert bis ${label}`, timestamp: Date.now() },
           ...(alert.history || [])
         ].slice(0, 8)
       };
@@ -7676,7 +10217,7 @@
         ...state.alertInbox
       ].slice(0, 30);
       storageSet(STORAGE_KEYS.alertInbox, state.alertInbox);
-      toast("Alert für 24 Stunden pausiert.");
+      toast(`Alert bis ${label} pausiert.`);
       render();
     }
   }
@@ -7872,53 +10413,8 @@
     }
   }
 
-  function saveApiKeys() {
-    const next = collectApiKeysFromInputs();
-    state.apiKeys = next;
-    storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
-    storageSet(STORAGE_KEYS.cache, {});
-    state.lastHomeRefresh = 0;
-    state.lastScreenerRefresh = 0;
-    state.lastEventsRefresh = 0;
-    state.assetLoadedAt = {};
-    toast("API Keys gespeichert. Cache geleert, Live-Daten werden erneut versucht.");
-    render();
-  }
-
-  function collectApiKeysFromInputs() {
-    const next = { ...state.apiKeys };
-    document.querySelectorAll("[data-api-key]").forEach((input) => {
-      next[input.dataset.apiKey] = input.value.trim();
-    });
-    return next;
-  }
-
-  function deleteProviderKeyById(providerId) {
-    const provider = providerById(providerId);
-    if (!provider) {
-      return;
-    }
-    state.apiKeys = { ...state.apiKeys, [providerId]: "" };
-    state.providerTests = {
-      ...state.providerTests,
-      [providerId]: {
-        status: "warn",
-        timestamp: Date.now(),
-        message: "Key gelöscht. Provider nutzt Fallback oder ist nur vorbereitet."
-      }
-    };
-    storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
-    storageSet(STORAGE_KEYS.providerTests, state.providerTests);
-    storageSet(STORAGE_KEYS.cache, {});
-    recordProviderHealth(providerId, "missing", "Key gelöscht. Provider nutzt Fallback oder bleibt vorbereitet.");
-    toast(`${provider.name} Key gelöscht.`);
-    render();
-  }
-
-  function buildFredMinimalTestRequest(key) {
-    const url = new URL("https://api.stlouisfed.org/fred/series/updates");
-    url.searchParams.set("api_key", key);
-    url.searchParams.set("file_type", "json");
+  function buildFredProxyTestRequest() {
+    const url = fredProxyUrl({ action: "test" });
     return {
       url: url.toString(),
       responseType: "json",
@@ -7927,78 +10423,80 @@
     };
   }
 
-  function fredRequestDiagnostics(rawInput, savedKey, storageKey, request, responseInfo = {}) {
-    const url = new URL(request.url);
-    const sentKey = url.searchParams.get("api_key") || "";
-    const fileType = url.searchParams.get("file_type") || "";
+  function buildFinnhubProxyTestRequest() {
     return {
-      codePath: "testProviderById > runFredMinimalProviderTest > buildFredMinimalTestRequest > fetchProviderTestPayload",
-      method: request.method || "GET",
-      endpoint: maskFredEndpoint(request.url, sentKey),
-      path: url.pathname,
+      url: finnhubProxyUrl({ endpoint: "quote", symbol: "AAPL" }),
+      responseType: "json",
+      providerId: "finnhub",
+      method: "GET"
+    };
+  }
+
+  function buildAlphaProxyTestRequest() {
+    return {
+      url: alphaProxyUrl({ endpoint: "quote", symbol: "AAPL" }),
+      responseType: "json",
+      providerId: "alphaVantage",
+      method: "GET"
+    };
+  }
+
+  function fredProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/fred", params);
+  }
+
+  function finnhubProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/finnhub", params);
+  }
+
+  function alphaProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/alphavantage", params);
+  }
+
+  function eiaProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/eia", params);
+  }
+
+  function fxProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/fx", params);
+  }
+
+  function coingeckoProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/coingecko", params);
+  }
+
+  function openDataProxyUrl(params = {}) {
+    return serverFunctionUrl("/api/opendata", params);
+  }
+
+  function serverFunctionUrl(path, params = {}) {
+    const base = serverApiAvailable() ? window.location.origin : "http://localhost";
+    const url = new URL(path, base);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, value);
+      }
+    });
+    return serverApiAvailable() ? url.toString() : `${url.pathname}${url.search}`;
+  }
+
+  function serverApiAvailable() {
+    return window.location.protocol === "https:" || window.location.protocol === "http:";
+  }
+
+  function fredProxyDiagnostics(request, responseInfo = {}) {
+    return {
+      kind: "fred-vercel-function",
+      codePath: "testProviderById > runFredVercelProviderTest > /api/fred > FRED API",
+      frontendEndpoint: request.url,
       pageOrigin: window.location.origin || "file://",
-      browserOnline: navigator.onLine ? "ja" : "nein",
-      apiKeyParamPresent: Boolean(sentKey),
-      fileType,
-      fileTypeJson: fileType === "json",
-      inputKey: describeKeyShape(rawInput),
-      savedKey: describeKeyShape(savedKey),
-      storageKey: describeKeyShape(storageKey),
-      sentKey: describeKeyShape(sentKey),
-      savedEqualsSent: cleanKey(savedKey) === sentKey,
-      storageEqualsSaved: storageKey === savedKey,
+      frontendKeyExposure: "nein, der Browser sendet keinen FRED-Key",
+      contentType: "unbekannt",
+      functionError: "",
+      fredError: "",
+      note: "",
       ...responseInfo
     };
-  }
-
-  function describeKeyShape(value) {
-    const raw = String(value ?? "");
-    const trimmed = raw.trim();
-    return {
-      rawLength: raw.length,
-      trimmedLength: trimmed.length,
-      trimChanged: raw !== trimmed,
-      mask: maskSecret(trimmed),
-      lowercaseAlnum32: /^[a-z0-9]{32}$/.test(trimmed),
-      hasWhitespace: /\s/.test(raw)
-    };
-  }
-
-  function maskSecret(value) {
-    const text = String(value || "");
-    if (!text) {
-      return "leer";
-    }
-    if (text.length <= 6) {
-      return `${text.slice(0, 1)}…${text.slice(-1)} (${text.length} Zeichen)`;
-    }
-    return `${text.slice(0, 3)}…${text.slice(-3)} (${text.length} Zeichen)`;
-  }
-
-  function maskFredEndpoint(url, key) {
-    const displayUrl = new URL(url);
-    if (!key) {
-      displayUrl.searchParams.set("api_key", "leer");
-      return displayUrl.toString();
-    }
-    displayUrl.searchParams.set("api_key", maskSecretShort(key));
-    return displayUrl.toString().replace(/%E2%80%A6/g, "…");
-  }
-
-  function maskSecretShort(value) {
-    const text = String(value || "");
-    if (!text) {
-      return "leer";
-    }
-    if (text.length <= 6) {
-      return `${text.slice(0, 1)}…${text.slice(-1)}`;
-    }
-    return `${text.slice(0, 3)}…${text.slice(-3)}`;
-  }
-
-  function providerInputValue(providerId) {
-    const input = Array.from(document.querySelectorAll("[data-api-key]")).find((item) => item.dataset.apiKey === providerId);
-    return input ? input.value : "";
   }
 
   function parsedProviderBody(text) {
@@ -8168,14 +10666,21 @@
   }
 
   function validateFredSeriesUpdates(data) {
+    if (data && data.ok === false) {
+      throw new Error(`FRED Function-Fehler: ${data.message || data.error || "unbekannter Fehler"}`);
+    }
+    const payload = data && data.data ? data.data : data;
     if (data && data.error_code) {
       throw new Error(`FRED API-Fehler ${data.error_code}: ${data.error_message || "Antwort ungültig."}`);
     }
-    const series = data && Array.isArray(data.seriess) ? data.seriess : [];
+    if (payload && payload.error_code) {
+      throw new Error(`FRED API-Fehler ${payload.error_code}: ${payload.error_message || "Antwort ungültig."}`);
+    }
+    const series = payload && Array.isArray(payload.seriess) ? payload.seriess : [];
     if (!series.length) {
       throw new Error("FRED-Antwort ungültig: JSON ist erreichbar, aber `seriess` fehlt oder ist leer.");
     }
-    return "Test erfolgreich: FRED Minimaltest `/fred/series/updates?api_key=…&file_type=json` liefert JSON.";
+    return "Test erfolgreich: /api/fred erreicht FRED serverseitig und liefert JSON.";
   }
 
   function validateBlsSeries(data) {
@@ -8236,29 +10741,26 @@
     }
 
     if (providerId === "fred") {
-      await runFredMinimalProviderTest(provider);
+      await runFredVercelProviderTest(provider);
       return;
     }
 
-    state.apiKeys = collectApiKeysFromInputs();
-    storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
     setProviderTest(providerId, "warn", "Test läuft lokal im Browser...");
     render();
 
-    const key = cleanKey(providerKeyValue(providerId));
-    if (provider.security === "backend-only" || (provider.security === "browser-critical" && !provider.testRequest && !provider.testUrl)) {
+    if (provider.security === "backend-only" && provider.keyMode !== "serverEnv") {
+      setProviderTest(providerId, "warn", "Backend-only: Test im öffentlichen Browser bewusst nicht ausgeführt.");
+      toast(`${provider.name}: Browser-Test hier nicht sinnvoll.`);
+      render();
+      return;
+    }
+    if (provider.security === "browser-critical" && !provider.testRequest && !provider.testUrl) {
       setProviderTest(providerId, "warn", provider.security === "browser-critical" ? "Browser-Test bewusst nicht implementiert: Quelle ist browserkritisch." : "Backend-only: Test im Browser bewusst nicht ausgeführt.");
       toast(`${provider.name}: Browser-Test hier nicht sinnvoll.`);
       render();
       return;
     }
-    if (["required", "oauth", "anon"].includes(provider.keyMode) && !key) {
-      setProviderTest(providerId, "warn", "Kein Key hinterlegt. Slot bleibt vorbereitet oder nutzt Fallbacks.");
-      toast(`${provider.name}: kein Key gespeichert.`);
-      render();
-      return;
-    }
-    const requestFactory = provider.testRequest || (provider.testUrl ? ((savedKey) => ({ url: provider.testUrl(savedKey), responseType: "json" })) : null);
+    const requestFactory = provider.testRequest || (provider.testUrl ? (() => ({ url: provider.testUrl(), responseType: "json" })) : null);
     if (!requestFactory) {
       setProviderTest(providerId, "warn", "Kein Browser-Test implementiert. Quelle ist nur zugeordnet, nicht als Browser-Livetest versprochen.");
       toast(`${provider.name}: kein Browser-Test implementiert.`);
@@ -8267,7 +10769,7 @@
     }
 
     try {
-      const request = requestFactory(key);
+      const request = requestFactory();
       const testResult = await fetchProviderTestPayload(request);
       const message = provider.validateTest ? provider.validateTest(testResult.data, testResult.response) : "Provider hat im Browser-Test geantwortet.";
       setProviderTest(providerId, "ok", message || "Provider hat im Browser-Test geantwortet.");
@@ -8280,39 +10782,35 @@
     render();
   }
 
-  async function runFredMinimalProviderTest(provider) {
-    const rawInput = providerInputValue("fred");
-    state.apiKeys = collectApiKeysFromInputs();
-    storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
-    const savedKey = providerKeyValue("fred");
-    const storedKey = providerKeyValue("fred", storageGet(STORAGE_KEYS.apiKeys, {}));
-    const key = cleanKey(savedKey);
+  async function runFredVercelProviderTest(provider) {
+    const request = buildFredProxyTestRequest();
 
-    if (!key) {
-      const emptyRequest = buildFredMinimalTestRequest("");
-      setProviderTest("fred", "warn", "Kein FRED-Key gespeichert. Test wurde nicht gesendet.", fredRequestDiagnostics(rawInput, savedKey, storedKey, emptyRequest, {
+    if (!serverApiAvailable()) {
+      setProviderTest("fred", "warn", "FRED läuft jetzt serverseitig über /api/fred. Im lokalen Datei-Modus ist diese Vercel Function nicht verfügbar.", fredProxyDiagnostics(request, {
         stage: "nicht gesendet",
         httpStatus: "kein Request",
         responseFormat: "keine Antwort",
-        parseStatus: "nicht ausgeführt"
+        parseStatus: "nicht ausgeführt",
+        note: "Öffne die Vercel-Deployment-URL oder nutze Vercel lokal, damit /api/fred existiert."
       }));
-      toast("FRED: kein Key gespeichert.");
+      recordProviderHealth("fred", "fallback", "FRED Vercel Function im lokalen Datei-Modus nicht verfügbar.");
+      toast("FRED: Vercel Function lokal nicht verfügbar.");
       render();
       return;
     }
 
-    const request = buildFredMinimalTestRequest(key);
-    setProviderTest("fred", "warn", "FRED Minimaltest läuft: Request gebaut, file_type=json gesetzt.", fredRequestDiagnostics(rawInput, savedKey, storedKey, request, {
+    setProviderTest("fred", "warn", "FRED Vercel-Function-Test läuft. Der API-Key bleibt serverseitig in FRED_API_KEY.", fredProxyDiagnostics(request, {
       stage: "Request gebaut",
       httpStatus: "wartet",
       responseFormat: "wartet",
-      parseStatus: "wartet"
+      parseStatus: "wartet",
+      note: "Frontend ruft nur /api/fred auf; der FRED-Key wird nicht im Browser gesendet."
     }));
     render();
 
     try {
       const testResult = await fetchProviderTestPayload(request);
-      let message = "FRED hat im Browser-Test geantwortet.";
+      let message = "FRED Vercel Function hat geantwortet.";
       try {
         message = provider.validateTest ? provider.validateTest(testResult.data, testResult.response) : message;
       } catch (validationError) {
@@ -8324,52 +10822,51 @@
         validationError.apiMessage = extractProviderErrorMessage(testResult.data, testResult.text);
         throw validationError;
       }
-      const details = fredRequestDiagnostics(rawInput, savedKey, storedKey, request, {
+      const details = fredProxyDiagnostics(request, {
         stage: "Response erhalten",
         httpStatus: testResult.response.status,
         contentType: testResult.contentType || "unbekannt",
         responseFormat: "JSON",
         parseStatus: testResult.parseOk ? "Parsing erfolgreich" : "Parsing fehlgeschlagen",
-        fredError: ""
+        fredError: "",
+        note: "Vercel Function konnte FRED serverseitig erreichen."
       });
       setProviderTest("fred", "ok", message, details);
-      toast("FRED: Minimaltest erfolgreich.");
+      toast("FRED: Vercel Function erfolgreich.");
     } catch (error) {
-      const details = fredRequestDiagnostics(rawInput, savedKey, storedKey, request, {
+      const details = fredProxyDiagnostics(request, {
         stage: error.httpStatus ? "Response erhalten" : "Fetch fehlgeschlagen",
         httpStatus: error.httpStatus || "keine HTTP-Antwort",
         contentType: error.contentType || "unbekannt",
-      responseFormat: error.parseOk === false ? "nicht JSON" : error.responseData ? "JSON" : "unbekannt",
-      parseStatus: error.parseOk === false ? "Parsing fehlgeschlagen" : error.responseData ? "Parsing erfolgreich" : "nicht ausgeführt",
-      fredError: error.apiMessage || "",
+        responseFormat: error.parseOk === false ? "nicht JSON" : error.responseData ? "JSON" : "unbekannt",
+        parseStatus: error.parseOk === false ? "Parsing fehlgeschlagen" : error.responseData ? "Parsing erfolgreich" : "nicht ausgeführt",
+        functionError: error.responseData?.message || "",
+        fredError: error.responseData?.fredError || error.apiMessage || "",
         browserFetchError: error.browserMessage || error.message || "",
-        responseBody: error.responseText ? String(error.responseText).slice(0, 420) : ""
+        responseBody: error.responseText ? String(error.responseText).slice(0, 420) : "",
+        note: "Wenn HTTP 500 mit missing_env erscheint, fehlt FRED_API_KEY in Vercel Environment Variables."
       });
-      const message = error.kind === "browser"
-        ? "FRED Browser-Test: keine lesbare HTTP-Antwort erhalten. Keypfad OK; der Browser hat den Fetch vor dem Response blockiert oder der Netzwerkzugriff wurde lokal verhindert."
-        : describeProviderTestError(error);
+      const message = describeProviderTestError(error);
       setProviderTest("fred", "error", message, details);
-      toast("FRED: Minimaltest fehlgeschlagen.");
+      toast("FRED: Vercel Function fehlgeschlagen.");
       logError(error);
     }
     render();
   }
 
   async function testConfiguredProviders() {
-    state.apiKeys = collectApiKeysFromInputs();
-    storageSet(STORAGE_KEYS.apiKeys, state.apiKeys);
     const testable = visibleProviders().filter((provider) => {
       const hasTest = Boolean(provider.testRequest || provider.testUrl);
-      if (!hasTest || provider.security === "backend-only" || provider.security === "browser-critical") {
+      if (!hasTest) {
         return false;
       }
-      if (["none", "optional"].includes(provider.keyMode)) {
-        return true;
+      if (provider.security === "browser-critical") {
+        return false;
       }
-      return Boolean(cleanKey(providerKeyValue(provider.id)));
+      return true;
     });
     if (!testable.length) {
-      toast("Keine testbaren Provider konfiguriert. Public/Demo Slots oder Keys eintragen.");
+      toast("Keine testbaren öffentlichen Quellen vorhanden.");
       return;
     }
     for (const provider of testable) {
@@ -8488,7 +10985,7 @@
     if (status === "stale") {
       return "Veraltete Cache-Daten aktiv, API wird später erneut versucht.";
     }
-    return "Fallback-Daten aktiv. Trage API Keys ein für Live-Daten.";
+    return "Fallback-Daten aktiv. Live-Daten laufen über serverseitige Quellen, sobald das Deployment korrekt konfiguriert ist.";
   }
 
   function countLiveQuotes() {
@@ -8507,6 +11004,18 @@
     }
     if (status === "prepared") {
       return "Zugeordnet";
+    }
+    if (status === "hybrid") {
+      return "Hybrid";
+    }
+    if (status === "local") {
+      return "Lokal";
+    }
+    if (status === "offline") {
+      return "Offline";
+    }
+    if (status === "unknown") {
+      return "Unbekannt";
     }
     if (status === "mapped" || status === "notUsed") {
       return "Aktuell nicht genutzt";
@@ -8573,6 +11082,14 @@
   function storageSet(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      logError(error);
+    }
+  }
+
+  function removeLegacyBrowserApiKeys() {
+    try {
+      localStorage.removeItem("mh.apiKeys.v2");
     } catch (error) {
       logError(error);
     }

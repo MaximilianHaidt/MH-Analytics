@@ -1,6 +1,8 @@
 # MH Analytics online stellen
 
-Diese Anleitung ist für Anfänger gedacht. MH Analytics bleibt eine statische Website: kein Node.js, kein npm, kein Build-Prozess und kein eigener Server.
+Diese Anleitung ist für Anfänger gedacht. MH Analytics bleibt im Frontend statisch: kein Build-Prozess, kein npm und kein eigener dauerlaufender Server.
+
+Die Online-Version nutzt Vercel Functions im Ordner `api`, damit geheime API-Keys nicht im Browser liegen.
 
 ## Lokal öffnen
 
@@ -8,7 +10,7 @@ Diese Anleitung ist für Anfänger gedacht. MH Analytics bleibt eine statische W
 2. `index.html` doppelklicken.
 3. Die Website startet im Browser.
 
-Wenn Live-Daten nicht laden, ist das normal, solange keine API Keys eingetragen sind. Die App nutzt dann Fallback-Daten.
+Lokal per Doppelklick laufen die Vercel Functions nicht. Deshalb nutzt die Website dort für serverseitige Quellen automatisch Fallback-Daten.
 
 ## Auf GitHub hochladen
 
@@ -21,6 +23,7 @@ Wenn Live-Daten nicht laden, ist das normal, solange keine API Keys eingetragen 
    - `README.md`
    - `DEPLOYMENT.md`
    - `vercel.json`
+   - Ordner `api`
 4. Achte darauf, dass die Dateinamen exakt gleich bleiben.
 
 ## Mit Vercel deployen
@@ -34,34 +37,65 @@ Wenn Live-Daten nicht laden, ist das normal, solange keine API Keys eingetragen 
    - Output Directory: leer lassen
 5. `Deploy` klicken.
 
-Vercel erkennt `index.html` als statische Startdatei.
+Vercel erkennt `index.html` als statische Startdatei und den Ordner `api` als serverseitige Functions.
 
-## API Keys nach dem Deployment
+## Environment Variables in Vercel eintragen
 
-API Keys werden aktuell lokal im Browser gespeichert.
+In Vercel:
 
-Das bedeutet:
+1. Projekt öffnen.
+2. `Settings` öffnen.
+3. `Environment Variables` öffnen.
+4. Diese Variablen exakt anlegen:
 
-- Jeder Browser hat seine eigenen Keys.
-- Keys werden nicht automatisch auf andere Geräte übertragen.
-- Für private Nutzung ist das okay.
-- Für eine öffentliche Plattform sollten sensible Keys später nicht im Browser liegen.
+```text
+FRED_API_KEY
+FINNHUB_API_KEY
+ALPHA_VANTAGE_API_KEY
+EIA_API_KEY
+```
 
-Später sinnvoll:
+Optional:
 
-- Backend-Proxy
-- Edge Functions
-- Supabase für User-Daten
-- getrennte Public-/Private-Key-Strategie
+```text
+COINGECKO_API_KEY
+```
 
-## Wenn etwas nicht lädt
+Für Frankfurter FX wird aktuell kein `FX_API_KEY` benötigt.
+
+5. Als Wert jeweils deinen API-Key eintragen.
+6. Speichern.
+7. Danach neu deployen.
+
+Wichtig: Die Keys werden nicht in der Website-Oberfläche eingegeben. Normale Nutzer sehen nur den Reiter `Datenquellen` mit Statusinformationen.
+
+## Serverseitige Routen testen
+
+Nach dem Deployment kannst du diese Routen direkt im Browser öffnen:
+
+```text
+/api/fred?action=test
+/api/finnhub?endpoint=quote&symbol=AAPL
+/api/alphavantage?endpoint=quote&symbol=AAPL
+/api/eia?dataset=oil
+/api/fx?base=USD&quotes=EUR,JPY,GBP
+/api/coingecko?ids=bitcoin,ethereum&vs_currencies=usd
+/api/opendata?source=bls-cpi
+/api/opendata?source=treasury-rates
+/api/opendata?source=worldbank-growth
+/api/opendata?source=imf-growth
+```
+
+Wenn eine Environment Variable fehlt, antwortet die jeweilige Function mit einem strukturierten Fehler wie `missing_env`.
+
+## Wenn Live-Daten nicht laden
 
 Prüfe zuerst:
 
-1. Sind `index.html`, `styles.css` und `app.js` im selben Ordner?
-2. Wurde `app.js` wirklich hochgeladen?
-3. Blockiert ein Browser-Plugin externe Widgets wie TradingView?
-4. Sind API Keys korrekt eingetragen?
+1. Wurde der Ordner `api` hochgeladen?
+2. Sind die Environment Variables exakt so benannt?
+3. Wurde nach dem Speichern der Variablen neu deployed?
+4. Öffnest du die Vercel-URL und nicht nur die lokale `index.html`?
 5. Zeigt die App einen Fallback-Status an?
 
-Fallback-Daten sind kein Fehler. Sie sind eingebaut, damit MH Analytics stabil bleibt, auch wenn ein Anbieter gerade nicht erreichbar ist.
+Fallback-Daten sind kein Fehler. Sie sind eingebaut, damit MH Analytics stabil bleibt, auch wenn ein Anbieter gerade nicht erreichbar ist oder eine Environment Variable fehlt.
