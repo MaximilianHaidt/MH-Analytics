@@ -1972,6 +1972,7 @@
 
   const HOME_MODULE_CATALOG = [
     { id: "dailyRecap", label: "Tages-Recap", description: "Was habe ich heute verpasst?", route: "home" },
+    { id: "news", label: "News / Sentiment", description: "Marktnews, Watchlist-Treiber und regelbasierte Einordnung", route: "research" },
     { id: "dailyBriefing", label: "Tagesüberblick", description: "Marktphase, Bewegungen und Termine", route: "home" },
     { id: "portfolio", label: "Portfolio", description: "Wert, Risiko, Exposure und Rebalancing", route: "portfolio" },
     { id: "watchlist", label: "Watchlist", description: "Beobachtete und favorisierte Assets", route: "portfolio" },
@@ -2793,6 +2794,18 @@
       keywords: ["rheinmetall", "rhm", "deutsche aktien", "europa", "sap", "siemens", "asml", "lvmh", "adidas"]
     },
     {
+      id: "news-sentiment",
+      category: "stocks",
+      question: "Wie funktioniert News / Sentiment?",
+      answer: "News/Sentiment V1 sammelt Marktnews, Company News, Watchlist-Hinweise und Event-Bezug aus vorhandenen serverseitigen Routen und lokalen Strukturdaten.",
+      where: "Im Research-Bereich, auf Asset-Seiten, im Tages-Recap, Screener und in Reports.",
+      canDo: "Du siehst Quelle, Datum, Asset-Bezug, Relevanzgrund, Datenstatus und eine einfache regelbasierte Einordnung als positiv, neutral, negativ, gemischt oder unbekannt.",
+      route: "research",
+      actionLabel: "News oeffnen",
+      related: ["data-hybrid", "asset-search", "reports-create"],
+      keywords: ["news", "nachrichten", "sentiment", "treiber", "company news", "marktnews", "ki"]
+    },
+    {
       id: "compare-stocks",
       category: "stocks",
       question: "Wie vergleiche ich zwei Aktien?",
@@ -3494,6 +3507,7 @@
       source: "local",
       lastQuery: ""
     },
+    newsFilter: "all",
     commandQuery: "",
     helpOpen: false,
     helpQuery: "",
@@ -3504,6 +3518,7 @@
     profiles: {},
     fundamentals: {},
     news: {},
+    marketNews: null,
     macro: [],
     globalMacro: [],
     cftcCot: null,
@@ -3514,10 +3529,12 @@
     lastScreenerRefresh: 0,
     lastEventsRefresh: 0,
     lastCftcRefresh: 0,
+    lastNewsRefresh: 0,
     loadingHome: false,
     loadingScreener: false,
     loadingEvents: false,
     loadingCftc: false,
+    loadingNews: false,
     loadingAssets: {}
   };
 
@@ -3587,6 +3604,27 @@
     if (cftcRefresh) {
       ensureCftcData(true);
       toast("CFTC-COT-Positionierung wird serverseitig erneut geprueft.");
+      return;
+    }
+
+    const newsFilter = event.target.closest("[data-news-filter]");
+    if (newsFilter) {
+      state.newsFilter = newsFilter.dataset.newsFilter || "all";
+      ensureNewsData(false);
+      render();
+      return;
+    }
+
+    const newsRefresh = event.target.closest("[data-news-refresh]");
+    if (newsRefresh) {
+      ensureNewsData(true);
+      toast("News/Treiber werden ueber vorhandene serverseitige Routen erneut geprueft.");
+      return;
+    }
+
+    const newsUrl = event.target.closest("[data-news-url]");
+    if (newsUrl) {
+      window.open(newsUrl.dataset.newsUrl, "_blank", "noopener,noreferrer");
       return;
     }
 
@@ -5717,7 +5755,7 @@
         <span class="score-pill ${recapScoreTone(item.score)}">${Math.round(item.score)}</span>
         <span>
           <strong>${esc(item.headline)}</strong>
-          <small>${esc(item.symbol)} · ${esc(item.source)} · ${esc(item.sentiment || "Neutral")}</small>
+          <small>${esc(item.symbol)} · ${esc(item.source)} · ${esc(newsSentimentLabel(item.sentiment))}</small>
         </span>
         ${renderStatusBadge(item.status)}
       </button>
@@ -5882,6 +5920,7 @@
       alerts: renderHomeAlertsModule,
       etf: renderHomeEtfModule,
       screener: renderHomeScreenerModule,
+      news: () => renderNewsSentimentCenter("home"),
       reports: () => renderReportCenterCard(),
       assetResearch: renderHomeAssetResearchModule,
       liquidity: () => renderLiquidityImpactCard(),
@@ -6776,8 +6815,8 @@
       <article class="card">
         <div class="card-topline">
           <div>
-            <span class="card-label">Reddit / Sentiment</span>
-            <h3>Social Radar</h3>
+            <span class="card-label">Lokales Sentiment-Modell</span>
+            <h3>Kontext-Radar</h3>
           </div>
           ${renderTinyStatus("modelled")}
         </div>
@@ -6852,6 +6891,9 @@
       </section>
       ${renderModuleActionBar("screener")}
       ${renderNextSteps("screener")}
+      <section class="section">
+        ${renderScreenerNewsDriversCard(rows)}
+      </section>
       ${renderTopPicksV2Section(rows)}
       <section class="section">
         <article class="card">
@@ -6895,6 +6937,30 @@
         <div class="insight-row">
           <span class="pill">Keine Blackbox</span>
           <p>Der Gesamtscore zeigt die gewichtete Mischung aus Momentum, Value, Growth, Quality, Risiko-Schutz, Event, Makro und Datenqualitaet. Der Dashboard-Modus passt die Gewichte leicht an.</p>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderScreenerNewsDriversCard(rows) {
+    ensureNewsData();
+    const symbols = rows.slice(0, 16).map((row) => row.symbol);
+    const news = newsRowsForView("screener", state.activeSymbol)
+      .filter((item) => symbols.includes(item.symbol) || item.category === "macro")
+      .slice(0, 5);
+    const status = combinedDataStatus(news.map((item) => item.meta?.status));
+    return `
+      <article class="card news-center-card screener-news-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">News-/Event-Treiber im Screener</span>
+            <h3>Warum Werte auffallen koennen</h3>
+            <p>Kurzer Kontext aus Company News, Watchlist-Treibern, Events und Makro. Sentiment bleibt regelbasiert/modelled und fliesst nicht als geheime Blackbox ein.</p>
+          </div>
+          ${renderStatusBadge(status)}
+        </div>
+        <div class="news-card-grid compact-news-grid">
+          ${news.map(renderNewsV1Card).join("") || renderEmptyState("Keine passenden News-Treiber fuer die aktuelle Screener-Auswahl.")}
         </div>
       </article>
     `;
@@ -9301,7 +9367,7 @@
     if (nextEvent && eventRelevance(nextEvent) >= 60) {
       items.push({ label: "Trigger", text: `${nextEvent.title} (${eventTimingLabel(nextEvent)}) kann die nächste Neueinschätzung auslösen.`, tone: "neutral" });
     }
-    if (news.items[0] && String(news.items[0].sentiment || "").toLowerCase() === "bullish") {
+    if (news.items[0] && normalizeNewsSentiment(news.items[0].sentiment) === "positive") {
       items.push({ label: "News", text: news.items[0].headline, tone: "bull" });
     }
     if (Number(quote.changePct || 0) > 1.5) {
@@ -9371,9 +9437,9 @@
     const newsItem = news.items[0] ? [{
       label: "News",
       title: news.items[0].headline,
-      text: `${news.items[0].source || "News"} · ${formatRelativeTime(news.items[0].datetime)} · ${news.items[0].sentiment || "Neutral"}`,
+      text: `${news.items[0].source || "News"} · ${newsDateLabel(news.items[0])} · ${newsSentimentLabel(news.items[0].sentiment)}`,
       status: news.meta.status,
-      tone: String(news.items[0].sentiment || "").toLowerCase() === "bullish" ? "bull" : String(news.items[0].sentiment || "").toLowerCase() === "bearish" ? "bear" : "neutral",
+      tone: newsSentimentTone(news.items[0].sentiment),
       symbol
     }] : [];
     const items = [...eventItems, ...alertItems, ...newsItem];
@@ -9499,28 +9565,34 @@
   }
 
   function renderCompanyNews(symbol, news) {
+    const rows = (news.items || [])
+      .map((item) => normalizeNewsItem({ ...item, meta: news.meta, category: "company" }, symbol))
+      .slice(0, 6);
     return `
       <article class="card">
         <div class="card-topline">
           <div>
-            <span class="card-label">Company News</span>
-            <h3>${esc(symbol)} Timeline</h3>
+            <span class="card-label">Company News / Sentiment V1</span>
+            <h3>${esc(symbol)} Treiber</h3>
+            <p>News werden ueber vorhandene /api-Routen oder lokale Strukturwerte geladen. Sentiment ist eine einfache Heuristik, keine KI-Analyse.</p>
           </div>
           ${renderTinyStatus(news.meta.status)}
         </div>
         <div class="stack-list">
-          ${news.items.slice(0, 5).map((item) => `
+          ${rows.map((item) => `
             <a class="news-row" href="${escAttr(item.url || tradingViewUrl(getAsset(symbol)))}" target="_blank" rel="noreferrer">
               <span>
                 <strong>${esc(item.headline)}</strong>
-                <span class="small">${esc(item.source)} - ${formatRelativeTime(item.datetime)}</span>
+                <span class="small">${esc(item.source)} - ${esc(newsDateLabel(item))} - ${esc(item.symbol || symbol)}</span>
+                <span class="small muted">${esc(item.reason || newsRelevanceReason(item))}</span>
                 <span class="small">${esc(item.summary || "Keine Zusammenfassung verfügbar.")}</span>
               </span>
-              <span class="pill ${item.sentiment ? item.sentiment.toLowerCase() : ""}">${esc(item.sentiment || "Neutral")}</span>
+              <span class="pill ${escAttr(newsSentimentTone(item.sentiment))}">${esc(newsSentimentLabel(item.sentiment))}</span>
             </a>
           `).join("") || renderEmptyState("Keine News verfügbar.")}
         </div>
         ${renderDataMeta(news.meta)}
+        ${renderDataMeta(makeMeta("Regelbasierte News-Sentiment-Heuristik", "modelled", null, "positiv/neutral/negativ/gemischt/unbekannt ohne KI-API."), true)}
       </article>
     `;
   }
@@ -9712,6 +9784,9 @@
         </div>
       </section>
       <section class="section">
+        ${renderNewsSentimentCenter("research")}
+      </section>
+      <section class="section">
         ${renderReportCenterCard()}
       </section>
       <section class="section">
@@ -9786,6 +9861,90 @@
           <div class="snapshot-tile"><span>Risiko</span><strong>Prüfen</strong><p>${esc(asset.risks)}</p></div>
         </div>
       </article>
+    `;
+  }
+
+  function renderNewsSentimentCenter(context = "research", options = {}) {
+    ensureNewsData();
+    const symbol = options.symbol || state.activeSymbol;
+    const rows = newsRowsForView(context, symbol);
+    const filtered = rows.filter((row) => newsMatchesFilter(row, state.newsFilter, symbol)).slice(0, context === "home" ? 6 : 12);
+    const status = combinedDataStatus(filtered.map((row) => row.meta?.status));
+    const counts = newsSummaryCounts(rows);
+    return `
+      <article class="card news-center-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">News / Sentiment V1</span>
+            <h3>Marktnews, Company News und Treiber ohne KI-Orakel</h3>
+            <p>Finnhub Company News und Alpha Vantage News/Sentiment laufen nur ueber eigene /api-Routen. Sentiment ist eine einfache Regelheuristik und wird als Modelled gekennzeichnet.</p>
+          </div>
+          <div class="row-actions">
+            ${renderStatusBadge(status)}
+            <button class="ghost-button" type="button" data-news-refresh>News pruefen</button>
+          </div>
+        </div>
+        <div class="metric-grid news-summary-grid">
+          ${renderMiniMetric("News", String(rows.length))}
+          ${renderMiniMetric("Watchlist", String(counts.watchlist))}
+          ${renderMiniMetric("Events", String(counts.events))}
+          ${renderMiniMetric("Makro", String(counts.macro))}
+        </div>
+        <div class="news-filter-row">
+          ${newsFilterOptions().map((filter) => `<button class="chip ${state.newsFilter === filter.id ? "active" : ""}" type="button" data-news-filter="${escAttr(filter.id)}">${esc(filter.label)}</button>`).join("")}
+        </div>
+        <div class="news-card-grid">
+          ${filtered.map(renderNewsV1Card).join("") || renderGuidedNewsEmptyState(state.newsFilter)}
+        </div>
+        ${renderDataMeta(makeMeta("Finnhub + Alpha Vantage + lokale News-Struktur", derivedDataStatus(status), null, "News-Sentiment ist regelbasiert/modelled; keine KI-API, keine Social-Scraping-Grauzone."), true)}
+      </article>
+    `;
+  }
+
+  function newsFilterOptions() {
+    return [
+      { id: "all", label: "Alle" },
+      { id: "watchlist", label: "Watchlist" },
+      { id: "favorites", label: "Favoriten" },
+      { id: "asset", label: "Aktives Asset" },
+      { id: "today", label: "Heute" },
+      { id: "week", label: "Diese Woche" },
+      { id: "events", label: "Ereignisse" },
+      { id: "macro", label: "Makro" }
+    ];
+  }
+
+  function renderNewsV1Card(row) {
+    const symbol = row.symbol && assetMap.has(row.symbol) ? row.symbol : "";
+    const attrs = symbol ? `data-symbol="${escAttr(symbol)}"` : row.url ? `data-news-url="${escAttr(row.url)}"` : `data-route="research"`;
+    return `
+      <button class="news-v1-card" type="button" ${attrs}>
+        <div class="card-topline">
+          <span class="pill ${escAttr(newsSentimentTone(row.sentiment))}">${esc(row.sentimentLabel || newsSentimentLabel(row.sentiment))}</span>
+          ${renderTinyStatus(row.meta?.status)}
+        </div>
+        <strong>${esc(row.headline)}</strong>
+        <span class="small">${esc(row.source)} · ${esc(newsDateLabel(row))}</span>
+        <p>${esc(row.summary || row.reason || "Keine Zusammenfassung verfuegbar.")}</p>
+        <div class="news-card-footer">
+          <span>${esc(symbol || row.category || "Markt")}</span>
+          <small>${esc(row.reason || newsRelevanceReason(row))}</small>
+        </div>
+        ${renderDataMeta(row.meta, true)}
+      </button>
+    `;
+  }
+
+  function renderGuidedNewsEmptyState(filter) {
+    return `
+      <div class="empty-state guided-empty news-empty-state">
+        <p>Keine News fuer diesen Filter im aktuellen Datenfenster. Es werden keine Fake-News oder erfundenen Sentimentwerte erzeugt.</p>
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-news-filter="all">Alle News</button>
+          <button class="ghost-button" type="button" data-route="events">Events oeffnen</button>
+          <button class="ghost-button" type="button" data-route="asset">Asset suchen</button>
+        </div>
+      </div>
     `;
   }
 
@@ -11336,6 +11495,40 @@
     }
   }
 
+  async function ensureNewsData(force = false) {
+    if (state.loadingNews) {
+      return;
+    }
+    const freshEnough = Date.now() - state.lastNewsRefresh < CACHE_TTL.news;
+    if (!force && freshEnough && state.marketNews) {
+      return;
+    }
+
+    state.loadingNews = true;
+    try {
+      const symbols = unique([...state.watchlist, ...dashboardPrefs().favorites, state.activeSymbol, "SPY", "QQQ"]).slice(0, 10);
+      const [marketNews] = await Promise.all([
+        api.getMarketNews(symbols),
+        Promise.all(symbols.slice(0, 6).map(async (symbol) => {
+          if (!state.news[symbol] || force) {
+            state.news[symbol] = await api.getCompanyNews(symbol);
+          }
+        }))
+      ]);
+      state.marketNews = marketNews;
+      state.lastNewsRefresh = Date.now();
+    } catch (error) {
+      logError(error);
+      state.marketNews = fallbackMarketNews("News-Livequelle nicht erreichbar. Lokale strukturierte Treiber bleiben sichtbar.");
+      state.lastNewsRefresh = Date.now();
+    } finally {
+      state.loadingNews = false;
+      if (["home", "asset", "research", "screener"].includes(state.route)) {
+        render();
+      }
+    }
+  }
+
   const api = {
     async searchSymbols(query) {
       const term = String(query || "").trim();
@@ -11685,6 +11878,30 @@
       }
 
       return fallbackNews(symbol, "Finnhub News-Livequelle nicht erreichbar oder serverseitig nicht konfiguriert.");
+    },
+
+    async getMarketNews(symbols = []) {
+      const tickers = unique(symbols).filter((symbol) => ["Stock", "ETF", "Index"].includes(getAsset(symbol)?.type || "")).slice(0, 10);
+      if (!serverApiAvailable()) {
+        recordProviderHealth("alphaVantage", "fallback", "Alpha Vantage News/Sentiment laeuft ueber /api/alphavantage und ist im lokalen Datei-Modus nicht verfuegbar.");
+        return fallbackMarketNews("Alpha Vantage News/Sentiment lokal nicht verfuegbar.");
+      }
+      try {
+        const url = alphaProxyUrl({ endpoint: "news", tickers: tickers.join(","), topics: "financial_markets,economy_macro,earnings", limit: 40 });
+        const result = await cachedJson(`alpha:news:${tickers.join("-") || "market"}`, url, CACHE_TTL.news, "alphaVantage");
+        const items = normalizeAlphaNewsItems(result.data, result.status, result.timestamp);
+        if (!items.length) {
+          throw new Error("Alpha Vantage News/Sentiment ohne nutzbaren Feed");
+        }
+        return {
+          items,
+          meta: makeMeta("Alpha Vantage NEWS_SENTIMENT via /api/alphavantage", result.status, result.timestamp, "Provider-Sentiment wird nur als Input gelesen; MH zeigt zusaetzlich eine einfache regelbasierte Einordnung.")
+        };
+      } catch (error) {
+        logError(error);
+        recordProviderHealth("alphaVantage", "fallback", error.message || "Alpha Vantage News/Sentiment nicht erreichbar.");
+        return fallbackMarketNews("Alpha Vantage News/Sentiment nicht erreichbar.");
+      }
     },
 
     async getDailyStats(symbol) {
@@ -13115,28 +13332,148 @@
       .filter((item) => item.symbols.includes(symbol) || item.symbols.includes(getAsset(symbol).sector))
       .concat(FALLBACK_NEWS.filter((item) => item.symbols.includes("SPY")))
       .slice(0, 5)
-      .map((item) => ({
+      .map((item) => normalizeNewsItem({
         headline: item.headline,
         source: item.source,
         summary: item.summary,
         sentiment: item.sentiment,
         relevance: item.relevance,
         datetime: null,
-        url: ""
-      }));
+        url: "",
+        symbols: item.symbols,
+        category: "company",
+        meta: makeMeta("Lokale News-Strukturdaten", "local", null, message)
+      }, symbol));
 
     return {
-      items: filtered.length ? filtered : FALLBACK_NEWS.slice(0, 3).map((item) => ({
+      items: filtered.length ? filtered : FALLBACK_NEWS.slice(0, 3).map((item) => normalizeNewsItem({
         headline: item.headline,
         source: item.source,
         summary: item.summary,
         sentiment: item.sentiment,
         relevance: item.relevance,
         datetime: null,
-        url: ""
-      })),
+        url: "",
+        symbols: item.symbols,
+        category: "market",
+        meta: makeMeta("Lokale News-Strukturdaten", "local", null, message)
+      }, symbol)),
       meta: makeMeta("Lokale News-Strukturdaten", "local", null, message)
     };
+  }
+
+  function fallbackMarketNews(message) {
+    return {
+      items: FALLBACK_NEWS.slice(0, 8).map((item) => normalizeNewsItem({
+        headline: item.headline,
+        source: item.source,
+        summary: item.summary,
+        sentiment: item.sentiment,
+        relevance: item.relevance,
+        datetime: null,
+        url: "",
+        symbols: item.symbols,
+        category: item.symbols.includes("Macro") ? "macro" : "market",
+        meta: makeMeta("Lokale News-Strukturdaten", "local", null, message)
+      }, item.symbols[0] || "SPY")),
+      meta: makeMeta("Lokale News-Strukturdaten", "local", null, message)
+    };
+  }
+
+  function normalizeAlphaNewsItems(data, status, timestamp) {
+    const feed = Array.isArray(data?.feed) ? data.feed : [];
+    const meta = makeMeta("Alpha Vantage NEWS_SENTIMENT", status, timestamp, "Alpha-Vantage-News laufen serverseitig; Sentiment-Anzeige bleibt regelbasiert/modelled.");
+    return feed.slice(0, 40).map((item) => {
+      const tickerSymbols = Array.isArray(item.ticker_sentiment)
+        ? item.ticker_sentiment.map((row) => normalizeSymbol(row.ticker)).filter((symbol) => assetMap.has(symbol))
+        : [];
+      const firstSymbol = tickerSymbols[0] || inferNewsSymbol(`${item.title || ""} ${item.summary || ""}`) || "SPY";
+      return normalizeNewsItem({
+        headline: item.title || "News ohne Titel",
+        source: item.source || "Alpha Vantage",
+        summary: item.summary || "",
+        sentiment: item.overall_sentiment_label || item.overall_sentiment_score,
+        relevance: alphaNewsRelevance(item),
+        datetime: alphaNewsTimestamp(item.time_published) || timestamp,
+        url: item.url || "",
+        symbols: tickerSymbols.length ? tickerSymbols : [firstSymbol],
+        category: alphaNewsCategory(item),
+        meta
+      }, firstSymbol);
+    });
+  }
+
+  function normalizeNewsItem(item, fallbackSymbol = "SPY") {
+    const text = `${item.headline || ""} ${item.summary || ""}`;
+    const symbol = normalizeSymbol(item.symbol || (Array.isArray(item.symbols) ? item.symbols.find((entry) => assetMap.has(normalizeSymbol(entry))) : "") || fallbackSymbol || "SPY");
+    const sentiment = normalizeNewsSentiment(item.sentiment, text);
+    const meta = item.meta || makeMeta(item.source || "News", "local", null);
+    return {
+      headline: item.headline || "News ohne Titel",
+      source: item.source || "News",
+      summary: item.summary || "",
+      sentiment,
+      sentimentLabel: newsSentimentLabel(sentiment),
+      relevance: Number.isFinite(Number(item.relevance)) ? Number(item.relevance) : 50,
+      datetime: item.datetime ? Number(item.datetime) : null,
+      url: item.url || "",
+      symbol,
+      symbols: Array.isArray(item.symbols) ? item.symbols.map(normalizeSymbol) : [symbol],
+      category: item.category || newsCategoryFromText(text),
+      reason: item.reason || newsRelevanceReason({ ...item, symbol, category: item.category || newsCategoryFromText(text) }),
+      meta,
+      sentimentMeta: makeMeta("Regelbasierte News-Sentiment-Heuristik", "modelled", null, "positiv/neutral/negativ/gemischt/unbekannt ohne KI-API.")
+    };
+  }
+
+  function alphaNewsTimestamp(value) {
+    const text = String(value || "");
+    const match = text.match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?/);
+    if (!match) return null;
+    const [, year, month, day, hour = "12", minute = "00"] = match;
+    const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
+    return Number.isNaN(date.getTime()) ? null : date.getTime();
+  }
+
+  function alphaNewsRelevance(item) {
+    const base = Number(item.relevance_score || item.overall_sentiment_score || 0);
+    const tickerBoost = Array.isArray(item.ticker_sentiment) ? Math.min(item.ticker_sentiment.length * 4, 18) : 0;
+    const title = String(item.title || "").toLowerCase();
+    const eventBoost = ["earnings", "guidance", "fed", "inflation", "rates", "merger", "lawsuit"].some((word) => title.includes(word)) ? 14 : 0;
+    return Math.round(clamp(52 + base * 35 + tickerBoost + eventBoost, 20, 95));
+  }
+
+  function alphaNewsCategory(item) {
+    const topics = Array.isArray(item.topics) ? item.topics.map((topic) => String(topic.topic || topic).toLowerCase()) : [];
+    const text = `${item.title || ""} ${item.summary || ""}`.toLowerCase();
+    if (topics.some((topic) => topic.includes("earnings")) || text.includes("earnings") || text.includes("guidance")) return "event";
+    if (topics.some((topic) => topic.includes("economy")) || ["inflation", "fed", "ecb", "rates", "yield", "macro"].some((word) => text.includes(word))) return "macro";
+    return "market";
+  }
+
+  function newsCategoryFromText(text) {
+    const lower = String(text || "").toLowerCase();
+    if (["earnings", "guidance", "dividend", "split", "ipo", "event"].some((word) => lower.includes(word))) return "event";
+    if (["inflation", "fed", "ecb", "yield", "rates", "macro", "gdp", "arbeitsmarkt"].some((word) => lower.includes(word))) return "macro";
+    return "market";
+  }
+
+  function inferNewsSymbol(text) {
+    const lower = String(text || "").toLowerCase();
+    return ASSETS.find((asset) => lower.includes(asset.symbol.toLowerCase()) || lower.includes(asset.name.toLowerCase()))?.symbol || "";
+  }
+
+  function newsRelevanceReason(item) {
+    const symbol = normalizeSymbol(item.symbol || "");
+    const pieces = [];
+    if (symbol && state.watchlist.includes(symbol)) pieces.push("Watchlist-Bezug");
+    if (symbol && dashboardPrefs().favorites.includes(symbol)) pieces.push("Favorit");
+    if (symbol && symbol === state.activeSymbol) pieces.push("aktives Asset");
+    if (item.category === "event") pieces.push("Event-/Earnings-Bezug");
+    if (item.category === "macro") pieces.push("Makro-Kontext");
+    if (item.datetime && Date.now() - Number(item.datetime) < 24 * 60 * 60 * 1000) pieces.push("heute frisch");
+    if (!pieces.length) pieces.push("Markttreiber");
+    return `${pieces.join(", ")}; Sentiment ist regelbasiert und nur Kontext.`;
   }
 
   function fallbackMacro(message) {
@@ -14242,6 +14579,17 @@
   }
 
   function watchlistNewsForView() {
+    const newsItems = state.watchlist
+      .flatMap((symbol) => {
+        const news = newsFor(symbol);
+        return (news.items || []).slice(0, 1).map((item) => ({
+          symbol,
+          kind: "News",
+          status: news.meta?.status || "local",
+          text: `${item.headline} - ${newsSentimentLabel(item.sentiment)}`
+        }));
+      })
+      .slice(0, 3);
     const eventItems = eventsForView()
       .filter((eventItem) => state.watchlist.includes(eventItem.symbol))
       .slice(0, 3)
@@ -14259,7 +14607,98 @@
         kind: "Move",
         text: `Tagesbewegung ${formatPercent(item.quote.changePct)}; prüfen, ob These noch passt.`
       }));
-    return [...movers, ...eventItems].slice(0, 5);
+    return [...newsItems, ...movers, ...eventItems].slice(0, 5);
+  }
+
+  function newsRowsForView(context = "research", activeSymbol = state.activeSymbol) {
+    const symbols = unique([...state.watchlist, ...dashboardPrefs().favorites, activeSymbol, ...HOME_TICKER]).slice(0, 18);
+    const companyRows = symbols.flatMap((symbol) => {
+      const news = newsFor(symbol);
+      return (news.items || []).slice(0, context === "asset" && symbol === activeSymbol ? 8 : 3).map((item) => ({
+        ...normalizeNewsItem({ ...item, meta: news.meta, category: "company" }, symbol),
+        channel: "Company News"
+      }));
+    });
+    const marketRows = ((state.marketNews || fallbackMarketNews("Lokale News-Strukturdaten aktiv.")).items || [])
+      .map((item) => ({ ...normalizeNewsItem(item, item.symbol || "SPY"), channel: item.category === "macro" ? "Makro-News" : "Marktnews" }));
+    const eventRows = eventNewsRowsForView(symbols);
+    return dedupeNewsRows([...marketRows, ...companyRows, ...eventRows])
+      .sort((a, b) => newsSortScore(b, activeSymbol) - newsSortScore(a, activeSymbol));
+  }
+
+  function eventNewsRowsForView(symbols) {
+    return eventsForView()
+      .filter((eventItem) => eventItem.date >= startOfToday())
+      .filter((eventItem) => symbols.includes(eventItem.symbol) || eventItem.symbol === "Macro" || eventItem.type === "Makro")
+      .slice(0, 12)
+      .map((eventItem) => normalizeNewsItem({
+        headline: eventItem.title,
+        source: "Event-Hub",
+        summary: eventItem.detail || `${eventTypeLabel(eventItem)} ${eventTimingLabel(eventItem)}`,
+        sentiment: "unknown",
+        relevance: eventRelevanceScore(eventItem),
+        datetime: eventItem.date ? eventItem.date.getTime() : null,
+        url: "",
+        symbol: eventItem.symbol === "Macro" ? "SPY" : eventItem.symbol,
+        symbols: [eventItem.symbol],
+        category: eventItem.type === "Makro" ? "macro" : "event",
+        reason: `${eventTypeLabel(eventItem)}; relevant als Termin-/Treiberkontext, nicht als gutes oder schlechtes Signal.`,
+        meta: eventItem.meta || makeMeta("Event-Hub", "local", null)
+      }, eventItem.symbol === "Macro" ? "SPY" : eventItem.symbol));
+  }
+
+  function dedupeNewsRows(rows) {
+    const seen = new Set();
+    return rows.filter((row) => {
+      const key = `${String(row.headline || "").toLowerCase()}|${row.symbol || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function newsSortScore(row, activeSymbol = state.activeSymbol) {
+    const watchBoost = state.watchlist.includes(row.symbol) ? 22 : 0;
+    const favoriteBoost = dashboardPrefs().favorites.includes(row.symbol) ? 16 : 0;
+    const activeBoost = row.symbol === activeSymbol ? 12 : 0;
+    const eventBoost = row.category === "event" ? 10 : 0;
+    const macroBoost = row.category === "macro" ? 8 : 0;
+    const ageHours = row.datetime ? Math.max(0, (Date.now() - Number(row.datetime)) / (60 * 60 * 1000)) : 48;
+    const freshness = row.datetime ? Math.max(0, 24 - ageHours) : 0;
+    return Number(row.relevance || 50) + watchBoost + favoriteBoost + activeBoost + eventBoost + macroBoost + freshness + statusRank(row.meta?.status || "local");
+  }
+
+  function newsMatchesFilter(row, filter, activeSymbol = state.activeSymbol) {
+    if (filter === "watchlist") return state.watchlist.includes(row.symbol);
+    if (filter === "favorites") return dashboardPrefs().favorites.includes(row.symbol);
+    if (filter === "asset") return row.symbol === activeSymbol || (row.symbols || []).includes(activeSymbol);
+    if (filter === "today") return row.datetime && row.datetime >= startOfToday().getTime();
+    if (filter === "week") return newsInDays(row, 7);
+    if (filter === "events") return row.category === "event";
+    if (filter === "macro") return row.category === "macro";
+    return true;
+  }
+
+  function newsInDays(row, days) {
+    if (!row.datetime) return false;
+    const start = startOfToday().getTime();
+    return row.datetime >= start && row.datetime <= start + days * 24 * 60 * 60 * 1000;
+  }
+
+  function newsSummaryCounts(rows) {
+    return rows.reduce((sum, row) => {
+      if (state.watchlist.includes(row.symbol)) sum.watchlist += 1;
+      if (row.category === "event") sum.events += 1;
+      if (row.category === "macro") sum.macro += 1;
+      return sum;
+    }, { watchlist: 0, events: 0, macro: 0 });
+  }
+
+  function newsDateLabel(row) {
+    if (row.datetime) {
+      return formatRelativeTime(row.datetime);
+    }
+    return dataFreshnessText(row.meta);
   }
 
   function eventTypeLabel(eventItem) {
@@ -17146,7 +17585,7 @@
   function reportNewsAndEvents(news, events) {
     const newsRows = (news.items || []).slice(0, 4).map((item) => ({
       label: item.source || "News",
-      text: `${item.headline} ${item.sentiment ? `(${item.sentiment})` : ""}`
+      text: `${item.headline} (${newsSentimentLabel(item.sentiment)}; ${statusLabel(news.meta?.status || item.meta?.status || "local")})`
     }));
     const eventRows = events.slice(0, 4).map((eventItem) => ({
       label: eventTypeLabel(eventItem),
@@ -17309,7 +17748,7 @@
   function reportRecapNewsRows(rows = []) {
     return reportInsightList(rows.map((item) => ({
       label: `${item.symbol || "News"} · Score ${Math.round(item.score || 0)}`,
-      text: item.headline || item.text || "News-Hinweis"
+      text: `${item.headline || item.text || "News-Hinweis"} (${newsSentimentLabel(item.sentiment)}; ${statusLabel(item.status || item.meta?.status || "local")})`
     })));
   }
 
@@ -17342,7 +17781,7 @@
   function reportWatchNewsRows(rows = []) {
     return reportInsightList(rows.map((item) => ({
       label: `${item.symbol} · ${item.kind}`,
-      text: item.text
+      text: `${item.text}${item.status ? ` (${statusLabel(item.status)})` : ""}`
     })));
   }
 
@@ -18891,26 +19330,64 @@
   }
 
   function classifyNewsSentiment(text) {
+    return normalizeNewsSentiment("", text);
+  }
+
+  function normalizeNewsSentiment(value, text = "") {
+    const raw = String(value ?? "").toLowerCase();
+    const score = Number(value);
+    if (Number.isFinite(score)) {
+      if (score >= 0.15) return "positive";
+      if (score <= -0.15) return "negative";
+      return "neutral";
+    }
+    if (["positive", "positiv", "bullish", "somewhat-bullish", "somewhat bullish"].some((word) => raw.includes(word))) return "positive";
+    if (["negative", "negativ", "bearish", "somewhat-bearish", "somewhat bearish"].some((word) => raw.includes(word))) return "negative";
+    if (raw.includes("mixed") || raw.includes("gemischt")) return "mixed";
+    if (raw.includes("neutral")) return "neutral";
     const lower = String(text || "").toLowerCase();
-    const positive = ["beat", "raises", "growth", "upgrade", "record", "strong", "profit"];
-    const negative = ["miss", "cuts", "downgrade", "weak", "probe", "loss", "warning"];
+    if (!lower) return "unknown";
+    const positive = ["beat", "beats", "raises", "growth", "upgrade", "record", "strong", "profit", "surge", "higher", "outperform", "launch", "wins", "guidance raised", "beschleunigt", "stark", "gewinn", "wachstum"];
+    const negative = ["miss", "misses", "cuts", "downgrade", "weak", "probe", "loss", "warning", "lawsuit", "falls", "drops", "risk", "slump", "recall", "guidance cut", "schwach", "verlust", "warnung"];
     const pos = positive.some((word) => lower.includes(word));
     const neg = negative.some((word) => lower.includes(word));
-    if (pos && !neg) {
-      return "Bullish";
-    }
-    if (neg && !pos) {
-      return "Bearish";
-    }
-    return "Neutral";
+    if (pos && neg) return "mixed";
+    if (pos) return "positive";
+    if (neg) return "negative";
+    return "neutral";
+  }
+
+  function newsSentimentLabel(sentiment) {
+    const labels = {
+      positive: "positiv",
+      neutral: "neutral",
+      negative: "negativ",
+      mixed: "gemischt",
+      unknown: "unbekannt"
+    };
+    return labels[normalizeNewsSentiment(sentiment)] || labels.unknown;
+  }
+
+  function newsSentimentTone(sentiment) {
+    const normalized = normalizeNewsSentiment(sentiment);
+    if (normalized === "positive") return "bull";
+    if (normalized === "negative") return "bear";
+    return "neutral";
   }
 
   function sentimentValue(label) {
-    if (label === "Bullish") {
+    const normalized = normalizeNewsSentiment(label);
+    if (normalized === "positive") {
       return 72;
     }
-    if (label === "Bearish") {
+    if (normalized === "negative") {
       return 34;
+    }
+    if (normalized === "mixed") {
+      return 48;
+    }
+    if (normalized === "unknown") {
+      return 50;
     }
     return 52;
   }

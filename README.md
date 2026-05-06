@@ -74,6 +74,7 @@ Für die aktuelle FX-Quelle wird kein `FX_API_KEY` benötigt, weil Frankfurter o
 
 - Route: `/api/alphavantage`
 - Environment Variable: `ALPHA_VANTAGE_API_KEY`
+- News/Sentiment V1 nutzt optional Alpha Vantage `NEWS_SENTIMENT` ueber die bestehende serverseitige `/api/alphavantage` Route.
 - Zuständig für: FX-/Rohstoff-Zusatzdaten, Zeitreihen, technische Indikatoren, IPO- und Earnings-Zusatzdaten
 
 **EIA**
@@ -146,6 +147,7 @@ Keys dürfen nicht in `app.js`, nicht in `index.html`, nicht in `localStorage` u
 
 - Start-Ticker: bevorzugt Finnhub über `/api/finnhub`, danach Alpha Vantage über `/api/alphavantage`, Krypto über `/api/coingecko`, sonst Fallback.
 - Asset-Seiten: Finnhub liefert Quotes, Profile, News, Basic Financials und Earnings, wenn die Vercel Function konfiguriert ist.
+- News/Sentiment: Finnhub Company News und Alpha Vantage NEWS_SENTIMENT laufen nur ueber eigene `/api/...`-Routen; die angezeigte Einordnung ist einfache `Modelled`-Heuristik und keine KI-Analyse.
 - Makro: FRED läuft über `/api/fred`; BLS, Treasury, World Bank und IMF laufen über `/api/opendata`; FX-Kernpaare laufen über `/api/fx`.
 - Energie/Rohstoffe: Öl läuft bevorzugt über `/api/eia`, Gold/Silber/WTI-Zusatzdaten über `/api/alphavantage`, sonst Fallback.
 - Rohstoff-Sentiment: CFTC COT läuft über `/api/opendata?source=cftc-cot`; bei Ausfall wird `Unavailable` angezeigt, kein lokaler Sentimentwert erfunden.
