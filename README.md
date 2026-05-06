@@ -20,10 +20,11 @@ Lokal nutzt MH Analytics Fallback-Daten, wenn serverseitige Live-Quellen nicht v
 
 ## Was in dieser Datenarchitektur-Runde geändert wurde
 
-- Der öffentliche Bereich heißt `Datenquellen` und ist eine reine Quellen-/Data-Health-Ansicht.
+- `Data Health`/`Datenquellen` stehen nicht mehr in der öffentlichen Hauptnavigation. Normale Nutzer sehen nur kurze Status-Badges direkt in den Modulen.
 - Die frühere öffentliche Provider-Konfiguration ist entfernt: keine editierbaren API-Key-Felder, keine Key-Speicherbuttons, keine Key-Testbuttons und keine Browser-Diagnose.
 - Alte Browserdaten aus früheren API-Key-Versionen werden beim Start bereinigt; neue Provider-Keys werden nicht mehr im Frontend gespeichert.
 - EIA wurde serverseitig angebunden.
+- CFTC Commitments of Traders wurde als Open-Data-Route fuer Rohstoff-Positionierung angebunden.
 - FX/Währungen laufen serverseitig über Frankfurter.
 - CoinGecko läuft als klarer Krypto-Datenpfad über eine eigene Vercel Function.
 - BLS, Treasury, World Bank und IMF laufen über eine normalisierte Open-Data-Schicht.
@@ -97,51 +98,26 @@ Für die aktuelle FX-Quelle wird kein `FX_API_KEY` benötigt, weil Frankfurter o
 
 - Route: `/api/opendata`
 - Kein API-Key nötig
-- Aktuell normalisiert: BLS CPI, BLS Arbeitsmarkt, Treasury Daily Rates, World Bank GDP Growth und IMF Growth
+- Aktuell normalisiert: BLS CPI, BLS Arbeitsmarkt, Treasury Daily Rates, World Bank GDP Growth, IMF Growth, Eurostat HICP/Arbeitsmarkt, SEC Submissions vorbereitet und CFTC COT für Rohstoff-Positionierung
 
-ECB, SEC/EDGAR, OECD, Eurostat und OpenFIGI sind im Datenquellenbereich sauber eingeordnet. Sie sind aber nicht alle vollständig live verdrahtet.
+**CFTC Commitments of Traders**
 
-## Öffentliche Datenquellen-Übersicht
+- Route: `/api/opendata?source=cftc-cot`
+- Kein API-Key nötig
+- Zuständig für: Commercial-/Non-Commercial-Positionierung bei Gold, Silber, WTI-Öl, Natural Gas und Kupfer
+- Wichtig: COT-Daten sind wöchentliche Kontextdaten, keine Kursprognose und keine Kauf-/Verkaufsempfehlung.
 
-Der Reiter `Datenquellen` zeigt für normale Nutzer:
+ECB, SEC/EDGAR, OECD, Eurostat und OpenFIGI sind intern in der Quellenlogik eingeordnet. Sie sind aber nicht alle vollständig live verdrahtet und werden nicht als öffentlicher Provider-Reiter geführt.
 
-- Provider-Name
-- Kategorie
-- Rolle
-- Typ: serverseitig, serverseitig normalisiert, Open Data oder hybrid
-- Status: Live, Fallback, teilweise oder nicht genutzt
-- verwendete Module
-- kurzer Transparenztext
+## Öffentliche Statushinweise
 
-Sichtbare Quellen:
+Die öffentliche Website zeigt keinen separaten Provider-, Data-Health- oder Datenquellen-Reiter. Stattdessen werden Statushinweise dort angezeigt, wo sie für Nutzer relevant sind:
 
-1. Finnhub
-2. Alpha Vantage
-3. Frankfurter FX
-4. FRED
-5. ECB
-6. BLS
-7. U.S. Treasury Fiscal Data
-8. SEC / EDGAR
-9. EIA
-10. CoinGecko
-11. World Bank
-12. IMF DataMapper
-13. OECD Data Explorer
-14. Eurostat
-15. OpenFIGI
+- `Live`, `Hybrid`, `Fallback`, `Lokal`, `Offline` oder `Unbekannt` direkt in Modulen.
+- kurze Datenstatus-Zeilen in Asset-Seiten, Makro, ETF, Portfolio und Reports.
+- keine Provider-Konfiguration, keine Key-Felder, keine Browser-Diagnose und keine öffentlichen Testbuttons.
 
-## Data Health / Quellenübersicht
-
-Der Reiter `Data Health` ist die öffentliche Transparenzseite für Datenqualität und Quellenstatus. Er ersetzt keine interne Betreiber-Konfiguration und zeigt keine API-Key-Felder.
-
-Data Health zeigt jetzt:
-
-- Gesamtstatus der Datenlage
-- Anzahl aktiver, live erfolgreicher, hybrider/fallback-gestützter und problematischer Quellen
-- Modulstatus für Startseite, Tagesüberblick, Tages-Recap, Asset-Seiten, Events, Quick Compare, Watchlist, Alerts, Makro/Liquidität, ETF, Portfolio, Research und Datenquellen
-- Provider-Karten mit Rolle, Quellentyp, Health, Frische, letzter erfolgreicher Aktualisierung und betroffenen Modulen
-- klare Zuständigkeit je Quelle, z. B. FRED für US-Makro, Finnhub für Aktien/News/Earnings, EIA für Energie und Frankfurter für FX
+Eine tiefere Provider- und Betreiberkonfiguration bleibt Sache der Vercel-/Backend-Dokumentation.
 
 Die verwendeten Statusbegriffe sind:
 
@@ -172,8 +148,31 @@ Keys dürfen nicht in `app.js`, nicht in `index.html`, nicht in `localStorage` u
 - Asset-Seiten: Finnhub liefert Quotes, Profile, News, Basic Financials und Earnings, wenn die Vercel Function konfiguriert ist.
 - Makro: FRED läuft über `/api/fred`; BLS, Treasury, World Bank und IMF laufen über `/api/opendata`; FX-Kernpaare laufen über `/api/fx`.
 - Energie/Rohstoffe: Öl läuft bevorzugt über `/api/eia`, Gold/Silber/WTI-Zusatzdaten über `/api/alphavantage`, sonst Fallback.
+- Rohstoff-Sentiment: CFTC COT läuft über `/api/opendata?source=cftc-cot`; bei Ausfall wird `Unavailable` angezeigt, kein lokaler Sentimentwert erfunden.
 - Events/Earnings: Finnhub und Alpha Vantage laufen über eigene `/api/...`-Routen; lokale Events bleiben Backup.
 - ETF, Portfolio, Journal und Reports bleiben bewusst hybrid oder lokal, weil dort viel Produktlogik und Nutzereingabe enthalten ist.
+
+## Datenrealismus / Datenklassen
+
+MH Analytics trennt Daten jetzt klarer:
+
+- `Live`: echter aktueller API-Abruf ueber eine serverseitige Route.
+- `Cached`: echter API-Abruf, aber aus lokalem Cache wiederverwendet.
+- `Hybrid`: echte Daten und lokale Produktlogik werden kombiniert.
+- `Local Structured`: lokal gepflegte strukturierte Daten, z. B. ETF-Holdings oder Asset-Baselines.
+- `Demo`: reine Beispieldaten fuer Demo- oder Onboarding-Modus.
+- `Modelled`: berechnete oder heuristische Einordnung, z. B. Scores, Ampeln oder Risiko-Logik.
+- `Unavailable`: keine belastbaren Daten vorhanden.
+
+Nur `Live` und `Cached` duerfen konkrete Abruf- oder Cache-Zeitpunkte zeigen. Lokale, Demo- und Modell-Daten zeigen keine aktuelle Fake-Frische. Das vollstaendige Modul-Audit steht in `DATA_AUDIT.md`.
+
+Neue bzw. vorbereitete Open-Data-Pfade:
+
+- `/api/opendata?source=eurostat-hicp`
+- `/api/opendata?source=eurostat-unemployment`
+- `/api/opendata?source=bundesbank-series&flow=...&key=...`
+- `/api/opendata?source=sec-submissions&cik=...` nur mit serverseitigem `SEC_USER_AGENT`
+- `/api/opendata?source=cftc-cot`
 
 ## Die wichtigsten Dateien
 
@@ -199,6 +198,20 @@ Die Website enthaelt einen oeffentlichen Bereich `Rechtliches` mit Platzhaltern 
 
 Diese Inhalte sind bewusst nicht final. Der Betreiber muss Name, Adresse, Kontakt, Unternehmensangaben und Datenschutzdetails vor Veroeffentlichung rechtlich pruefen und ausfuellen lassen. MH Analytics gibt keine Rechtsberatung.
 
+## Login / Cloud-Sync Planung
+
+Login und Cloud-Sync sind aktuell nicht implementiert und nicht in der oeffentlichen UI aktiviert. Die lokale Nutzung bleibt Standard.
+
+Ein spaeterer Ausbau soll nur optional erfolgen und darf keine API-Keys, Betreiber-Secrets oder Provider-Konfiguration synchronisieren. Geplante Sync-Daten waeren Watchlist, Favoriten, Portfolios, Alerts, Journal, Preferences, Learning/XP und Report-Metadaten.
+
+Der Architekturplan mit Auth-Optionen, Datenmodell, Sicherheitsregeln, Datenschutzpunkten, Migration lokaler Daten und spaeterem Alert-Server steht in `ROADMAP.md`.
+
+## Community Planung
+
+Community ist aktuell nicht implementiert und nicht in der oeffentlichen UI aktiviert. Es gibt keine Profile, Posts, Kommentare, Likes, Upvotes oder Community-Formulare.
+
+Ein spaeterer Community-Ausbau muss zuerst Moderation, Meldesystem, Regeln, Datenschutz, Haftung, Missbrauchsschutz und klare Anti-Pump-and-Dump-Regeln loesen. Das Community-Konzept V1 steht in `ROADMAP.md`.
+
 ## Roadmap, nicht als Versprechen
 
 Spaetere Bloecke bleiben bewusst offen und wurden in dieser QA-Runde nicht neu gebaut:
@@ -206,10 +219,10 @@ Spaetere Bloecke bleiben bewusst offen und wurden in dieser QA-Runde nicht neu g
 - Journal / Psychologie / Fehleranalyse V2
 - tiefere Live-Daten in Spezialbereichen
 - ETF-Live-Holdings, falls eine geeignete Quelle gefunden wird
-- Login / Cloud-Sync
+- Login / Cloud-Sync nach dem Plan in `ROADMAP.md`
 - echte Push- oder E-Mail-Benachrichtigungen
 - serverseitige Alert-Pruefung
-- Community spaeter
+- Community spaeter nach dem Konzept in `ROADMAP.md`
 - finale rechtliche Pruefung
 - Datenqualitaet und Plausibilitaetspruefungen weiter vertiefen.
 

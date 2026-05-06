@@ -41,11 +41,23 @@
   };
 
   const BOOT_TIME = Date.now();
+  const DATA_STATUS_DEFINITIONS = [
+    { id: "live", label: "Live", freshness: "echter aktueller API-Abruf" },
+    { id: "cached", label: "Cached", freshness: "echter API-Abruf, lokal zwischengespeichert" },
+    { id: "hybrid", label: "Hybrid", freshness: "Mischung aus echten Daten und lokaler Logik" },
+    { id: "local", label: "Local Structured", freshness: "lokal gepflegte strukturierte Datenbasis" },
+    { id: "demo", label: "Demo", freshness: "reine Beispieldaten fuer Demo-Modus" },
+    { id: "modelled", label: "Modelled", freshness: "berechnete oder heuristische Einordnung" },
+    { id: "unavailable", label: "Unavailable", freshness: "keine belastbaren Daten vorhanden" }
+  ];
+  const DATA_STATUS_LABELS = Object.fromEntries(DATA_STATUS_DEFINITIONS.map((item) => [item.id, item.label]));
+  const LIVE_TIMESTAMP_STATUSES = new Set(["live", "cached"]);
   const CACHE_TTL = {
     quote: 60 * 1000,
     profile: 24 * 60 * 60 * 1000,
     fundamentals: 6 * 60 * 60 * 1000,
     news: 15 * 60 * 1000,
+    search: 15 * 60 * 1000,
     macro: 6 * 60 * 60 * 1000,
     events: 30 * 60 * 1000,
     series: 30 * 60 * 1000,
@@ -162,7 +174,7 @@
       name: "ECB",
       group: "euroMacro",
       categories: ["Euro-Makro", "EZB", "EUR-FX"],
-      status: "mapped",
+      status: "active",
       keyMode: "none",
       security: "browser-ok-public",
       description: "Vorbereiteter Slot für EZB-Zinsen, FX-Referenzkurse und europäische Makrodaten.",
@@ -402,12 +414,12 @@
       name: "Eurostat",
       group: "euroMacro",
       categories: ["Euro-Makro", "EU-Daten", "Länder"],
-      status: "mapped",
+      status: "active",
       keyMode: "none",
       security: "browser-ok-public",
       description: "Offizielle Open-Data-Quelle für EU-Statistiken, Eurozone-Kennzahlen und Länderprofile.",
-      usage: "Open Data. In dieser Runde als transparenter Quellenstatus eingeordnet; Live-Module werden später gezielt angebunden.",
-      testHint: "Status entsteht später über echte Modulabrufe."
+      usage: "Open Data. Eurozone/Deutschland-Inflation und Arbeitsmarkt laufen ueber /api/opendata, wenn der Abruf erreichbar ist.",
+      testHint: "/api/opendata?source=eurostat-hicp und /api/opendata?source=eurostat-unemployment"
     },
     {
       id: "openfigi",
@@ -418,17 +430,30 @@
       keyMode: "none",
       security: "backend-ready",
       description: "Referenzdatenquelle für spätere Symbol-, FIGI- und Instrumenten-Zuordnung.",
-      usage: "Für diese Runde nur als Datenquellenstatus eingeordnet; spätere Nutzung erfolgt kontrolliert serverseitig.",
+      usage: "Für diese Runde nur als interner Quellenstatus eingeordnet; spätere Nutzung erfolgt kontrolliert serverseitig.",
       testHint: "Nicht als Live-Modul beworben."
     }
   ];
 
+  PROVIDERS.push({
+    id: "cftc",
+    name: "CFTC Commitments of Traders",
+    group: "energy",
+    categories: ["COT", "Rohstoffe", "Positionierung"],
+    status: "active",
+    keyMode: "none",
+    security: "server-normalized",
+    description: "Offizielle COT-Positionierungsdaten fuer Futures-Maerkte.",
+    usage: "Open Data. Wird ueber /api/opendata?source=cftc-cot normalisiert und nur als Kontext, nicht als Prognose genutzt.",
+    testHint: "/api/opendata?source=cftc-cot"
+  });
+
   const DEFAULT_WATCHLIST = ["NVDA", "MSFT", "AAPL", "SPY", "BTC"];
   const HOME_TICKER = ["SPY", "QQQ", "DAX", "NVDA", "MSFT", "AAPL", "BTC", "ETH", "GOLD"];
-  const PUBLIC_PROVIDER_IDS = ["finnhub", "alphaVantage", "frankfurter", "fred", "ecb", "bls", "treasury", "sec", "eia", "coingecko", "worldBank", "imf", "oecd", "eurostat", "openfigi"];
+  const PUBLIC_PROVIDER_IDS = ["finnhub", "alphaVantage", "frankfurter", "fred", "ecb", "bls", "treasury", "sec", "eia", "cftc", "coingecko", "worldBank", "imf", "oecd", "eurostat", "openfigi"];
   const REMOVED_PUBLIC_PROVIDER_IDS = ["newsApi", "gnews", "fmp", "twelveData", "coincap", "eodhd", "marketaux", "exchangeRateApi", "openExchangeRates", "metalsApi", "reddit", "brevo", "supabase", "finnhubNews"];
   const OPTIONAL_INTERNAL_PROVIDER_IDS = [];
-  const PRIORITY_PROVIDER_IDS = ["finnhub", "alphaVantage", "frankfurter", "fred", "ecb", "bls", "treasury", "sec", "eia", "coingecko", "worldBank", "imf", "oecd", "eurostat", "openfigi"];
+  const PRIORITY_PROVIDER_IDS = ["finnhub", "alphaVantage", "frankfurter", "fred", "ecb", "bls", "treasury", "sec", "eia", "cftc", "coingecko", "worldBank", "imf", "oecd", "eurostat", "openfigi"];
   const DATA_HEALTH_PROVIDER_IDS = [
     "finnhub",
     "alphaVantage",
@@ -439,6 +464,7 @@
     "treasury",
     "sec",
     "eia",
+    "cftc",
     "coingecko",
     "worldBank",
     "imf",
@@ -457,6 +483,7 @@
     treasury: ["Yield Curve", "Treasury Rates", "Zinsstruktur"],
     sec: ["Filings", "Submissions", "XBRL", "Fundamentaldatenbasis"],
     eia: ["Energie", "Öl", "Gas", "Rohstoffdaten"],
+    cftc: ["COT-Positionierung", "Gold", "Silber", "Oel", "Gas", "Kupfer"],
     coingecko: ["Krypto-Preise", "Market Cap", "BTC/ETH/SOL"],
     worldBank: ["Länderprofile", "globale Makrodaten", "Strukturdaten"],
     imf: ["internationale Makroergänzung", "Ländervergleiche"],
@@ -479,9 +506,18 @@
     { id: "worldBank", role: "Globale Makroquelle", type: "Serverseitig normalisiert", category: "Länderdaten", description: "World Bank liefert globale Länder- und BIP-Daten über die Open-Data-Schicht.", fallback: "Globale Vergleichskarten nutzen lokale Länder-Fallbacks." },
     { id: "imf", role: "Internationale Makroergänzung", type: "Serverseitig normalisiert", category: "Globale Makro", description: "IMF ergänzt internationale Wachstums- und Länderdaten.", fallback: "IMF ist Ergänzung, nicht alleinige Basis." },
     { id: "oecd", role: "Vergleichsdaten", type: "Open Data / späterer Adapter", category: "OECD", description: "OECD ist für strukturierte Länder- und Wirtschaftsvergleiche eingeordnet.", fallback: "Noch nicht als Live-Kernpfad beworben." },
-    { id: "eurostat", role: "EU-Statistik", type: "Open Data", category: "Euro-Makro", description: "Eurostat ist als offizielle EU-Datenquelle eingeordnet.", fallback: "Eurostat-Reihen werden erst nach gezielter Modulverdrahtung live gezählt." },
+    { id: "eurostat", role: "EU-Statistik", type: "Open Data", category: "Euro-Makro", description: "Eurostat liefert HICP-Inflation und Arbeitslosenquote fuer Eurozone/Deutschland ueber die Open-Data-Normalisierung.", fallback: "Wenn Eurostat nicht erreichbar ist, bleiben lokale Euro-Makro-Strukturwerte sichtbar." },
     { id: "openfigi", role: "Referenzdaten", type: "Open Data / Mapping", category: "Identifier", description: "OpenFIGI ist für spätere Instrumenten- und Identifier-Logik eingeordnet.", fallback: "Aktuell kein produktiver Live-Pfad; Symboluniversum bleibt lokal kontrolliert." }
   ];
+
+  DATA_SOURCE_REGISTRY.push({
+    id: "cftc",
+    role: "Rohstoff-Positionierung",
+    type: "Serverseitig normalisiert",
+    category: "COT / Rohstoffe",
+    description: "CFTC Commitments of Traders liefert Commercial- und Non-Commercial-Positionierung fuer wichtige Futures-Maerkte.",
+    fallback: "Wenn der Abruf nicht erreichbar ist, zeigt MH Analytics Unavailable statt ersetzter Sentimentwerte."
+  });
 
   const DATA_HEALTH_MODULES = [
     { id: "home", name: "Startseite", providers: ["finnhub", "alphaVantage", "coingecko", "fred"], mode: "Hybrid", quality: "hoch", description: "Ticker, Tagesüberblick, Tages-Recap und Marktstatus bündeln Live- und Fallback-Daten." },
@@ -498,7 +534,21 @@
     { id: "etf", name: "ETF V2", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "ETF-Struktur, TER, Holdings, Regionen, Sektoren, Overlap und Kostenrechnung sind strukturiert lokal; Marktpreise können über Quote-Pfade kommen." },
     { id: "portfolio", name: "Portfolio", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "Positionen und Notizen sind lokal; Marktdaten werden soweit verfügbar live ergänzt." },
     { id: "research", name: "Research / Report", providers: ["finnhub", "fred", "sec", "worldBank", "treasury"], mode: "Hybrid / Synthese", quality: "mittel", description: "Reports kombinieren echte Inputs, lokale Fallbacks und eigene Research-Synthese inklusive Makro-Report." },
-    { id: "sources", name: "Datenquellen", providers: DATA_HEALTH_PROVIDER_IDS, mode: "Transparenz", quality: "hoch", description: "Zeigt Quellen, Status, Frische, Health und betroffene Module ohne öffentliche Betreiber-Konfiguration." }
+    { id: "sources", name: "Interner Quellenstatus", providers: DATA_HEALTH_PROVIDER_IDS, mode: "Transparenz", quality: "hoch", description: "Zeigt Quellen, Status, Frische, Health und betroffene Module ohne öffentliche Betreiber-Konfiguration." }
+  ];
+
+  DATA_HEALTH_MODULES.forEach((module) => {
+    if (["asset", "macro", "energy", "research"].includes(module.id) && !module.providers.includes("cftc")) {
+      module.providers.push("cftc");
+    }
+  });
+
+  const CFTC_COMMODITIES = [
+    { id: "GOLD", label: "Gold", assetSymbols: ["GOLD", "GLD"] },
+    { id: "SILVER", label: "Silber", assetSymbols: ["SILVER", "SLV"] },
+    { id: "OIL", label: "WTI Oel", assetSymbols: ["OIL", "WTI"] },
+    { id: "GAS", label: "Natural Gas", assetSymbols: ["GAS", "NATGAS"] },
+    { id: "COPPER", label: "Kupfer", assetSymbols: ["COPPER"] }
   ];
 
   const ASSETS = [
@@ -1175,6 +1225,30 @@
       thesis: "Luxusmarktführer mit Markenmacht und globaler Preissetzung.",
       risks: "China-Konsum, Währung, Zyklus im Luxussegment.",
       sentiment: 57
+    },
+    {
+      symbol: "RHM.DE",
+      name: "Rheinmetall AG",
+      type: "Stock",
+      sector: "Industrials",
+      tv: "XETR:RHM",
+      currency: "EUR",
+      fallback: { price: 525.00, changePct: 0.34, marketCap: 23000000000, pe: 31.0, eps: 16.9, revenue: 7600000000 },
+      thesis: "Deutscher Verteidigungs- und Industriewert mit hoher Auftragsdynamik. Lokale Basisdaten dienen nur als Fallback.",
+      risks: "Politische Budgets, Lieferketten, hohe Erwartungen und zyklische Industrieanteile.",
+      sentiment: 61
+    },
+    {
+      symbol: "ADS.DE",
+      name: "Adidas AG",
+      type: "Stock",
+      sector: "Consumer Discretionary",
+      tv: "XETR:ADS",
+      currency: "EUR",
+      fallback: { price: 218.00, changePct: -0.16, marketCap: 39000000000, pe: 42.0, eps: 5.2, revenue: 21400000000 },
+      thesis: "Globale Sportmarke mit Turnaround- und Margenhebel. Lokale Basisdaten dienen nur als Fallback.",
+      risks: "Konsumzyklus, Markenmomentum, China, Wettbewerb und Bewertung.",
+      sentiment: 55
     },
     {
       symbol: "VTI",
@@ -1855,7 +1929,7 @@
     investor: {
       label: "Investor",
       description: "Research, Watchlist, Portfolio, Events, Makro und Reports werden nach vorne gezogen.",
-      modules: { portfolio: "high", watchlist: "high", assetResearch: "high", events: "normal", macro: "normal", reports: "normal", dailyRecap: "normal", dataHealth: "normal" },
+      modules: { portfolio: "high", watchlist: "high", assetResearch: "high", events: "normal", macro: "normal", reports: "normal", dailyRecap: "normal" },
       shortcuts: ["watchlist", "portfolio", "asset", "events", "reports"],
       profile: { goal: "wealth", horizon: "long", risk: "medium", experience: "advanced", focus: ["stocks", "portfolio", "macro"] }
     },
@@ -1876,22 +1950,22 @@
     macro: {
       label: "Makro",
       description: "Makroampel, Ländervergleich, Zinsen, FX, Liquidität und Asset-Implikationen stehen vorne.",
-      modules: { macro: "high", liquidity: "high", dailyBriefing: "normal", dailyRecap: "normal", etf: "normal", reports: "normal", dataHealth: "normal" },
-      shortcuts: ["macro", "dataHealth", "reports", "events", "watchlist"],
+      modules: { macro: "high", liquidity: "high", dailyBriefing: "normal", dailyRecap: "normal", etf: "normal", reports: "normal" },
+      shortcuts: ["macro", "reports", "events", "watchlist", "asset"],
       profile: { goal: "learning", horizon: "medium", risk: "medium", experience: "advanced", focus: ["macro", "commodities", "portfolio"] }
     },
     learning: {
       label: "Anfänger / Learning",
       description: "Tagesüberblick, Research-Snapshot, einfache Kennzahlen und Erklärtexte werden sichtbarer.",
-      modules: { dailyBriefing: "high", dailyRecap: "high", assetResearch: "normal", macro: "normal", etf: "normal", watchlist: "normal", reports: "normal", dataHealth: "normal" },
-      shortcuts: ["today", "asset", "watchlist", "macro", "dataHealth"],
+      modules: { dailyBriefing: "high", dailyRecap: "high", assetResearch: "normal", macro: "normal", etf: "normal", watchlist: "normal", reports: "normal" },
+      shortcuts: ["today", "asset", "watchlist", "macro", "reports"],
       profile: { goal: "learning", horizon: "long", risk: "low", experience: "beginner", focus: ["etfs", "macro", "portfolio"] }
     },
     portfolio: {
       label: "Portfolio-Fokus",
       description: "Portfolio, Risiko, Exposure, Rebalancing, Watchlist, Alerts und Reports werden priorisiert.",
       modules: { portfolio: "high", watchlist: "high", alerts: "normal", dailyRecap: "normal", events: "normal", macro: "normal", reports: "normal" },
-      shortcuts: ["portfolio", "alerts", "watchlist", "reports", "dataHealth"],
+      shortcuts: ["portfolio", "alerts", "watchlist", "reports", "macro"],
       profile: { goal: "capital_preservation", horizon: "long", risk: "low", experience: "advanced", focus: ["portfolio", "etfs", "dividends"] }
     }
   };
@@ -1909,8 +1983,7 @@
     { id: "quickCompare", label: "Quick Compare", description: "Zwei Assets direkt vergleichen", route: "compare" },
     { id: "screener", label: "Screener", description: "Datengetriebene Asset-Auswahl", route: "screener" },
     { id: "reports", label: "Reports", description: "Research als Browser-PDF exportieren", route: "research" },
-    { id: "assetResearch", label: "Asset-Research", description: "5-Minuten-Research für den aktiven Wert", route: "asset" },
-    { id: "dataHealth", label: "Data Health", description: "Quellen, Status und Datenqualität", route: "data-health" }
+    { id: "assetResearch", label: "Asset-Research", description: "5-Minuten-Research für den aktiven Wert", route: "asset" }
   ];
 
   const SHORTCUT_CATALOG = [
@@ -1925,8 +1998,7 @@
     { id: "reports", label: "Report erstellen", route: "research" },
     { id: "events", label: "Event-Hub", route: "events" },
     { id: "compare", label: "Quick Compare", route: "compare" },
-    { id: "screener", label: "Screener", route: "screener" },
-    { id: "dataHealth", label: "Data Health", route: "data-health" }
+    { id: "screener", label: "Screener", route: "screener" }
   ];
 
   const PROFILE_OPTION_LABELS = {
@@ -2488,11 +2560,15 @@
     { id: "overlap", term: "Overlap", aliases: ["ueberschneidung", "doppelt"], text: "Ueberschneidung zwischen zwei ETFs oder Positionen.", why: "Zu viel Overlap kann Diversifikation nur scheinbar verbessern.", where: "ETF V2, Quick Compare, Portfolio-Fit" },
     { id: "free-cashflow", term: "Free Cashflow", aliases: ["fcf"], text: "Geldfluss, der nach Investitionen uebrig bleibt.", why: "Wichtig fuer Qualitaet, Dividenden, Rueckkaeufe und Schuldentragfaehigkeit.", where: "Asset-Research und Quality Score, soweit Daten vorhanden" },
     { id: "debt-to-gdp", term: "Debt-to-GDP", aliases: ["staatsverschuldung", "verschuldung"], text: "Staatsschulden im Verhaeltnis zur Wirtschaftsleistung.", why: "Gibt Kontext zu fiskalischem Spielraum und Zinslast.", where: "Makro-/Laendervergleich V2" },
+    { id: "cftc-cot", term: "CFTC COT", aliases: ["cot", "commitments of traders", "rohstoff sentiment", "positionierung"], text: "Commitments of Traders zeigen woechentlich, wie Commercials und Non-Commercials in Futures positioniert sind.", why: "Hilft, Extrempositionierung bei Gold, Silber, Oel, Gas oder Kupfer als Kontext zu sehen, ohne daraus eine sichere Prognose abzuleiten.", where: "Makro, Liquiditaet, Rohstoff-Asset-Seiten und Reports" },
     { id: "momentum", term: "Momentum", aliases: ["trendstaerke"], text: "Relative Staerke aus Bewegung, Trend und Aktivitaet.", why: "Hilft, starke oder schwache Setups zu erkennen, kann aber ueberhitzen.", where: "Screener, Top Picks, Asset-Technik" },
     { id: "value", term: "Value", aliases: ["bewertung"], text: "Bewertungsorientierte Einordnung eines Assets.", why: "Kann guenstige Kandidaten zeigen, ist aber ohne Qualitaet kein Signal.", where: "Screener Value Score und Asset-Research" },
     { id: "growth", term: "Growth", aliases: ["wachstum"], text: "Wachstumsorientierte Einordnung aus Umsatz-/Gewinn- oder Modellnaehe.", why: "Starkes Wachstum kann hohe Bewertung erklaeren, aber auch Erwartungen erhoehen.", where: "Screener Growth Score und Asset-Seiten" },
-    { id: "hybrid", term: "Hybrid-Daten", aliases: ["hybrid daten"], text: "Mischung aus echten Datenpfaden und lokaler Produktlogik oder Fallbacks.", why: "Zeigt transparent, dass nicht jeder Baustein voll live ist.", where: "Data Health, Reports, Asset-Seiten" },
-    { id: "fallback", term: "Fallback-Daten", aliases: ["fallback"], text: "Strukturierte lokale Ersatzdaten, wenn Live-Daten fehlen.", why: "Die App bleibt nutzbar, verkauft Fallback aber nicht als Live-Wahrheit.", where: "Data Health und Status-Badges" },
+    { id: "cached", term: "Cached-Daten", aliases: ["cache", "cached"], text: "Echter API-Abruf, aber zwischengespeichert statt neu geladen.", why: "Verhindert Fake-Live: Cache ist echt, aber nicht frisch live.", where: "Status-Badges, Reports, Datenstatus" },
+    { id: "hybrid", term: "Hybrid-Daten", aliases: ["hybrid daten"], text: "Mischung aus echten Datenpfaden und lokaler Produktlogik.", why: "Zeigt transparent, dass nicht jeder Baustein voll live ist.", where: "Status-Badges, Reports, Asset-Seiten" },
+    { id: "local-structured", term: "Local Structured", aliases: ["local structured", "lokale daten", "fallback"], text: "Lokal gepflegte strukturierte Daten, zum Beispiel ETF-Holdings oder bekannte Asset-Basisdaten.", why: "Die App bleibt nutzbar, verkauft lokale Daten aber nicht als Live-Wahrheit.", where: "Status-Badges in Modulen" },
+    { id: "modelled", term: "Modelled", aliases: ["modelliert", "heuristik"], text: "Berechnete oder heuristische Einordnung aus vorhandenen Inputs.", why: "Macht Scores und Ampeln nachvollziehbar, ohne objektive Messgenauigkeit vorzutäuschen.", where: "Screener, Makroampel, Risiko- und Qualitätslogik" },
+    { id: "unavailable", term: "Unavailable", aliases: ["nicht verfuegbar", "missing"], text: "Keine belastbaren Daten vorhanden.", why: "Besser ehrlich leer oder eingeschränkt als scheinbar aktuelle Daten zu zeigen.", where: "Status-Badges und Empty States" },
     { id: "etf", term: "ETF", aliases: ["fonds"], text: "Boersengehandelter Fonds, oft als breiter Baustein fuer Regionen oder Themen.", why: "Kann Diversifikation bieten, aber Kosten, Overlap und Konzentration bleiben wichtig.", where: "ETF V2, Portfolio, Quick Compare" },
     { id: "dividende", term: "Dividende", aliases: ["ausschuettung"], text: "Ausschuettung eines Unternehmens oder Fonds an Anleger.", why: "Relevant fuer Einkommen, Termine und ETF-Ausschuettungslogik.", where: "Event-Hub, ETF V2, Alerts" },
     { id: "market-cap", term: "Marktkapitalisierung", aliases: ["market cap"], text: "Boersenwert eines Unternehmens: Aktienkurs mal Anzahl Aktien.", why: "Hilft bei Groesse, Liquiditaet und Risikoklasse.", where: "Asset-Seiten, Screener-Filter" }
@@ -2508,18 +2584,827 @@
   ];
 
   const FEATURE_COMMANDS = [
-    { id: "asset-nvda", label: "Nvidia analysieren", text: "Oeffnet die Asset-Seite fuer NVDA.", route: "asset", symbol: "NVDA", keywords: ["nvidia", "nvda", "aktie analysieren"] },
+    { id: "asset-search", label: "Asset oder Aktie suchen", text: "Oeffnet die sichtbare Suche fuer Apple, Nvidia, Rheinmetall, ETFs, Gold oder Bitcoin.", route: "asset", keywords: ["asset", "aktie", "suchen", "apple", "aapl", "nvidia", "nvda", "rheinmetall", "rhm", "msci world", "qqq", "btc"] },
     { id: "etf-compare", label: "ETF vergleichen", text: "Kosten, Overlap, Holdings und Portfolio-Fit pruefen.", route: "etf", keywords: ["etf", "ter", "overlap", "kosten", "vwce", "vti"] },
     { id: "report", label: "Report erstellen", text: "Oeffnet das Research-/Report-Center.", route: "research", keywords: ["report", "pdf", "drucken", "export"] },
     { id: "portfolio", label: "Portfolio pruefen", text: "Risiko, Exposure, Cash und Rebalancing ansehen.", route: "portfolio", keywords: ["portfolio", "depot", "risiko", "exposure"] },
     { id: "macro", label: "Makro ansehen", text: "Inflation, Zinsen, Yield Curve, Realzins und Laendervergleich.", route: "macro", keywords: ["makro", "zinsen", "inflation", "yield curve", "realzins"] },
+    { id: "cftc-cot", label: "Rohstoff-Sentiment ansehen", text: "Oeffnet CFTC-COT-Positionierung fuer Gold, Silber, Oel, Gas und Kupfer.", route: "macro", keywords: ["cftc", "cot", "rohstoff", "gold", "silber", "oel", "gas", "kupfer", "positionierung"] },
     { id: "alert", label: "Alert setzen", text: "Preis-, Earnings-, Event- oder Watchlist-Alert anlegen.", route: "alerts", keywords: ["alert", "alarm", "benachrichtigung", "preis"] },
     { id: "watchlist", label: "Watchlist oeffnen", text: "Beobachtete Werte und Watchlist-Report ansehen.", route: "portfolio", keywords: ["watchlist", "beobachten"] },
-    { id: "data-health", label: "Data Health ansehen", text: "Quellen, Live/Hybrid/Fallback und Modulstatus pruefen.", route: "data-health", keywords: ["data health", "daten", "quellen", "fallback", "hybrid"] },
     { id: "screener", label: "Screener starten", text: "Ratings, Top Picks, Filter und transparente Scores nutzen.", route: "screener", keywords: ["screener", "rating", "top picks", "momentum"] },
     { id: "demo-add", label: "Demo-Daten laden", text: "Lokales Beispielsetup mit Watchlist, Testportfolio und Alerts.", action: "demo-add", keywords: ["demo", "beispiel", "start"] },
     { id: "glossary-kgv", label: "KGV erklaeren", text: "Kurze Glossar-Erklaerung zu Bewertung.", glossary: "kgv", keywords: ["kgv", "pe", "erklaeren"] },
-    { id: "glossary-hybrid", label: "Hybrid-Daten erklaeren", text: "Was Live, Hybrid und Fallback in MH Analytics bedeuten.", glossary: "hybrid", keywords: ["hybrid", "fallback", "datenstatus"] }
+    { id: "glossary-hybrid", label: "Datenstatus erklaeren", text: "Was Live, Cached, Hybrid, Local Structured und Modelled in MH Analytics bedeuten.", glossary: "hybrid", keywords: ["hybrid", "cached", "local", "fallback", "datenstatus"] }
+  ];
+
+  const HELP_CATEGORIES = [
+    { id: "start", label: "Erste Schritte", intro: "Schnell starten, Demo-Daten laden und das Dashboard einrichten." },
+    { id: "navigation", label: "Navigation", intro: "Die wichtigsten Bereiche der Plattform finden." },
+    { id: "stocks", label: "Aktien & Suche", intro: "Aktien suchen, analysieren, vergleichen und Asset-Seiten verstehen." },
+    { id: "screener-ratings", label: "Screener & Ratings", intro: "Filter, Ratings, Top-Picks und Score-Logik nachvollziehen." },
+    { id: "etf-portfolio", label: "ETF & Portfolio", intro: "ETF-Analyse, Portfolio-Fit, Risiko und Exposure einordnen." },
+    { id: "macro-data", label: "Makro & Daten", intro: "Makroampel, Zinsen, Inflation, Liquiditaet und Laendervergleich." },
+    { id: "reports", label: "Reports & Export", intro: "Research-Reports erstellen, drucken und als PDF speichern." },
+    { id: "alerts-watchlist", label: "Alerts & Watchlist", intro: "Werte beobachten und Erinnerungen setzen." },
+    { id: "glossary", label: "Begriffe erklaert", intro: "Kurze Erklaerungen zu Kennzahlen und Datenstatus." },
+    { id: "preferences", label: "Personalisierung", intro: "Dashboard-Modus, Favoriten, Shortcuts und Setup verwalten." }
+  ];
+
+  const HELP_FAQS = [
+    {
+      id: "start-new",
+      category: "start",
+      question: "Ich bin neu, womit soll ich anfangen?",
+      answer: "Starte mit der 60-Sekunden-Checkliste: Watchlist, erstes Asset, Testportfolio, ETF-Vergleich, Alert und Report.",
+      where: "Auf der Startseite im Bereich Starte in 60 Sekunden.",
+      canDo: "Du kannst Demo-Daten laden oder direkt einen ersten echten Wert analysieren.",
+      route: "home",
+      actionLabel: "Startseite oeffnen",
+      related: ["demo-load", "asset-search", "dashboard-setup"],
+      keywords: ["neu", "anfang", "start", "beginnen", "onboarding"]
+    },
+    {
+      id: "start-capabilities",
+      category: "start",
+      question: "Was kann MH Analytics?",
+      answer: "MH Analytics verbindet Asset-Research, Screener, ETF-Analyse, Portfolio, Makro, Alerts, Reports und lokale Personalisierung.",
+      where: "Die Hauptnavigation fuehrt zu den Modulen; die Startseite zeigt die wichtigsten Einstiege.",
+      canDo: "Du kannst Werte analysieren, vergleichen, beobachten, Reports erstellen und Datenstatus transparent pruefen.",
+      route: "home",
+      actionLabel: "Startseite ansehen",
+      related: ["nav-screener", "reports-create", "portfolio-find"],
+      keywords: ["was kann", "funktionen", "uebersicht", "module"]
+    },
+    {
+      id: "demo-load",
+      category: "start",
+      question: "Wie lade ich Demo-Daten?",
+      answer: "Demo-Daten werden nur lokal geladen und sind als Beispielsetup gedacht.",
+      where: "Auf der Startseite in Guided Start, Empty States oder ueber die Feature-Suche.",
+      canDo: "Damit bekommst du Beispiel-Watchlist, Testportfolio, Alerts und ETF-Vergleich, ohne echte Daten zu ueberschreiben.",
+      action: "demo-add",
+      actionLabel: "Demo-Daten laden",
+      related: ["start-new", "watchlist-add", "portfolio-test"],
+      keywords: ["demo", "beispiel", "testdaten", "laden"]
+    },
+    {
+      id: "dashboard-setup",
+      category: "start",
+      question: "Wie richte ich mein Dashboard ein?",
+      answer: "Waehle einen Dashboard-Modus und priorisiere Module nach deinem Stil.",
+      where: "Im Bereich Personalisierung.",
+      canDo: "Du kannst Investor, Trader, ETF-Anleger, Makro, Anfaenger oder Portfolio-Fokus waehlen.",
+      route: "preferences",
+      actionLabel: "Personalisierung oeffnen",
+      related: ["prefs-dashboard", "prefs-favorites", "prefs-export"],
+      keywords: ["dashboard", "einrichten", "modus", "personal"]
+    },
+    {
+      id: "next-steps",
+      category: "start",
+      question: "Was ist mein naechster sinnvoller Schritt?",
+      answer: "Nutze die naechste Schritt-Karte des aktuellen Moduls: sie zeigt 3 bis 4 passende Aktionen statt alles gleichzeitig.",
+      where: "Auf Startseite, Asset-Seite, ETF, Portfolio, Makro und Screener.",
+      canDo: "Typische Schritte sind vergleichen, Alert setzen, Report erstellen oder Portfolio-Fit pruefen.",
+      route: "home",
+      actionLabel: "Startseite oeffnen",
+      related: ["reports-create", "alert-set", "compare-stocks"],
+      keywords: ["naechster schritt", "was tun", "weiter"]
+    },
+    {
+      id: "nav-portfolio",
+      category: "navigation",
+      question: "Wo finde ich mein Portfolio?",
+      answer: "Portfolio und Watchlist liegen im Portfolio-Bereich.",
+      where: "Hauptnavigation: Watchlist oder Portfolio-Kontext im Portfolio-Modul.",
+      canDo: "Du kannst Positionen, Cash, Risiko, Exposure, Rebalancing-Hinweise und Reports pruefen.",
+      route: "portfolio",
+      actionLabel: "Portfolio oeffnen",
+      related: ["portfolio-test", "portfolio-exposure", "portfolio-report"],
+      keywords: ["portfolio", "depot", "positionen", "risiko"]
+    },
+    {
+      id: "nav-watchlist",
+      category: "navigation",
+      question: "Wo finde ich die Watchlist?",
+      answer: "Die Watchlist ist im Portfolio-/Watchlist-Bereich und wird auch auf der Startseite kompakt gezeigt.",
+      where: "Hauptnavigation: Watchlist.",
+      canDo: "Du kannst Werte beobachten, Alerts setzen und Watchlist-Reports erstellen.",
+      route: "portfolio",
+      actionLabel: "Watchlist oeffnen",
+      related: ["watchlist-add", "alert-set", "watchlist-report"],
+      keywords: ["watchlist", "beobachtung", "liste"]
+    },
+    {
+      id: "nav-etf",
+      category: "navigation",
+      question: "Wo finde ich den ETF-Vergleich?",
+      answer: "Den ETF-Vergleich findest du im ETF-Bereich.",
+      where: "Hauptnavigation: ETF.",
+      canDo: "Dort pruefst du TER, Kosten, Overlap, Holdings, Regionen und Portfolio-Fit.",
+      route: "etf",
+      actionLabel: "ETF oeffnen",
+      related: ["etf-ter", "etf-overlap", "etf-fit"],
+      keywords: ["etf vergleich", "etf", "overlap", "kosten"]
+    },
+    {
+      id: "nav-reports",
+      category: "navigation",
+      question: "Wo finde ich Reports?",
+      answer: "Reports liegen im Research-/Report-Center und in den Action-Bars wichtiger Module.",
+      where: "Hauptnavigation: Research.",
+      canDo: "Du kannst Asset-, Portfolio-, ETF-, Tages-, Watchlist-, Makro- und Screener-Reports vorbereiten.",
+      route: "research",
+      actionLabel: "Reports oeffnen",
+      related: ["reports-create", "reports-pdf", "reports-types"],
+      keywords: ["reports", "research", "pdf", "export"]
+    },
+    {
+      id: "nav-screener",
+      category: "navigation",
+      question: "Wo finde ich den Screener?",
+      answer: "Der Screener ist ein eigener Hauptbereich fuer Filter, Ratings und Top-Picks.",
+      where: "Hauptnavigation: Screener.",
+      canDo: "Du kannst Momentum, Value, Growth, Quality, Risk, Events und Makro-Kontext transparent pruefen.",
+      route: "screener",
+      actionLabel: "Screener oeffnen",
+      related: ["screener-top", "screener-rating", "screener-why"],
+      keywords: ["screener", "ratings", "top picks", "filter"]
+    },
+    {
+      id: "nav-macro",
+      category: "navigation",
+      question: "Wo finde ich Makrodaten?",
+      answer: "Makrodaten findest du im Makro-Bereich; Liquiditaet hat zusaetzlich einen eigenen Blick.",
+      where: "Hauptnavigation: Makro oder Liquiditaet.",
+      canDo: "Du kannst Inflation, Zinsen, Realzins, Yield Curve, Wachstum, FX und Asset-Implikationen ansehen.",
+      route: "macro",
+      actionLabel: "Makro oeffnen",
+      related: ["macro-yield", "macro-real-rate", "macro-traffic"],
+      keywords: ["makro", "inflation", "zinsen", "laender"]
+    },
+    {
+      id: "nav-compare",
+      category: "navigation",
+      question: "Wo finde ich Quick Compare?",
+      answer: "Quick Compare ist der schnelle Vergleich fuer zwei Assets oder ETFs.",
+      where: "Hauptnavigation: Compare.",
+      canDo: "Du kannst zwei Werte nebeneinander pruefen und danach tiefer in Asset oder ETF wechseln.",
+      route: "compare",
+      actionLabel: "Compare oeffnen",
+      related: ["compare-stocks", "etf-overlap", "asset-search"],
+      keywords: ["compare", "vergleich", "zwei aktien", "quick"]
+    },
+    {
+      id: "asset-analyze",
+      category: "stocks",
+      question: "Wie analysiere ich eine Aktie?",
+      answer: "Oeffne die Asset-Seite und suche nach Symbol oder Namen.",
+      where: "Im Bereich Aktie.",
+      canDo: "Du siehst Kurs, Profil, Research-Snapshot, Chancen/Risiken, Events, Compare, Alert und Report-Einstieg.",
+      route: "asset",
+      actionLabel: "Asset-Seite oeffnen",
+      related: ["asset-search", "compare-stocks", "alert-set"],
+      keywords: ["aktie analysieren", "analyse", "asset", "research"]
+    },
+    {
+      id: "asset-search",
+      category: "stocks",
+      question: "Wie suche ich nach Apple oder Nvidia?",
+      answer: "Nutze die Asset-Suche und gib Name oder Symbol ein, zum Beispiel Apple, AAPL, Nvidia oder NVDA.",
+      where: "Oben im Bereich Aktie und ueber die Command Palette.",
+      canDo: "Ein Klick auf ein Suchergebnis oeffnet die passende Asset-Seite mit Datenstatus.",
+      route: "asset",
+      actionLabel: "Asset-Suche oeffnen",
+      related: ["asset-analyze", "asset-route", "compare-stocks"],
+      keywords: ["apple", "aapl", "nvidia", "nvda", "suche", "symbol"]
+    },
+    {
+      id: "asset-search-rheinmetall",
+      category: "stocks",
+      question: "Wie finde ich Rheinmetall oder europaeische Aktien?",
+      answer: "Gib Rheinmetall, RHM, SAP, Siemens, ASML, LVMH, Novo Nordisk oder Adidas in die Asset-Suche ein.",
+      where: "Im Bereich Aktie in der globalen Asset-Suche.",
+      canDo: "Die Ergebnisliste zeigt Symbol, Name, Typ, Exchange/Region und Datenstatus, damit du nicht blind das falsche Mapping oeffnest.",
+      route: "asset",
+      actionLabel: "Asset-Suche oeffnen",
+      related: ["asset-search", "asset-route", "data-local"],
+      keywords: ["rheinmetall", "rhm", "deutsche aktien", "europa", "sap", "siemens", "asml", "lvmh", "adidas"]
+    },
+    {
+      id: "compare-stocks",
+      category: "stocks",
+      question: "Wie vergleiche ich zwei Aktien?",
+      answer: "Nutze Quick Compare oder die Compare-Aktion auf einer Asset-Seite.",
+      where: "Hauptnavigation: Compare oder Asset-Action-Bar.",
+      canDo: "Du kannst zwei Werte nebeneinander auf Kennzahlen, Status und Research-Kontext vergleichen.",
+      route: "compare",
+      actionLabel: "Compare oeffnen",
+      related: ["nav-compare", "asset-search", "reports-create"],
+      keywords: ["zwei aktien", "vergleichen", "vergleich", "compare"]
+    },
+    {
+      id: "screener-rating",
+      category: "screener-ratings",
+      question: "Was bedeutet das Rating?",
+      answer: "Das Rating ist eine transparente Produktlogik, keine Kaufempfehlung.",
+      where: "Im Screener, auf Asset-Seiten und in Reports.",
+      canDo: "Du kannst die Komponenten Momentum, Value, Growth, Quality, Risk, Event, Makro und Datenqualitaet einsehen.",
+      route: "screener",
+      actionLabel: "Screener oeffnen",
+      related: ["screener-why", "screener-top", "data-hybrid"],
+      keywords: ["rating", "score", "bewertung", "buy", "risk"]
+    },
+    {
+      id: "screener-why",
+      category: "screener-ratings",
+      question: "Warum steht eine Aktie im Screener oben?",
+      answer: "Ein Wert steht oben, wenn mehrere Score-Komponenten zusammen stark wirken und die Datenlage brauchbar ist.",
+      where: "Im Screener unter der Erklaerung Warum oben.",
+      canDo: "Du siehst die wichtigsten Treiber und gleichzeitig negative Hinweise wie Risiko, Bewertung oder Datenstatus.",
+      route: "screener",
+      actionLabel: "Screener oeffnen",
+      related: ["screener-rating", "screener-top", "macro-context"],
+      keywords: ["warum oben", "oben", "top pick", "ranking"]
+    },
+    {
+      id: "asset-route",
+      category: "stocks",
+      question: "Wie oeffne ich die Asset-Seite?",
+      answer: "Klicke in Suche, Screener, Watchlist, Compare oder Command Palette auf ein Asset.",
+      where: "Ueberall dort, wo ein Symbol als Aktion angezeigt wird.",
+      canDo: "Die aktive Asset-Seite wird auf das gewaehlte Symbol umgestellt.",
+      route: "asset",
+      actionLabel: "Asset-Seite oeffnen",
+      related: ["asset-search", "nav-screener", "nav-watchlist"],
+      keywords: ["asset seite", "oeffnen", "symbol"]
+    },
+    {
+      id: "screener-top",
+      category: "screener-ratings",
+      question: "Welche Top-Picks zeigt der Screener?",
+      answer: "Der Screener gruppiert Long-Kandidaten, Watch-Kandidaten, Risk-Kandidaten und Watchlist-Auffaelligkeiten.",
+      where: "Im Screener-Kontrollzentrum und in den Ergebnisbereichen.",
+      canDo: "Du kannst Kandidaten weiter pruefen, vergleichen, reporten oder Alerts setzen.",
+      route: "screener",
+      actionLabel: "Screener oeffnen",
+      related: ["screener-why", "screener-rating", "alert-set"],
+      keywords: ["top picks", "long", "risk", "watch"]
+    },
+    {
+      id: "etf-compare",
+      category: "etf-portfolio",
+      question: "Wo kann ich ETFs vergleichen?",
+      answer: "Im ETF-Bereich findest du Kostenanalyse, Overlap, Holdings, Regionen und Portfolio-Fit.",
+      where: "Hauptnavigation: ETF.",
+      canDo: "Waehle zwei ETFs und pruefe, ob sie echte Diversifikation bringen oder sich stark ueberschneiden.",
+      route: "etf",
+      actionLabel: "ETF oeffnen",
+      related: ["etf-ter", "etf-overlap", "etf-fit"],
+      keywords: ["etf vergleichen", "vwce", "qqq", "vti", "etf"]
+    },
+    {
+      id: "etf-ter",
+      category: "etf-portfolio",
+      question: "Was bedeutet TER?",
+      answer: "TER ist die laufende jaehrliche Kostenquote eines ETFs.",
+      where: "Im ETF-Bereich, ETF-Karten und ETF-Reports.",
+      canDo: "Der Kostenrechner zeigt, wie TER langfristig auf simulierte Kosten und Endwert wirken kann.",
+      route: "etf",
+      glossary: "ter",
+      actionLabel: "TER im Glossar oeffnen",
+      related: ["etf-compare", "reports-etf", "etf-overlap"],
+      keywords: ["ter", "kosten", "total expense ratio"]
+    },
+    {
+      id: "etf-overlap",
+      category: "etf-portfolio",
+      question: "Was bedeutet ETF-Overlap?",
+      answer: "Overlap zeigt, wie stark sich zwei ETFs bei Holdings, Regionen oder Themen ueberschneiden.",
+      where: "Im ETF-Overlap-Checker und in ETF-Reports.",
+      canDo: "Du kannst erkennen, ob zwei ETFs Diversifikation bringen oder fast dasselbe doppelt kaufen.",
+      route: "etf",
+      glossary: "overlap",
+      actionLabel: "Overlap im Glossar oeffnen",
+      related: ["etf-compare", "etf-fit", "portfolio-exposure"],
+      keywords: ["overlap", "ueberschneidung", "doppelt", "diversifikation"]
+    },
+    {
+      id: "etf-fit",
+      category: "etf-portfolio",
+      question: "Wie pruefe ich Portfolio-Fit?",
+      answer: "Nutze den Portfolio-Fit-Hinweis im ETF-Bereich oder im Portfolio-Kontext.",
+      where: "ETF-Bereich und Portfolio-Modul.",
+      canDo: "Du pruefst, ob ein ETF USA-, Tech-, Waehrungs- oder Konzentrationsrisiken eher erhoeht oder abfedert.",
+      route: "etf",
+      actionLabel: "ETF-Fit pruefen",
+      related: ["portfolio-exposure", "portfolio-cluster", "etf-overlap"],
+      keywords: ["portfolio fit", "passt", "etf fit", "what if"]
+    },
+    {
+      id: "portfolio-test",
+      category: "etf-portfolio",
+      question: "Wie erstelle ich ein Testportfolio?",
+      answer: "Du kannst ein lokales Testportfolio anlegen oder Demo-Daten laden.",
+      where: "Im Portfolio-Bereich oder ueber Guided Start.",
+      canDo: "Positionen und Cash bleiben lokal im Browser und dienen der Analyse, nicht dem Handel.",
+      route: "portfolio",
+      actionLabel: "Portfolio oeffnen",
+      related: ["demo-load", "portfolio-exposure", "portfolio-report"],
+      keywords: ["testportfolio", "portfolio erstellen", "demoportfolio"]
+    },
+    {
+      id: "portfolio-cluster",
+      category: "etf-portfolio",
+      question: "Was bedeutet Klumpenrisiko?",
+      answer: "Klumpenrisiko bedeutet, dass wenige Positionen, Regionen, Sektoren oder Themen das Portfolio stark dominieren.",
+      where: "Im Portfolio-Health- und Exposure-Bereich.",
+      canDo: "Du kannst groesste Positionen, Sektoren, Laender, Waehrung und Asset-Typen pruefen.",
+      route: "portfolio",
+      actionLabel: "Portfolio oeffnen",
+      related: ["portfolio-exposure", "etf-fit", "glossary-vola"],
+      keywords: ["klumpenrisiko", "konzentration", "cluster"]
+    },
+    {
+      id: "portfolio-exposure",
+      category: "etf-portfolio",
+      question: "Was ist Exposure?",
+      answer: "Exposure beschreibt, welchen Anteil dein Portfolio in Regionen, Sektoren, Waehrungen oder Asset-Typen hat.",
+      where: "Im Portfolio-Modul unter Risiko / Exposure.",
+      canDo: "Du erkennst, ob du stark USA-, Tech-, ETF-, Krypto- oder Waehrungs-lastig bist.",
+      route: "portfolio",
+      actionLabel: "Exposure pruefen",
+      related: ["portfolio-cluster", "etf-fit", "portfolio-report"],
+      keywords: ["exposure", "anteil", "sektor", "land", "waehrung"]
+    },
+    {
+      id: "portfolio-report",
+      category: "etf-portfolio",
+      question: "Wie exportiere ich einen Portfolio-Report?",
+      answer: "Erstelle den Portfolio-Report ueber die Report-Aktion im Portfolio oder im Research-Bereich.",
+      where: "Portfolio-Action-Bar oder Research-/Report-Center.",
+      canDo: "Der Report enthaelt Portfolio-Health, Risiko, Exposure, Klumpenrisiken, Datenstatus und Disclaimer.",
+      route: "research",
+      actionLabel: "Reports oeffnen",
+      related: ["reports-create", "reports-pdf", "portfolio-exposure"],
+      keywords: ["portfolio report", "portfolio export", "pdf"]
+    },
+    {
+      id: "macro-yield",
+      category: "macro-data",
+      question: "Was bedeutet Yield Curve?",
+      answer: "Die Yield Curve vergleicht Renditen verschiedener Laufzeiten, zum Beispiel 2 Jahre gegen 10 Jahre.",
+      where: "Im Makro-Bereich und Makro-Report.",
+      canDo: "Du kannst sehen, ob die Kurve normal, flach oder invers wirkt. Das ist Kontext, keine Prognose.",
+      route: "macro",
+      glossary: "yield-curve",
+      actionLabel: "Yield Curve im Glossar",
+      related: ["macro-real-rate", "macro-traffic", "data-hybrid"],
+      keywords: ["yield curve", "zinskurve", "invers"]
+    },
+    {
+      id: "macro-real-rate",
+      category: "macro-data",
+      question: "Was bedeutet Realzins?",
+      answer: "Realzins ist hier eine einfache Naeherung: Rendite oder Zinsniveau minus Inflation.",
+      where: "Im Makro-/Laendervergleich.",
+      canDo: "Du kannst einschaetzen, ob finanzielle Bedingungen fuer Gold, Growth, Anleihen oder Krypto eher restriktiv wirken.",
+      route: "macro",
+      glossary: "realzins",
+      actionLabel: "Realzins im Glossar",
+      related: ["macro-yield", "macro-traffic", "macro-liquidity"],
+      keywords: ["realzins", "real rate", "zinsen inflation"]
+    },
+    {
+      id: "macro-debt",
+      category: "macro-data",
+      question: "Was bedeutet Debt-to-GDP?",
+      answer: "Debt-to-GDP beschreibt Staatsschulden im Verhaeltnis zur Wirtschaftsleistung.",
+      where: "Im Makro-/Laendervergleich und im Glossar.",
+      canDo: "Du kannst fiskalischen Spielraum, Zinslast und langfristige Makro-Risiken vorsichtig einordnen.",
+      route: "macro",
+      glossary: "debt-to-gdp",
+      actionLabel: "Debt-to-GDP im Glossar",
+      related: ["macro-countries", "macro-traffic", "data-hybrid"],
+      keywords: ["debt-to-gdp", "verschuldung", "staatsverschuldung", "fiskalrisiko"]
+    },
+    {
+      id: "macro-traffic",
+      category: "macro-data",
+      question: "Was bedeutet Makroampel?",
+      answer: "Die Makroampel ist eine nachvollziehbare Heuristik aus Inflation, Zinsen, Realzins, Wachstum, Arbeitsmarkt, Liquiditaet, FX und Verschuldung.",
+      where: "Oben im Makro-Bereich.",
+      canDo: "Du siehst die wichtigsten Treiber und ob die Lage eher niedrig, moderat, erhoeht oder hoch riskant wirkt.",
+      route: "macro",
+      actionLabel: "Makro oeffnen",
+      related: ["macro-real-rate", "macro-liquidity", "macro-countries"],
+      keywords: ["makroampel", "risikoampel", "macro"]
+    },
+    {
+      id: "macro-liquidity",
+      category: "macro-data",
+      question: "Was bedeutet Liquiditaet?",
+      answer: "Liquiditaet beschreibt Geldmengen- und Finanzierungsumfeld als Kontext fuer Maerkte.",
+      where: "Im Liquiditaetsbereich und im Makro-Dashboard.",
+      canDo: "Du kannst sehen, ob die Lage eher liquiditaetsfreundlich, neutral oder belastend eingeordnet wird.",
+      route: "liquidity",
+      actionLabel: "Liquiditaet oeffnen",
+      related: ["macro-traffic", "macro-real-rate", "macro-countries"],
+      keywords: ["liquiditaet", "geldmenge", "m2"]
+    },
+    {
+      id: "macro-cftc-cot",
+      category: "macro-data",
+      question: "Was bedeutet CFTC COT bei Rohstoffen?",
+      answer: "CFTC COT zeigt woechentlich, wie Commercials und Non-Commercials in Futures wie Gold, Silber, Oel, Gas oder Kupfer positioniert sind.",
+      where: "Im Makro- und Liquiditaetsbereich sowie auf passenden Rohstoff-Asset-Seiten.",
+      canDo: "Du kannst Extrempositionierung als Kontext lesen. Das ist keine Prognose und keine Kauf- oder Verkaufsempfehlung.",
+      route: "macro",
+      glossary: "cftc-cot",
+      actionLabel: "CFTC-Kontext oeffnen",
+      related: ["macro-liquidity", "macro-real-rate", "data-live"],
+      keywords: ["cftc", "cot", "commitments of traders", "rohstoff sentiment", "commercials", "non-commercials", "positionierung"]
+    },
+    {
+      id: "macro-countries",
+      category: "macro-data",
+      question: "Wo sehe ich den Laendervergleich?",
+      answer: "Der Laendervergleich liegt im Makro-Bereich.",
+      where: "Makro: USA, Eurozone/Europa, Deutschland und China.",
+      canDo: "Du vergleichst Inflation, Wachstum, Arbeitsmarkt, Zinsen, Realzins, Verschuldung, FX und Datenstatus.",
+      route: "macro",
+      actionLabel: "Laendervergleich oeffnen",
+      related: ["macro-yield", "data-live", "reports-macro"],
+      keywords: ["laendervergleich", "usa", "europa", "deutschland", "china"]
+    },
+    {
+      id: "macro-context",
+      category: "macro-data",
+      question: "Was bedeutet Makro-Kontext im Screener?",
+      answer: "Makro-Kontext zeigt, ob Zinsen, Realzins, Dollar, Liquiditaet oder Risk-off-Lage eher unterstuetzen, neutral sind oder belasten.",
+      where: "Im Screener und in Top-Picks-Erklaerungen.",
+      canDo: "Du kannst erkennen, warum ein Wert trotz starkem Momentum makrobedingt riskanter wirken kann.",
+      route: "screener",
+      actionLabel: "Screener oeffnen",
+      related: ["screener-why", "macro-traffic", "macro-real-rate"],
+      keywords: ["makro kontext", "macro context", "risk assets"]
+    },
+    {
+      id: "reports-create",
+      category: "reports",
+      question: "Wie erstelle ich einen Report?",
+      answer: "Nutze Report erstellen in den Modulen oder oeffne das Research-/Report-Center.",
+      where: "Asset, Portfolio, ETF, Makro, Watchlist, Screener und Tages-Recap.",
+      canDo: "Du bekommst eine strukturierte Druckansicht mit Summary, Kennzahlen, Chancen/Risiken, Triggern, Datenstatus und Disclaimer.",
+      route: "research",
+      actionLabel: "Report-Center oeffnen",
+      related: ["reports-pdf", "reports-types", "portfolio-report"],
+      keywords: ["report erstellen", "research", "export"]
+    },
+    {
+      id: "reports-pdf",
+      category: "reports",
+      question: "Wie speichere ich als PDF?",
+      answer: "Oeffne die Report-Vorschau und nutze Drucken / Als PDF speichern im Browser.",
+      where: "Im Report-Overlay oder Report-Center.",
+      canDo: "Die Druckansicht blendet Navigation und Buttons aus und bleibt ohne Server-PDF lokal.",
+      route: "research",
+      actionLabel: "Reports oeffnen",
+      related: ["reports-create", "reports-types", "reports-disclaimer"],
+      keywords: ["pdf", "drucken", "speichern", "exportieren"]
+    },
+    {
+      id: "reports-types",
+      category: "reports",
+      question: "Welche Reports gibt es?",
+      answer: "Es gibt Asset-, Portfolio-, ETF-, Tages-Recap-, Watchlist-, Makro- und Screener-/Top-Picks-Reports.",
+      where: "Im Research-/Report-Center und in passenden Modul-Action-Bars.",
+      canDo: "Waehle den Report-Typ passend zu deiner aktuellen Analyse.",
+      route: "research",
+      actionLabel: "Reports oeffnen",
+      related: ["reports-create", "reports-pdf", "watchlist-report"],
+      keywords: ["welche reports", "report typen", "asset report", "etf report"]
+    },
+    {
+      id: "reports-disclaimer",
+      category: "reports",
+      question: "Warum enthalten Reports einen Disclaimer?",
+      answer: "Reports sind Analyse- und Dokumentationshilfen, keine persoenliche Empfehlung.",
+      where: "Unten in jedem Report.",
+      canDo: "Du siehst Datenstatus, Quellenhinweise und den Hinweis, dass Entscheidungen beim Nutzer liegen.",
+      route: "research",
+      actionLabel: "Reports oeffnen",
+      related: ["reports-create", "data-hybrid", "data-local"],
+      keywords: ["disclaimer", "anlageberatung", "haftung"]
+    },
+    {
+      id: "reports-macro",
+      category: "reports",
+      question: "Wie erstelle ich einen Makro-Report?",
+      answer: "Oeffne den Makro-Bereich oder das Report-Center und waehle Makro-Report.",
+      where: "Makro-Action-Bar oder Research-/Report-Center.",
+      canDo: "Der Report enthaelt Makroampel, Laendervergleich, Risiken, Asset-Implikationen und Datenstatus.",
+      route: "macro",
+      actionLabel: "Makro oeffnen",
+      related: ["reports-create", "macro-traffic", "macro-countries"],
+      keywords: ["makro report", "macro report"]
+    },
+    {
+      id: "watchlist-report",
+      category: "reports",
+      question: "Wie erstelle ich einen Watchlist-Report?",
+      answer: "Nutze den Watchlist-Report im Research-Center oder in der Watchlist-Action.",
+      where: "Research-/Report-Center und Watchlist-Bereich.",
+      canDo: "Der Report fasst beobachtete Assets, Bewegungen, Events, Alerts und Datenstatus zusammen.",
+      route: "research",
+      actionLabel: "Reports oeffnen",
+      related: ["watchlist-add", "reports-pdf", "alert-set"],
+      keywords: ["watchlist report", "beobachtung report"]
+    },
+    {
+      id: "alert-set",
+      category: "alerts-watchlist",
+      question: "Wie setze ich einen Alert?",
+      answer: "Oeffne Alerts oder nutze die Alert-Aktion auf Asset-, Screener- oder Watchlist-Karten.",
+      where: "Hauptnavigation: Alerts.",
+      canDo: "Du kannst Preis-, Earnings-, Event- oder Watchlist-Hinweise lokal anlegen.",
+      route: "alerts",
+      actionLabel: "Alerts oeffnen",
+      related: ["alert-snooze", "alert-event", "watchlist-add"],
+      keywords: ["alert", "alarm", "benachrichtigung", "preisalert"]
+    },
+    {
+      id: "alert-snooze",
+      category: "alerts-watchlist",
+      question: "Was bedeutet Snooze?",
+      answer: "Snooze verschiebt einen Alert oder Hinweis fuer spaeter, statt ihn sofort endgueltig zu loeschen.",
+      where: "Im Alerts-Bereich.",
+      canDo: "Du kannst Hinweise ruhiger verwalten, ohne wichtige Beobachtungspunkte zu verlieren.",
+      route: "alerts",
+      actionLabel: "Alerts oeffnen",
+      related: ["alert-set", "alert-event", "watchlist-add"],
+      keywords: ["snooze", "verschieben", "spaeter"]
+    },
+    {
+      id: "alert-event",
+      category: "alerts-watchlist",
+      question: "Was ist ein Event-Alert?",
+      answer: "Ein Event-Alert erinnert an Termine wie Earnings, Dividenden, Makrodaten oder relevante Watchlist-Events.",
+      where: "Im Alerts- und Event-Hub-Bereich.",
+      canDo: "Du kannst Termine beobachten, ohne daraus automatisch ein gutes oder schlechtes Signal zu machen.",
+      route: "alerts",
+      actionLabel: "Alerts oeffnen",
+      related: ["nav-watchlist", "events-find", "reports-create"],
+      keywords: ["event alert", "earnings alert", "dividende"]
+    },
+    {
+      id: "watchlist-add",
+      category: "alerts-watchlist",
+      question: "Wie fuege ich etwas zur Watchlist hinzu?",
+      answer: "Nutze die Watchlist-Aktion auf Asset-Seiten oder gib ein Symbol im Watchlist-Bereich ein.",
+      where: "Asset-Seite und Watchlist.",
+      canDo: "Watchlist-Werte werden auf Startseite, Events, Alerts, Reports und Screener-Kontext hervorgehoben.",
+      route: "portfolio",
+      actionLabel: "Watchlist oeffnen",
+      related: ["asset-search", "alert-set", "prefs-favorites"],
+      keywords: ["watchlist hinzufuegen", "beobachten", "speichern"]
+    },
+    {
+      id: "watchlist-vs-favorites",
+      category: "alerts-watchlist",
+      question: "Was ist der Unterschied zwischen Watchlist und Favoriten?",
+      answer: "Watchlist bedeutet: Werte beobachten. Favoriten bedeutet: besonders haeufig genutzte Werte priorisieren.",
+      where: "Watchlist liegt im Portfolio-/Watchlist-Bereich, Favoriten in Personalisierung und auf Asset-Seiten.",
+      canDo: "Favoriten werden in Suche, Startseite und Command Palette bevorzugt; Watchlist-Werte treiben Events, Alerts und Reports.",
+      route: "portfolio",
+      actionLabel: "Watchlist oeffnen",
+      related: ["watchlist-add", "prefs-favorites", "asset-search"],
+      keywords: ["favoriten", "watchlist unterschied", "lieblingsassets", "beobachten"]
+    },
+    {
+      id: "events-find",
+      category: "alerts-watchlist",
+      question: "Wo finde ich Events und Earnings?",
+      answer: "Events und Earnings liegen im Event-Hub.",
+      where: "Hauptnavigation: Events.",
+      canDo: "Du kannst nach Zeitraum, Typ, Watchlist-Bezug und Relevanz filtern.",
+      route: "events",
+      actionLabel: "Event-Hub oeffnen",
+      related: ["alert-event", "watchlist-add", "reports-create"],
+      keywords: ["events", "earnings", "termine", "dividende"]
+    },
+    {
+      id: "prefs-dashboard",
+      category: "preferences",
+      question: "Wie aendere ich mein Dashboard?",
+      answer: "Im Bereich Personalisierung stellst du Dashboard-Modus, Modulprioritaeten und Shortcuts ein.",
+      where: "Hauptnavigation: Personalisierung.",
+      canDo: "Die Startseite passt Reihenfolge, Sichtbarkeit und Erklaerungstiefe an.",
+      route: "preferences",
+      actionLabel: "Personalisierung oeffnen",
+      related: ["dashboard-setup", "prefs-favorites", "prefs-beginner"],
+      keywords: ["dashboard aendern", "personalisierung", "einstellungen"]
+    },
+    {
+      id: "prefs-favorites",
+      category: "preferences",
+      question: "Wie setze ich Favoriten?",
+      answer: "Favoriten sind persoenliche Schnellzugriffe und Priorisierungen, getrennt von der Watchlist.",
+      where: "Im Personalisierungsbereich und an Symbol-Aktionen.",
+      canDo: "Favoriten koennen Startseite, Suche, Watchlist, Compare, Reports und Screener beeinflussen.",
+      route: "preferences",
+      actionLabel: "Favoriten verwalten",
+      related: ["watchlist-add", "prefs-dashboard", "asset-search"],
+      keywords: ["favoriten", "lieblingsassets", "stern"]
+    },
+    {
+      id: "prefs-export",
+      category: "preferences",
+      question: "Wie exportiere oder importiere ich mein Setup?",
+      answer: "Setup Export/Import speichert lokale Nutzerdaten als JSON, aber niemals geheime Betreiber-Zugangsdaten.",
+      where: "Im Personalisierungsbereich oder ueber Guided Start.",
+      canDo: "Du kannst Preferences, Watchlist, Portfolios, Alerts, Journal, Aktivitaeten und XP sichern oder importieren.",
+      route: "preferences",
+      actionLabel: "Setup verwalten",
+      related: ["data-no-keys", "demo-load", "prefs-dashboard"],
+      keywords: ["export", "import", "setup", "backup", "sichern"]
+    },
+    {
+      id: "prefs-beginner",
+      category: "preferences",
+      question: "Wo stelle ich Anfaenger-Erklaerungen ein?",
+      answer: "Anfaenger-Erklaerungen steuerst du in der Personalisierung ueber Detailgrad und Learning-Hinweise.",
+      where: "Personalisierung: Anzeigeeinstellungen.",
+      canDo: "Aktiviert kurze Hilfen bei Begriffen wie KGV, TER, Yield Curve, Realzins, Volatilitaet und Datenstatus.",
+      route: "preferences",
+      actionLabel: "Anzeige einstellen",
+      related: ["glossary-kgv", "data-hybrid", "start-new"],
+      keywords: ["anfaenger", "erklaerungen", "learning", "hilfe"]
+    },
+    {
+      id: "data-live",
+      category: "macro-data",
+      question: "Was bedeutet Live?",
+      answer: "Live bedeutet, dass ein Modul echte Daten ueber serverseitige Routen oder OpenData-Pfade nutzen kann.",
+      where: "Als Status-Badge direkt in Modulen und Reports.",
+      canDo: "Du erkennst, welche Teile datengetrieben sind. Live heisst trotzdem nicht fehlerfrei oder vollstaendig.",
+      route: "home",
+      actionLabel: "Startseite oeffnen",
+      related: ["data-hybrid", "data-local", "data-missing"],
+      keywords: ["live", "live daten", "echtzeit"]
+    },
+    {
+      id: "data-hybrid",
+      category: "macro-data",
+      question: "Was bedeutet Hybrid?",
+      answer: "Hybrid bedeutet Mischung aus echten Datenpfaden und lokaler Produktlogik.",
+      where: "In Asset, ETF, Portfolio, Makro, Screener und Reports.",
+      canDo: "Du siehst transparent, dass manche Bausteine live sind und andere heuristisch oder lokal bleiben.",
+      route: "home",
+      glossary: "hybrid",
+      actionLabel: "Hybrid im Glossar",
+      related: ["data-live", "data-local", "data-no-keys"],
+      keywords: ["hybrid", "hybrid daten", "datenstatus"]
+    },
+    {
+      id: "data-local",
+      category: "macro-data",
+      question: "Was bedeutet Local Structured?",
+      answer: "Local Structured sind lokal gepflegte strukturierte Daten, etwa ETF-Strukturen, bekannte Asset-Basisdaten oder lokale Ereignislisten.",
+      where: "Als Datenstatus in Modulen und Reports.",
+      canDo: "Die App bleibt nutzbar, kennzeichnet lokale Daten aber nicht als Live-Wahrheit.",
+      route: "home",
+      glossary: "local-structured",
+      actionLabel: "Local Structured im Glossar",
+      related: ["data-fake", "data-missing", "data-hybrid"],
+      keywords: ["fallback", "local", "lokale daten", "ersatzdaten", "offline"]
+    },
+    {
+      id: "data-modelled",
+      category: "macro-data",
+      question: "Was bedeutet Modelled?",
+      answer: "Modelled bedeutet, dass eine Einordnung berechnet oder heuristisch aus vorhandenen Inputs abgeleitet wird.",
+      where: "Bei Screener-Scores, Makroampeln, Sentiment- und Risiko-Logik.",
+      canDo: "Du siehst damit Produktlogik und Plausibilitaet, aber keine objektive Live-Messung und keine Anlageberatung.",
+      route: "screener",
+      glossary: "modelled",
+      actionLabel: "Modelled im Glossar",
+      related: ["data-hybrid", "screener-rating", "macro-traffic"],
+      keywords: ["modelled", "modelliert", "heuristik", "score"]
+    },
+    {
+      id: "data-fake",
+      category: "macro-data",
+      question: "Sind lokale Daten ausgedacht?",
+      answer: "Local-Structured-Daten sind gepflegte lokale Beispiel- oder Ersatzdaten, keine Behauptung perfekter Live-Daten.",
+      where: "Direkt dort, wo ein Modul mit Local Structured, Demo oder Modelled arbeitet.",
+      canDo: "Wenn Daten fehlen, zeigt MH Analytics einen eingeschraenkten Status statt Fantasiedaten als sicher zu verkaufen.",
+      route: "home",
+      actionLabel: "Startseite oeffnen",
+      related: ["data-local", "data-missing", "reports-disclaimer"],
+      keywords: ["ausgedacht", "fake", "fallback daten", "local structured"]
+    },
+    {
+      id: "data-missing",
+      category: "macro-data",
+      question: "Warum fehlen manche Live-Daten?",
+      answer: "Live-Daten koennen fehlen, wenn Provider-Keys nicht gesetzt sind, Ratenlimits greifen, Provider antworten fehlerhaft oder eine Integration noch hybrid ist.",
+      where: "Der jeweilige Modulstatus und Reports zeigen die Einschraenkung.",
+      canDo: "Normale Nutzer geben keine Keys ein. Betreiber konfigurieren Provider nur serverseitig.",
+      route: "home",
+      actionLabel: "Startseite oeffnen",
+      related: ["data-live", "data-hybrid", "data-no-keys"],
+      keywords: ["fehlen", "missing", "keine live daten", "provider"]
+    },
+    {
+      id: "data-no-keys",
+      category: "macro-data",
+      question: "Werden geheime Betreiber-Zugangsdaten im Browser gespeichert?",
+      answer: "Nein. Geheime Betreiber-Zugangsdaten gehoeren nicht in die oeffentliche UI und werden nicht exportiert oder importiert.",
+      where: "Betreiber-seitige Zugangsdaten laufen nur ueber die Server-/Vercel-Umgebung.",
+      canDo: "Du kannst normale Preferences lokal speichern, aber keine Provider-Secrets eingeben.",
+      route: "home",
+      actionLabel: "Startseite oeffnen",
+      related: ["prefs-export", "data-hybrid", "data-missing"],
+      keywords: ["zugangsdaten", "secrets", "browser", "localstorage"]
+    },
+    {
+      id: "data-local-storage",
+      category: "macro-data",
+      question: "Was wird lokal gespeichert?",
+      answer: "Lokal gespeichert werden normale Nutzerdaten wie Preferences, Watchlist, Favoriten, Alerts, Portfolios, Journal, Aktivitaeten und Lernfortschritt.",
+      where: "In den Browser-Einstellungen dieser App und im Setup-Export.",
+      canDo: "API-Keys und Betreiber-Secrets werden nicht lokal gespeichert, nicht exportiert und nicht importiert.",
+      route: "preferences",
+      actionLabel: "Personalisierung oeffnen",
+      related: ["prefs-export", "data-no-keys", "demo-load"],
+      keywords: ["lokal gespeichert", "localstorage", "setup", "daten im browser"]
+    },
+    {
+      id: "glossary-kgv",
+      category: "glossary",
+      question: "Was bedeutet KGV?",
+      answer: "KGV ist das Kurs-Gewinn-Verhaeltnis: Preis im Verhaeltnis zum Gewinn je Aktie.",
+      where: "Asset-Seiten, Screener Value Score und Reports.",
+      canDo: "Es hilft bei Bewertung, ist aber ohne Wachstum, Qualitaet und Datenstatus unvollstaendig.",
+      route: "home",
+      glossary: "kgv",
+      actionLabel: "KGV im Glossar",
+      related: ["glossary-eps", "screener-rating", "asset-analyze"],
+      keywords: ["kgv", "pe", "bewertung"]
+    },
+    {
+      id: "glossary-eps",
+      category: "glossary",
+      question: "Was bedeutet EPS?",
+      answer: "EPS bedeutet Earnings per Share, also Gewinn je Aktie.",
+      where: "Asset-Seite und Fundamentaldaten, soweit verfuegbar.",
+      canDo: "EPS hilft, Gewinnentwicklung und Bewertung einzuordnen, wenn die Datenbasis vorhanden ist.",
+      route: "home",
+      glossary: "eps",
+      actionLabel: "EPS im Glossar",
+      related: ["glossary-kgv", "screener-rating", "data-hybrid"],
+      keywords: ["eps", "gewinn je aktie"]
+    },
+    {
+      id: "glossary-vola",
+      category: "glossary",
+      question: "Was bedeutet Volatilitaet?",
+      answer: "Volatilitaet beschreibt, wie stark ein Asset schwankt.",
+      where: "Screener Risk Score, Asset-Technik und Portfolio-Risiko.",
+      canDo: "Hohe Volatilitaet kann Chance und Risiko erhoehen und sollte nicht automatisch als gut gelten.",
+      route: "home",
+      glossary: "volatilitaet",
+      actionLabel: "Volatilitaet im Glossar",
+      related: ["glossary-drawdown", "portfolio-cluster", "screener-rating"],
+      keywords: ["volatilitaet", "vola", "schwankung"]
+    },
+    {
+      id: "glossary-drawdown",
+      category: "glossary",
+      question: "Was bedeutet Drawdown?",
+      answer: "Drawdown ist der Rueckgang vom Zwischenhoch bis zum Tief.",
+      where: "Portfolio, Risiko und Research-Kontext.",
+      canDo: "Du kannst Risiko besser verstehen als nur ueber Rendite oder Tagesbewegungen.",
+      route: "home",
+      glossary: "drawdown",
+      actionLabel: "Drawdown im Glossar",
+      related: ["glossary-vola", "portfolio-cluster", "portfolio-exposure"],
+      keywords: ["drawdown", "verlust vom hoch", "rueckgang"]
+    },
+    {
+      id: "glossary-style",
+      category: "glossary",
+      question: "Was bedeuten Momentum, Value und Growth?",
+      answer: "Momentum beschreibt Trendstaerke, Value Bewertungsnaehe und Growth Wachstumsnaehe.",
+      where: "Screener, Top Picks und Asset-Research.",
+      canDo: "Die Begriffe helfen, unterschiedliche Gruende fuer ein Ranking zu verstehen.",
+      route: "screener",
+      actionLabel: "Screener oeffnen",
+      related: ["screener-rating", "screener-why", "glossary-kgv"],
+      keywords: ["momentum", "value", "growth", "stil"]
+    }
   ];
 
   const LEVELS = [
@@ -2601,9 +3486,18 @@
       avgPrice: "",
       cashChange: 0
     },
+    assetSearch: {
+      query: "",
+      results: [],
+      loading: false,
+      error: "",
+      source: "local",
+      lastQuery: ""
+    },
     commandQuery: "",
     helpOpen: false,
     helpQuery: "",
+    helpCategory: "start",
     helpAnswer: null,
     importPreview: null,
     quotes: {},
@@ -2612,21 +3506,25 @@
     news: {},
     macro: [],
     globalMacro: [],
+    cftcCot: null,
     seriesStats: {},
     events: [],
     assetLoadedAt: {},
     lastHomeRefresh: 0,
     lastScreenerRefresh: 0,
     lastEventsRefresh: 0,
+    lastCftcRefresh: 0,
     loadingHome: false,
     loadingScreener: false,
     loadingEvents: false,
+    loadingCftc: false,
     loadingAssets: {}
   };
 
   const app = document.getElementById("app");
   const toastStack = document.getElementById("toastStack");
   const assetMap = new Map(ASSETS.map((asset) => [asset.symbol, asset]));
+  let assetSearchTimer = null;
 
   function init() {
     removeLegacyBrowserApiKeys();
@@ -2655,6 +3553,40 @@
       storageSet(STORAGE_KEYS.theme, state.theme);
       applyTheme();
       render();
+      return;
+    }
+
+    const assetSearchResult = event.target.closest("[data-asset-search-symbol]");
+    if (assetSearchResult) {
+      selectAssetSearchResult(assetSearchResult.dataset.assetSearchSymbol);
+      return;
+    }
+
+    const assetSearchQuery = event.target.closest("[data-asset-search-query]");
+    if (assetSearchQuery) {
+      setAssetSearchQuery(assetSearchQuery.dataset.assetSearchQuery || "");
+      return;
+    }
+
+    const assetSearchSubmit = event.target.closest("[data-asset-search-submit]");
+    if (assetSearchSubmit) {
+      runAssetSearch(state.assetSearch.query || state.activeSymbol || "", { immediate: true });
+      return;
+    }
+
+    const assetRefresh = event.target.closest("[data-asset-refresh]");
+    if (assetRefresh) {
+      const symbol = normalizeSymbol(assetRefresh.dataset.assetRefresh || state.activeSymbol);
+      ensureAssetData(symbol, true);
+      runAssetSearch(symbol, { immediate: true });
+      toast(`${symbol} wird erneut über serverseitige Datenpfade geprüft.`);
+      return;
+    }
+
+    const cftcRefresh = event.target.closest("[data-cftc-refresh]");
+    if (cftcRefresh) {
+      ensureCftcData(true);
+      toast("CFTC-COT-Positionierung wird serverseitig erneut geprueft.");
       return;
     }
 
@@ -2740,6 +3672,14 @@
     const glossaryButton = event.target.closest("[data-glossary]");
     if (glossaryButton) {
       focusGlossaryTerm(glossaryButton.dataset.glossary);
+      return;
+    }
+
+    const helpCategory = event.target.closest("[data-help-category]");
+    if (helpCategory) {
+      state.helpCategory = helpCategory.dataset.helpCategory || "start";
+      state.helpAnswer = null;
+      renderGuidanceDock();
       return;
     }
 
@@ -2944,6 +3884,12 @@
   }
 
   function handleInput(event) {
+    const assetSearchInput = event.target.closest("[data-asset-search-input]");
+    if (assetSearchInput) {
+      updateAssetSearchInput(assetSearchInput.value);
+      return;
+    }
+
     const input = event.target.closest("[data-search-input]");
     if (input) {
       renderSuggestions(input);
@@ -3050,6 +3996,20 @@
   }
 
   function handleKeydown(event) {
+    if (event.key === "Escape" && state.helpOpen) {
+      state.helpOpen = false;
+      state.helpAnswer = null;
+      renderGuidanceDock();
+      return;
+    }
+
+    const assetSearchInput = event.target.closest("[data-asset-search-input]");
+    if (assetSearchInput && event.key === "Enter") {
+      event.preventDefault();
+      selectBestAssetSearchResult(assetSearchInput.value);
+      return;
+    }
+
     const commandInput = event.target.closest("[data-command-search]");
     if (commandInput && event.key === "Enter") {
       event.preventDefault();
@@ -3202,11 +4162,11 @@
     } else if (state.route === "preferences") {
       renderPreferencesPage();
     } else if (state.route === "data-health") {
-      renderDataHealthPage();
+      renderPublicDataStatusNoticePage();
     } else if (state.route === "legal") {
       renderLegalPage();
     } else if (state.route === "settings") {
-      renderSettingsPage();
+      renderPublicDataStatusNoticePage();
     } else {
       renderHomePage();
     }
@@ -3386,9 +4346,9 @@
           <div class="card-topline">
             <div>
               <span class="card-label">Datenstatus heute</span>
-              <h3>Live, Hybrid, Fallback und lokal klar getrennt</h3>
+              <h3>Live, Cached, Hybrid und lokal klar getrennt</h3>
             </div>
-            <button class="tiny-button" type="button" data-route="data-health">Data Health</button>
+            <span class="pill">Status im Modul</span>
           </div>
           <div class="trust-status-grid">
             ${items.map((item) => `
@@ -3673,7 +4633,7 @@
         { label: "Report", report: "portfolio", primary: true },
         { label: "What-if", route: "portfolio" },
         { label: "Risiko pruefen", route: "portfolio" },
-        { label: "Data Health", route: "data-health" }
+        { label: "Alerts", route: "alerts" }
       ],
       etf: [
         { label: "Compare", route: "compare", primary: true },
@@ -3683,7 +4643,7 @@
       ],
       macro: [
         { label: "Report", report: "macro", primary: true },
-        { label: "Data Health", route: "data-health" },
+        { label: "Events", route: "events" },
         { label: "Laendervergleich", route: "macro" }
       ],
       screener: [
@@ -3717,10 +4677,10 @@
     const similar = similarAssetFor(symbol);
     const map = {
       asset: [
-        { label: "Mit aehnlichem Asset vergleichen", text: `${symbol} vs ${similar}`, action: "compare-pair", left: symbol, right: similar },
-        { label: "Alert setzen", text: "Preis- oder Event-Regel fuer dieses Asset anlegen.", dataset: { alertQuick: symbol, alertQuickType: "price" } },
-        { label: "In Watchlist speichern", text: "Asset fuer Recap, Events und Alerts vormerken.", dataset: { watchAdd: symbol } },
-        { label: "Asset-Report erstellen", text: "Research-Snapshot als Druckansicht exportieren.", report: "asset", symbol }
+        { label: "Technik ansehen", text: "Trend, Momentum und Risikoindikatoren ohne neue Seite pruefen.", dataset: { assetTab: "technical" } },
+        { label: "Fundamentals pruefen", text: "Bewertung, EPS, Umsatz und Datenstatus kompakt ansehen.", dataset: { assetTab: "fundamental" } },
+        { label: "Events pruefen", text: "Nahe Termine und News-Kontext direkt auf der Asset-Seite ansehen.", dataset: { assetTab: "events" } },
+        { label: "These festhalten", text: "Kurze Entscheidungsthese im lokalen Journal speichern.", dataset: { journalOpen: symbol, journalContext: "asset-next" } }
       ],
       portfolio: [
         { label: "Klumpenrisiko pruefen", text: "Groesste Positionen und Sektorlast ansehen.", route: "portfolio" },
@@ -3737,7 +4697,7 @@
       macro: [
         { label: "Makro-Report exportieren", text: "Ampel, Laendervergleich und Risiken sichern.", report: "macro" },
         { label: "Asset-Implikationen ansehen", text: "Kontext fuer Aktien, Gold, Anleihen und Krypto.", route: "macro" },
-        { label: "Data Health pruefen", text: "Sehen, welche Makroquellen live/hybrid/fallback sind.", route: "data-health" }
+        { label: "Events ansehen", text: "Makrotermine und relevante Ereignisse im Kalender pruefen.", route: "events" }
       ],
       screener: [
         { label: "Top Pick oeffnen", text: "Besten Kandidaten mit Erklaerung ansehen.", symbol: topPicksForView().long[0]?.symbol || "NVDA" },
@@ -3860,26 +4820,37 @@
     const quoteStatus = getOverallDataStatus();
     const macroStatus = macroCountryComparisonForView().status || "hybrid";
     return [
-      { label: "Aktien", status: quoteStatus === "live" ? "hybrid" : quoteStatus, text: "Quotes live/hybrid, Research lokal transparent." },
-      { label: "Makro", status: macroStatus, text: "FRED/OpenData/Fallback je Reihe sichtbar." },
+      { label: "Aktien", status: derivedDataStatus(quoteStatus), text: "Quotes live/cached moeglich, Research bleibt lokale Produktlogik." },
+      { label: "Makro", status: macroStatus, text: "FRED/OpenData/Local Structured je Reihe sichtbar." },
       { label: "ETF", status: "local", text: "Struktur lokal, Kurse hybrid moeglich." },
       { label: "Portfolio", status: "local", text: "Positionen lokal, Kurse hybrid." },
       { label: "Reports", status: "local", text: "Browser-PDF ohne Server-PDF." },
-      { label: "Letzter Check", status: quoteStatus, text: formatTimestamp(Date.now()) }
+      { label: "Datenfrische", status: derivedDataStatus(quoteStatus), text: getOverallDataStatusText() }
     ];
   }
 
   function featureSearchResults(query = "") {
     const term = String(query || "").trim().toLowerCase();
     const mode = dashboardPrefs().mode;
-    const scored = FEATURE_COMMANDS.map((command) => {
+    const assetCommands = term.length >= 2
+      ? searchAssets(term).slice(0, 4).map((asset) => ({
+        id: `asset:${asset.symbol}`,
+        label: `${asset.name} analysieren`,
+        text: `${asset.symbol} öffnen · ${asset.type} · ${assetExchange(asset) || assetRegion(asset)}`,
+        symbol: asset.symbol,
+        route: "asset",
+        keywords: [asset.symbol, asset.name, asset.sector, asset.type],
+        score: 9 - Math.min(scoreAssetMatch(asset, term), 5)
+      }))
+      : [];
+    const scored = [...assetCommands, ...FEATURE_COMMANDS.map((command) => {
       const haystack = [command.label, command.text, ...(command.keywords || [])].join(" ").toLowerCase();
       let score = !term ? 1 : haystack.includes(term) ? 10 : term.split(/\s+/).filter((part) => haystack.includes(part)).length;
       if (mode === "trader" && ["alert", "screener"].some((word) => haystack.includes(word))) score += 1;
       if (mode === "etf" && haystack.includes("etf")) score += 2;
       if (mode === "macro" && haystack.includes("makro")) score += 2;
       return { ...command, score };
-    }).filter((command) => command.score > 0);
+    })].filter((command) => command.score > 0);
     return scored.sort((a, b) => b.score - a.score).slice(0, 6);
   }
 
@@ -3900,13 +4871,19 @@
   }
 
   function runCommandAction(id) {
+    if (String(id || "").startsWith("asset:")) {
+      const symbol = String(id).slice("asset:".length);
+      state.commandQuery = "";
+      recordActivity("Suche", `${symbol} analysieren`, { route: "asset", symbol });
+      selectAsset(symbol);
+      return;
+    }
     const command = FEATURE_COMMANDS.find((item) => item.id === id);
     if (!command) return;
     state.commandQuery = "";
     recordActivity("Suche", command.label, { route: command.route || "home", symbol: command.symbol || "" });
     if (command.glossary) {
       focusGlossaryTerm(command.glossary);
-      navigate("home");
       return;
     }
     if (command.action) {
@@ -3925,7 +4902,11 @@
   function focusGlossaryTerm(id) {
     state.learning = normalizeLearningState({ ...state.learning, focusTerm: id });
     storageSet(STORAGE_KEYS.learning, state.learning);
-    render();
+    if (state.route !== "home") {
+      navigate("home");
+    } else {
+      render();
+    }
   }
 
   function glossaryTermById(id) {
@@ -3973,6 +4954,10 @@
       loadDemoSetup(replaces);
       return;
     }
+    if (action === "demo-journal") {
+      loadDemoJournalEntry();
+      return;
+    }
     if (action === "export-setup") {
       exportLocalSetup();
       return;
@@ -3992,11 +4977,31 @@
     }
     if (action === "open-help") {
       state.helpOpen = true;
+      state.helpCategory = state.helpCategory || "start";
       renderGuidanceDock();
       return;
     }
     if (action === "close-help") {
       state.helpOpen = false;
+      state.helpAnswer = null;
+      renderGuidanceDock();
+      return;
+    }
+    if (action === "help-back") {
+      state.helpAnswer = null;
+      state.helpQuery = "";
+      state.helpCategory = "start";
+      renderGuidanceDock();
+      return;
+    }
+    if (action === "help-clear") {
+      state.helpQuery = "";
+      state.helpAnswer = null;
+      renderGuidanceDock();
+      return;
+    }
+    if (action === "help-close-answer") {
+      state.helpAnswer = null;
       renderGuidanceDock();
       return;
     }
@@ -4007,6 +5012,37 @@
     if (action === "compare-pair") {
       openComparePair(dataset.left || state.activeSymbol, dataset.right || similarAssetFor(state.activeSymbol));
     }
+  }
+
+  function loadDemoJournalEntry() {
+    const symbol = assetMap.has(state.activeSymbol) ? state.activeSymbol : "NVDA";
+    const entry = normalizeJournalEntry({
+      id: `demo-journal-${Date.now()}`,
+      symbol,
+      type: "observe",
+      category: getAsset(symbol).type === "ETF" ? "etf" : "longterm",
+      size: "Demo/Testnotiz",
+      thesis: "Demo: Ich prüfe, ob These, Risiko und Datenlage zusammenpassen, bevor ich handle.",
+      arguments: ["Trend und Kontext prüfen", "Risiko begrenzen", "Event-Termine beachten"],
+      bullCase: "These bestätigt sich durch bessere Daten oder saubere technische Stärke.",
+      bearCase: "Volatilität, Bewertung oder Event-Risiko sprechen gegen einen schnellen Einstieg.",
+      trigger: "Nächster Report, Event oder klarer technischer Bruch",
+      invalidation: "These kippt, wenn Risiko und Datenlage nicht mehr zusammenpassen.",
+      target: "Bessere Entscheidungsqualität, keine Kaufempfehlung.",
+      emotion: "neutral",
+      emotionStrength: 3,
+      conviction: 6,
+      pressure: "low",
+      rule: { plan: "yes", entry: "partial", risk: "yes", reason: "yes", impulse: "yes", size: "partial" },
+      mistakes: ["missing_plan"],
+      comment: "Lokaler Demo-Eintrag. Kann gelöscht oder überschrieben werden.",
+      timestamp: Date.now() - 1000 * 60 * 45
+    });
+    state.journal = [entry, ...journalEntriesForView().filter((item) => !String(item.id).startsWith("demo-journal-"))].slice(0, 120);
+    storageSet(STORAGE_KEYS.journal, state.journal);
+    recordActivity("Journal", "Demo-Eintrag geladen", { route: "journal", symbol });
+    toast("Demo-Journal-Eintrag lokal geladen.");
+    render();
   }
 
   function loadDemoSetup(replace = false) {
@@ -4150,76 +5186,189 @@
   }
 
   function renderHelpAssistantDock() {
+    const category = helpCategoryById(state.helpCategory) || HELP_CATEGORIES[0];
     return `
       <div class="help-assistant-dock" id="helpAssistantDock">
         ${state.helpOpen ? `
-          <article class="help-panel">
-            <div class="card-topline">
+          <article class="help-panel" role="dialog" aria-label="MH Help Assistant">
+            <div class="help-panel-head">
               <div>
                 <span class="card-label">MH Help Assistant</span>
                 <h3>Navigation & Begriffe</h3>
               </div>
-              <button class="tiny-button" type="button" data-guidance-action="close-help">Schliessen</button>
+              <div class="help-window-actions">
+                <button class="tiny-button" type="button" data-guidance-action="help-back">Start</button>
+                <button class="tiny-button" type="button" data-guidance-action="close-help" aria-label="Help Assistant schliessen">Schliessen</button>
+              </div>
             </div>
             <p class="small">Regelbasiert, lokal, keine KI-API und keine Finanzberatung.</p>
+            <div class="help-category-tabs" aria-label="Hilfekategorien">
+              ${HELP_CATEGORIES.map((item) => `
+                <button class="help-category-tab ${item.id === category.id ? "active" : ""}" type="button" data-help-category="${escAttr(item.id)}">
+                  ${esc(item.label)}
+                </button>
+              `).join("")}
+            </div>
             <label class="field">
               <span>Frage</span>
               <input data-help-input value="${escAttr(state.helpQuery)}" placeholder="Wo finde ich ETFs? Was bedeutet KGV?">
             </label>
             <div class="row-actions">
               <button class="primary-button" type="button" data-guidance-action="ask-help">Antwort suchen</button>
+              <button class="ghost-button" type="button" data-guidance-action="help-clear">Neue Frage</button>
             </div>
+            ${state.helpAnswer ? renderHelpAnswer(state.helpAnswer) : renderHelpCategory(category)}
             <div id="helpSuggestions" class="help-suggestions">
-              ${renderHelpSuggestionItems(helpSuggestions(state.helpQuery))}
+              ${state.helpQuery ? renderHelpSuggestionItems(helpSuggestions(state.helpQuery)) : ""}
             </div>
-            ${state.helpAnswer ? renderHelpAnswer(state.helpAnswer) : ""}
           </article>
         ` : `<button class="help-fab" type="button" data-guidance-action="open-help">?</button>`}
       </div>
     `;
   }
 
+  function helpCategoryById(id) {
+    return HELP_CATEGORIES.find((item) => item.id === id) || null;
+  }
+
+  function helpCategoryLabel(id) {
+    return helpCategoryById(id)?.label || "Hilfe";
+  }
+
+  function helpFaqById(id) {
+    return HELP_FAQS.find((item) => item.id === id) || null;
+  }
+
+  function helpFaqsForCategory(categoryId) {
+    return HELP_FAQS.filter((item) => item.category === categoryId);
+  }
+
+  function helpFaqSearchText(faq) {
+    return [faq.question, faq.answer, faq.where, faq.canDo, helpCategoryLabel(faq.category), ...(faq.keywords || [])].join(" ").toLowerCase();
+  }
+
+  function scoreHelpFaq(faq, term) {
+    if (!term) return faq.category === state.helpCategory ? 2 : 1;
+    const haystack = helpFaqSearchText(faq);
+    let score = haystack.includes(term) ? 12 : 0;
+    if (faq.question.toLowerCase() === term) score += 20;
+    for (const part of term.split(/\s+/).filter(Boolean)) {
+      if (haystack.includes(part)) score += 1;
+    }
+    if (faq.category === state.helpCategory) score += 2;
+    return score;
+  }
+
+  function helpFaqsForQuery(query = "") {
+    const term = String(query || "").trim().toLowerCase();
+    return HELP_FAQS
+      .map((faq) => ({ ...faq, score: scoreHelpFaq(faq, term) }))
+      .filter((faq) => faq.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+  }
+
   function helpSuggestions(query = "") {
-    const base = [
-      "Ich bin neu, womit soll ich anfangen?",
-      "Wo kann ich ETFs vergleichen?",
-      "Wie erstelle ich einen Report?",
-      "Was bedeutet Hybrid-Daten?",
-      "Wo sehe ich mein Portfolio?",
-      "Wie setze ich einen Alert?",
-      "Wo finde ich den Screener?"
-    ];
-    const term = String(query || "").toLowerCase();
-    return base.filter((item) => !term || item.toLowerCase().includes(term)).slice(0, 5);
+    const term = String(query || "").trim();
+    if (term) return helpFaqsForQuery(term).slice(0, 5);
+    return helpFaqsForCategory(state.helpCategory || "start").slice(0, 5);
+  }
+
+  function renderHelpCategory(category) {
+    const questions = helpFaqsForCategory(category.id);
+    return `
+      <div class="help-category-card">
+        <span class="pill">${esc(category.label)}</span>
+        <p>${esc(category.intro)}</p>
+        <div class="help-question-list">
+          ${questions.slice(0, 7).map((item) => renderHelpQuestionButton(item)).join("")}
+        </div>
+      </div>
+    `;
   }
 
   function renderHelpSuggestionItems(items) {
-    return items.map((item) => `<button class="chip" type="button" data-help-prompt="${escAttr(item)}">${esc(item)}</button>`).join("");
+    if (!items.length) {
+      return `<div class="empty-state guided-empty"><p>Keine passende Hilfefrage gefunden. Probiere Portfolio, ETF, Report, KGV, Hybrid oder Alert.</p></div>`;
+    }
+    return items.map((item) => renderHelpQuestionButton(item)).join("");
+  }
+
+  function renderHelpQuestionButton(item) {
+    const question = typeof item === "string" ? item : item.question;
+    return `<button class="help-question-button" type="button" data-help-prompt="${escAttr(question)}">${esc(question)}</button>`;
   }
 
   function renderHelpSuggestions(query) {
     const target = document.getElementById("helpSuggestions");
-    if (target) target.innerHTML = renderHelpSuggestionItems(helpSuggestions(query));
+    if (target) target.innerHTML = query ? renderHelpSuggestionItems(helpSuggestions(query)) : "";
   }
 
   function askHelpAssistant(query) {
     state.helpQuery = String(query || "").trim();
     state.helpAnswer = helpAnswerForQuery(state.helpQuery);
+    state.helpCategory = state.helpAnswer.categoryId || state.helpCategory || "start";
     recordActivity("Hilfe", state.helpQuery || "Help Assistant", { route: state.helpAnswer.route || "home" });
     renderGuidanceDock();
   }
 
   function helpAnswerForQuery(query) {
-    const term = String(query || "").toLowerCase();
+    const term = String(query || "").trim().toLowerCase();
+    const faq = term ? helpFaqsForQuery(term)[0] : helpFaqById("start-new");
+    if (faq) return helpAnswerFromFaq(faq);
     const glossary = glossaryTermForQuery(term);
     if (glossary) {
-      return { category: "Begriff", title: glossary.term, text: `${glossary.text} Wichtig: ${glossary.why}`, route: "home", actionLabel: "Glossar oeffnen", glossary: glossary.id };
+      return {
+        categoryId: "glossary",
+        category: "Begriff",
+        title: glossary.term,
+        text: glossary.text,
+        where: glossary.where,
+        canDo: `Warum wichtig: ${glossary.why}`,
+        route: "home",
+        actionLabel: "Glossar oeffnen",
+        glossary: glossary.id
+      };
     }
     const command = featureSearchResults(term)[0];
     if (command) {
-      return { category: "Navigation", title: command.label, text: command.text, route: command.route || "home", actionLabel: command.route ? "Oeffnen" : "Ausfuehren", commandId: command.id };
+      return {
+        categoryId: "navigation",
+        category: "Navigation",
+        title: command.label,
+        text: command.text,
+        where: command.route ? `Modul: ${routeLabel(command.route)}` : "Direkte lokale Aktion.",
+        canDo: "Der Assistant nutzt denselben lokalen Aktionskatalog wie die Feature-Suche.",
+        route: command.route || "home",
+        actionLabel: command.route ? "Oeffnen" : "Ausfuehren",
+        commandId: command.id
+      };
     }
-    return { category: "Start", title: "Starte mit Guided Start", text: "Wenn du neu bist, beginne mit Watchlist, erstem Asset, Testportfolio und Tagesreport.", route: "home", actionLabel: "Start oeffnen" };
+    return helpAnswerFromFaq(helpFaqById("start-new"));
+  }
+
+  function helpAnswerFromFaq(faq) {
+    return {
+      categoryId: faq.category,
+      category: helpCategoryLabel(faq.category),
+      title: faq.question,
+      text: faq.answer,
+      where: faq.where,
+      canDo: faq.canDo,
+      route: faq.route || "home",
+      action: faq.action || "",
+      actionLabel: faq.actionLabel || "Oeffnen",
+      glossary: faq.glossary || "",
+      commandId: faq.commandId || "",
+      related: (faq.related || []).map(helpFaqById).filter(Boolean).slice(0, 3)
+    };
+  }
+
+  function helpAnswerActionAttributes(answer) {
+    if (answer.action) return `data-guidance-action="${escAttr(answer.action)}"`;
+    if (answer.glossary) return `data-glossary="${escAttr(answer.glossary)}"`;
+    if (answer.commandId) return `data-command-action="${escAttr(answer.commandId)}"`;
+    return `data-route="${escAttr(answer.route || "home")}"`;
   }
 
   function renderHelpAnswer(answer) {
@@ -4228,7 +5377,19 @@
         <span class="pill">${esc(answer.category)}</span>
         <h4>${esc(answer.title)}</h4>
         <p>${esc(answer.text)}</p>
-        <button class="ghost-button" type="button" ${answer.glossary ? `data-glossary="${escAttr(answer.glossary)}"` : answer.commandId ? `data-command-action="${escAttr(answer.commandId)}"` : `data-route="${escAttr(answer.route || "home")}"`}>${esc(answer.actionLabel || "Oeffnen")}</button>
+        ${answer.where ? `<div class="help-answer-line"><strong>Wo?</strong><span>${esc(answer.where)}</span></div>` : ""}
+        ${answer.canDo ? `<div class="help-answer-line"><strong>Was dort?</strong><span>${esc(answer.canDo)}</span></div>` : ""}
+        <div class="help-answer-actions">
+          <button class="ghost-button" type="button" ${helpAnswerActionAttributes(answer)}>${esc(answer.actionLabel || "Oeffnen")}</button>
+          <button class="tiny-button" type="button" data-guidance-action="help-close-answer">Antwort schliessen</button>
+          <button class="tiny-button" type="button" data-guidance-action="help-back">Zurueck zur Auswahl</button>
+        </div>
+        ${answer.related?.length ? `
+          <div class="help-related">
+            <span class="card-label">Verwandt</span>
+            ${answer.related.map((item) => renderHelpQuestionButton(item)).join("")}
+          </div>
+        ` : ""}
       </div>
     `;
   }
@@ -4269,8 +5430,8 @@
       alerts: "Alerts",
       journal: "Journal",
       preferences: "Personalisierung",
-      "data-health": "Data Health",
-      settings: "Datenquellen"
+      "data-health": "Datenstatus-Hinweis",
+      settings: "Datenstatus-Hinweis"
     };
     return labels[route] || route || "Modul";
   }
@@ -4437,7 +5598,7 @@
           <div class="recap-priority-list">
             ${recap.priorityItems.map(renderRecapPriorityItem).join("") || renderEmptyState("Heute gibt es keine stark priorisierten Punkte im aktuellen Datenfenster.")}
           </div>
-          ${renderDataMeta(makeMeta("Daily-Recap: Watchlist + Events + Alerts + News", recap.status, Date.now(), "Relevanz wird lokal aus vorhandenen Daten priorisiert."), true)}
+          ${renderDataMeta(makeMeta("Daily-Recap: Watchlist + Events + Alerts + News", derivedDataStatus(recap.status), Date.now(), "Relevanz wird lokal aus vorhandenen Daten priorisiert."), true)}
         </article>
         <div class="daily-recap-layout">
           <article class="card recap-panel">
@@ -4574,7 +5735,7 @@
               <h3>Weiterarbeiten, wo du aufgehört hast</h3>
               <p>Letztes Asset: ${esc(state.activeSymbol)}. Favoriten: ${prefs.favorites.map(esc).join(", ") || "noch keine"}.</p>
             </div>
-            ${renderDataMeta(makeMeta("Lokale Dashboard-Personalisierung", "live", Date.now()), true)}
+            ${renderDataMeta(makeMeta("Lokale Dashboard-Personalisierung", "local", Date.now()), true)}
           </div>
           <div class="dashboard-mode-row">
             ${Object.keys(DASHBOARD_MODES).map((mode) => `
@@ -4724,7 +5885,6 @@
       reports: () => renderReportCenterCard(),
       assetResearch: renderHomeAssetResearchModule,
       liquidity: () => renderLiquidityImpactCard(),
-      dataHealth: () => renderProviderHealthPreview()
     };
     const content = renderers[module.id] ? renderers[module.id]() : "";
     if (!content) {
@@ -4853,7 +6013,7 @@
             <span class="card-label">Screener</span>
             <h3>Top-Treffer mit deinen Standardfiltern</h3>
           </div>
-          ${renderDataMeta(makeMeta("Screener Defaults + lokale Heuristik", getOverallDataStatus(), Date.now()), true)}
+          ${renderDataMeta(makeMeta("Screener Defaults + lokale Heuristik", derivedDataStatus(getOverallDataStatus()), Date.now()), true)}
         </div>
         <div class="stack-list">
           ${rows.map((row, index) => `
@@ -4904,7 +6064,7 @@
             ${renderResearchBulletList(research.risks.slice(0, 2))}
           </div>
         </div>
-        ${renderDataMeta(makeMeta("Asset-Research: lokale Verdichtung + verfügbare Daten", research.dataStatus, Date.now()), true)}
+        ${renderDataMeta(makeMeta("Asset-Research: lokale Verdichtung + verfügbare Daten", derivedDataStatus(research.dataStatus), Date.now()), true)}
       </article>
     `;
   }
@@ -4931,7 +6091,7 @@
             <h1>Zwei Assets direkt vergleichen.</h1>
             <p>Aktien und ETFs nebeneinander: Kurs, Profil, Bewertung, Technik, Chancen, Risiken und Datenstatus. Die Interpretation bleibt bewusst als MH-Hybridlogik gekennzeichnet.</p>
           </div>
-          ${renderDataMeta(makeMeta("Hybrid: Live-Daten + lokale Research-Logik", compareStatusFor(leftSymbol, rightSymbol), Date.now()), true)}
+          ${renderDataMeta(makeMeta("Hybrid: Live-Daten + lokale Research-Logik", derivedDataStatus(compareStatusFor(leftSymbol, rightSymbol)), Date.now()), true)}
         </div>
         ${renderCompareWorkbench(leftSymbol, rightSymbol, { full: true })}
       </section>
@@ -4949,7 +6109,7 @@
             <p>Aktie gegen Aktie oder ETF gegen ETF: Preis, Profil, Bewertung, Technik, Chancen und Risiken in einer ruhigen Gegenüberstellung.</p>
           </div>
           <div class="row-actions">
-            ${renderDataMeta(makeMeta("Hybrid: Finnhub, Alpha Vantage, ETF-Fallback", compareStatusFor(leftSymbol, rightSymbol), Date.now()), true)}
+            ${renderDataMeta(makeMeta("Hybrid: Finnhub, Alpha Vantage, ETF-Fallback", derivedDataStatus(compareStatusFor(leftSymbol, rightSymbol)), Date.now()), true)}
             <button class="ghost-button" type="button" data-route="compare">Compare öffnen</button>
           </div>
         </div>
@@ -5170,7 +6330,7 @@
       data.profile.meta.status,
       data.fundamentals.meta.status,
       data.analysis.meta?.status,
-      data.etf ? "fallback" : null
+      data.etf ? "local" : null
     ]);
   }
 
@@ -5179,8 +6339,7 @@
       Number(data.quote.meta.timestamp || 0),
       Number(data.profile.meta.timestamp || 0),
       Number(data.fundamentals.meta.timestamp || 0),
-      Number(data.analysis.meta?.timestamp || 0),
-      BOOT_TIME
+      Number(data.analysis.meta?.timestamp || 0)
     );
   }
 
@@ -5324,7 +6483,7 @@
             <h2>Makro-Schnellblick</h2>
             <p>FRED-Daten laufen online über die Vercel Function /api/fred. Lokal per Doppelklick bleibt die Seite stabil mit klar markierten Fallback-Werten.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="data-health">Datenstatus öffnen</button>
+          <span class="pill">Status je Kennzahl</span>
         </div>
         <div class="grid five macro-grid">
           ${macro.map((item) => `
@@ -5416,7 +6575,7 @@
                 <span class="card-label">Short / Risk Picks</span>
                 <h3>Risiko-Ranking</h3>
               </div>
-              ${renderStatusBadge("fallback")}
+              ${renderStatusBadge("modelled")}
             </div>
             <div class="stack-list">
               ${picks.risk.map((pick, index) => renderPickRow(pick, index + 1)).join("")}
@@ -5537,7 +6696,7 @@
             <span class="card-label">Sektor-Heatmap</span>
             <h3>Risk-on / Risk-off Karte</h3>
           </div>
-          ${renderTinyStatus("fallback")}
+          ${renderTinyStatus("modelled")}
         </div>
         <div class="heatmap">
           ${SECTOR_HEATMAP.map((cell) => `
@@ -5547,7 +6706,7 @@
             </button>
           `).join("")}
         </div>
-        ${renderDataMeta(makeMeta("Lokales Sektor-Modell", "fallback", BOOT_TIME, "Sektor-Heatmap bleibt als lokales Modell stabil."))}
+        ${renderDataMeta(makeMeta("Lokales Sektor-Modell", "modelled", null, "Sektor-Heatmap bleibt als lokales Modell stabil."))}
       </article>
     `;
   }
@@ -5620,7 +6779,7 @@
             <span class="card-label">Reddit / Sentiment</span>
             <h3>Social Radar</h3>
           </div>
-          ${renderTinyStatus("fallback")}
+          ${renderTinyStatus("modelled")}
         </div>
         <div class="stack-list">
           ${SOCIAL_ITEMS.map((item) => `
@@ -5634,7 +6793,7 @@
             </button>
           `).join("")}
         </div>
-        ${renderDataMeta(makeMeta("Lokales Social/Sentiment-Modell", "fallback", BOOT_TIME, "Direkte Reddit/X APIs sind in dieser statischen Version nicht aktiv."))}
+        ${renderDataMeta(makeMeta("Lokales Social/Sentiment-Modell", "modelled", null, "Direkte Reddit/X APIs sind in dieser statischen Version nicht aktiv."))}
       </article>
     `;
   }
@@ -5702,7 +6861,7 @@
               <h3><span id="screenerResultCount">${filtered.length}</span> gefilterte Assets</h3>
               <p>Jede Zeile zeigt Score-Komponenten, wichtigste Treiber, naechsten Event-Kontext und Datenstatus.</p>
             </div>
-            ${renderDataMeta(makeMeta("Lokale Screener Engine + verfügbare Quotes", getOverallDataStatus(), Date.now()), true)}
+            ${renderDataMeta(makeMeta("Lokale Screener Engine + verfügbare Quotes", derivedDataStatus(getOverallDataStatus()), Date.now()), true)}
           </div>
           <div id="screenerResults">
             ${renderScreenerResults(filtered)}
@@ -5721,7 +6880,7 @@
             <h3>${esc(summary.comment.title)}</h3>
             <p>${esc(summary.comment.text)}</p>
           </div>
-          ${renderDataMeta(makeMeta("Screener V2: lokale Scores + Live/Hybrid/Fallback Inputs", summary.status, Date.now()), true)}
+          ${renderDataMeta(makeMeta("Screener V2: lokale Scores + Live/Hybrid/Fallback Inputs", derivedDataStatus(summary.status), Date.now()), true)}
         </div>
         <div class="metric-grid">
           ${renderMiniMetric("Analysiert", String(summary.total))}
@@ -5892,7 +7051,7 @@
               <h3>${esc(summary.focusTitle)}</h3>
               <p>${esc(summary.focusText)}</p>
             </div>
-            ${renderDataMeta(makeMeta("Event-Hub Datenmix", eventStatus, Date.now(), eventHubModeText(events)), true)}
+            ${renderDataMeta(makeMeta("Event-Hub Datenmix", derivedDataStatus(eventStatus), Date.now(), eventHubModeText(events)), true)}
           </div>
           <div class="event-hub-summary">
             ${renderMiniMetric("Heute", String(summary.today))}
@@ -5966,7 +7125,7 @@
     const sourceFilters = [
       ["all", "Alle Quellen"],
       ["live", "Live"],
-      ["fallback", "Fallback"],
+      ["local", "Local Structured"],
       ["finnhub", "Finnhub"],
       ["alpha", "Alpha Vantage"],
       ["local", "Lokal / MH"]
@@ -5978,7 +7137,7 @@
             <span class="card-label">Filter</span>
             <h3>Zeitraum, Typ und Relevanz</h3>
           </div>
-          ${renderDataMeta(makeMeta("Event-Hub Filter", bestDataStatus(events.map((eventItem) => eventItem.meta.status)), Date.now()), true)}
+          ${renderDataMeta(makeMeta("Event-Hub Filter", derivedDataStatus(bestDataStatus(events.map((eventItem) => eventItem.meta.status))), Date.now()), true)}
         </div>
         <div class="event-filter-grid">
           <div>
@@ -6027,7 +7186,7 @@
 
   function renderEventProviderPanel() {
     const events = eventsForView();
-    const status = events.some((eventItem) => eventItem.meta.status === "live") ? "live" : events.some((eventItem) => eventItem.meta.status === "stale") ? "stale" : "fallback";
+    const status = events.some((eventItem) => normalizeDataStatus(eventItem.meta.status) === "live") ? "live" : events.some((eventItem) => normalizeDataStatus(eventItem.meta.status) === "cached") ? "cached" : "local";
     return `
       <article class="card event-provider-panel">
         <div class="card-topline">
@@ -6035,7 +7194,7 @@
             <span class="card-label">Events / Earnings Provider</span>
             <h3>Datenpfade für Termine und Corporate Actions</h3>
           </div>
-          ${renderDataMeta(makeMeta("Provider Registry + Event-Datenlayer", status, Date.now()), true)}
+          ${renderDataMeta(makeMeta("Provider Registry + Event-Datenlayer", derivedDataStatus(status), Date.now()), true)}
         </div>
         <div class="grid four event-provider-grid">
           ${EVENT_PROVIDER_SLOTS.map((slot) => `
@@ -6043,7 +7202,7 @@
               <span class="card-label">${esc(slot.provider)}</span>
               <strong>${esc(slot.name)}</strong>
               <p>${esc(slot.coverage)}</p>
-              ${slot.providerId ? renderProviderLiveBadge(providerHealthFor(slot.providerId)) : renderStatusBadge("fallback")}
+              ${slot.providerId ? renderProviderLiveBadge(providerHealthFor(slot.providerId)) : renderStatusBadge("local")}
             </div>
           `).join("")}
         </div>
@@ -6053,6 +7212,7 @@
 
   function renderMacroPage() {
     ensureHomeData();
+    ensureCftcData();
     const snapshot = macroCountryComparisonForView();
     const macro = macroEnhancedForView();
     app.innerHTML = `
@@ -6064,7 +7224,7 @@
             <p>Inflation, Arbeitsmarkt, Zinsen, Realzins, Yield Curve, Wachstum, Verschuldung, FX und Liquidität werden in eine nachvollziehbare Makroampel übersetzt. Live-/Hybrid-/Fallback-Status bleibt sichtbar.</p>
           </div>
           <div class="row-actions">
-            <button class="ghost-button" type="button" data-route="data-health">Data Health</button>
+            <span class="pill">Status-Badges je Block</span>
             <button class="ghost-button" type="button" data-report="macro">Makro-Report</button>
           </div>
         </div>
@@ -6084,6 +7244,7 @@
           ${renderMacroFxLiquidityPanel(snapshot)}
           ${renderMacroAssetImplications(snapshot)}
         </div>
+        ${renderCftcCommoditySection("macro")}
         ${renderMacroDataHealthPanel(snapshot)}
         <div class="grid four macro-deep-grid">
           ${macro.map((item) => renderMacroDeepCard(item)).join("")}
@@ -6297,6 +7458,86 @@
     `;
   }
 
+  function renderCftcCommoditySection(context = "macro") {
+    const rows = cftcCotRowsForView();
+    const meta = cftcCotMeta();
+    const title = context === "asset" ? "CFTC-Positionierung zum Rohstoff" : "CFTC Rohstoff-Sentiment V1";
+    const intro = context === "asset"
+      ? "Commitments-of-Traders-Daten zeigen Commercials und Non-Commercials im passenden Futures-Markt. Das ist Kontext, keine Prognose."
+      : "Commercial- und Non-Commercial-Positionierung fuer Gold, Silber, Oel, Gas und Kupfer. Die Ampel ist eine einfache Nettoquote am Open Interest, keine Handelsanweisung.";
+    return `
+      <article class="card cftc-sentiment-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">CFTC Commitments of Traders</span>
+            <h3>${esc(title)}</h3>
+            <p>${esc(intro)}</p>
+          </div>
+          <div class="row-actions">
+            ${renderStatusBadge(meta.status)}
+            <button class="ghost-button" type="button" data-cftc-refresh>CFTC aktualisieren</button>
+          </div>
+        </div>
+        <div class="grid five cftc-grid">
+          ${rows.map((row) => renderCftcCommodityTile(row)).join("")}
+        </div>
+        <div class="insight-row cftc-context-row">
+          <span class="pill">Kontext</span>
+          <p>COT-Daten erscheinen woechentlich und koennen Extrempositionierung sichtbar machen. Commercials sind haeufig Hedger, Non-Commercials eher spekulative Marktteilnehmer. Daraus entsteht keine sichere Kursprognose.</p>
+        </div>
+        ${renderDataMeta(meta, true)}
+      </article>
+    `;
+  }
+
+  function renderCftcCommodityTile(row) {
+    const tone = row.sentiment?.tone || "neutral";
+    return `
+      <div class="snapshot-tile cftc-tile">
+        <div class="card-topline">
+          <span>${esc(row.label)}</span>
+          <span class="score-pill ${escAttr(tone)}">${esc(row.sentiment?.label || "unbekannt")}</span>
+        </div>
+        <strong>${formatCftcContracts(row.nonCommercialNet)}</strong>
+        <p>Non-Commercial netto · ${formatCftcRatio(row.sentiment?.ratio)}</p>
+        <p>Commercial netto: ${formatCftcContracts(row.commercialNet)}</p>
+        <p>WoW: ${formatCftcContracts(row.nonCommercialNetChange)}</p>
+        <small>${row.reportDate ? `Datenstand: ${esc(row.reportDate)}` : "kein Datenstand verfuegbar"}</small>
+        ${renderDataMeta(row.meta, true)}
+      </div>
+    `;
+  }
+
+  function renderCommodityCotAssetCard(symbol) {
+    const row = cftcCotForSymbol(symbol);
+    if (!row) {
+      return "";
+    }
+    return `
+      <article class="card cftc-sentiment-card asset-cftc-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Rohstoff-Positionierung</span>
+            <h3>${esc(row.label)}: ${esc(row.sentiment.label)}</h3>
+            <p>${esc(row.sentiment.explanation)} ${esc(cftcTrendText(row))}</p>
+          </div>
+          <span class="score-pill ${escAttr(row.sentiment.tone)}">${esc(row.sentiment.signal)}</span>
+        </div>
+        <div class="grid four">
+          ${renderMiniMetric("Non-Commercial netto", formatCftcContracts(row.nonCommercialNet))}
+          ${renderMiniMetric("Commercial netto", formatCftcContracts(row.commercialNet))}
+          ${renderMiniMetric("Open Interest", formatCftcContracts(row.openInterest).replace("+", ""))}
+          ${renderMiniMetric("Datenstand", row.reportDate || "--")}
+        </div>
+        <div class="insight-row cftc-context-row">
+          <span class="pill">Keine Prognose</span>
+          <p>CFTC-COT zeigt Positionierung im Futures-Markt. Es ersetzt keine Analyse von Preis, Makro, Liquiditaet oder Risiko.</p>
+        </div>
+        ${renderDataMeta(row.meta, true)}
+      </article>
+    `;
+  }
+
   function renderMacroDataHealthPanel(snapshot) {
     return `
       <article class="card macro-source-card">
@@ -6306,7 +7547,7 @@
             <h3>Live, Hybrid und Fallback klar getrennt</h3>
             <p>Der Makrovergleich nutzt offizielle serverseitige und Open-Data-Pfade, bleibt aber ehrlich hybrid, solange nicht jede Länderreihe live gleichwertig verfügbar ist.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="data-health">Quellenstatus öffnen</button>
+          <span class="pill">Quellenstatus im Block</span>
         </div>
         <div class="grid four">
           ${snapshot.sourceRows.map((row) => `
@@ -6322,7 +7563,7 @@
   }
 
   function renderGlobalMacroCard() {
-    const rows = state.globalMacro.length ? state.globalMacro : fallbackGlobalMacro("Globale Open-Data-Fallbacks aktiv.");
+    const rows = state.globalMacro.length ? state.globalMacro : fallbackGlobalMacro("Globale Local-Structured-Makrodaten aktiv.");
     const status = bestDataStatus(rows.map((row) => row.meta?.status || row.status));
     return `
       <article class="card macro-context-card">
@@ -6348,6 +7589,7 @@
   }
 
   function renderLiquidityPage() {
+    ensureCftcData();
     const liquidity = liquidityForView();
     const narrative = liquidityNarrativeForView();
     const buckets = liquidityBucketsForView();
@@ -6359,7 +7601,7 @@
             <h1>Liquidität, Realzins und Zinskurve klar einordnen.</h1>
             <p>Dieser Bereich trennt Geldmengen und Liquidität vom allgemeinen Makro-Dashboard. M1, M2, M3, M4, Realzins, Yield Curve und Zentralbank-Bilanzen sind mit Quelle, Zeitstempel und Status sichtbar gekennzeichnet.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="data-health">Quellenstatus öffnen</button>
+          <span class="pill">Status je Kennzahl</span>
         </div>
         <article class="card macro-context-card">
           <div class="card-topline">
@@ -6397,6 +7639,7 @@
             <p>FRED und ECB sind vorbereitet. Wo kein Live-Pfad aktiv ist, nutzt MH Analytics strukturierte lokale Fallback-Daten.</p>
           </article>
         </div>
+        ${renderCftcCommoditySection("liquidity")}
       </section>
       <section class="section compact-section">
         <div class="grid three">
@@ -6864,7 +8107,7 @@
   }
 
   function etfDataMeta(etf) {
-    return makeMeta(etf.dataNote || "Lokale ETF-Strukturdaten", "local", BOOT_TIME, "ETF-Struktur ist lokal gepflegt; Marktpreise können je nach Asset live/hybrid oder fallback sein.");
+    return makeMeta(etf.dataNote || "Lokale ETF-Strukturdaten", "local", null, "ETF-Struktur ist lokal gepflegt; Marktpreise koennen je nach Asset live, cached oder hybrid sein.");
   }
 
   function etfCategoryTags(etf) {
@@ -7122,7 +8365,7 @@
             <h3>Schnellregel speichern</h3>
             <p>Preislevel, Earnings, Events und Watchlist-Bewegungen werden lokal geprüft.</p>
           </div>
-          ${renderStatusBadge("fallback")}
+          ${renderStatusBadge("local")}
         </div>
         <form class="alert-form" data-alert-form>
           <label class="field">
@@ -7250,7 +8493,7 @@
             <span class="card-label">Historie</span>
             <h3>Was wurde ausgelöst oder bearbeitet?</h3>
           </div>
-          ${renderDataMeta(makeMeta("Lokale Alert-Historie", "live", Date.now()), true)}
+          ${renderDataMeta(makeMeta("Lokale Alert-Historie", "local", Date.now()), true)}
         </div>
         <div class="alert-history-list">
           ${history.map(renderAlertHistoryRow).join("") || renderEmptyState("Noch keine Alert-Historie.")}
@@ -7270,7 +8513,12 @@
   }
 
   function renderAssetPage() {
-    const symbol = assetMap.has(state.activeSymbol) ? state.activeSymbol : "NVDA";
+    const requestedSymbol = normalizeSymbol(state.activeSymbol || "NVDA");
+    if (!assetMap.has(requestedSymbol)) {
+      renderUnknownAssetPage(requestedSymbol);
+      return;
+    }
+    const symbol = requestedSymbol;
     const asset = getAsset(symbol);
     const quote = quoteFor(symbol);
     const profile = profileFor(symbol);
@@ -7283,11 +8531,17 @@
     const assetContext = { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events };
     const research = buildAssetResearchSnapshot(assetContext);
     const assetEtf = research.etf;
+    const activeAlertsForAsset = state.alerts.map(normalizeAlertRecord).filter((alert) => alert.symbol === symbol);
+    const nextEventForAsset = events[0];
 
     ensureAssetData(symbol);
     ensureEventData();
+    if (cftcCommodityIdForSymbol(symbol)) {
+      ensureCftcData();
+    }
 
     app.innerHTML = `
+      ${renderAssetSearchPanel(symbol)}
       <section class="asset-hero">
         <div class="asset-main">
           <p class="eyebrow">${asset.type === "ETF" ? "ETF-Asset-Seite" : "Einzelaktien-Seite"}</p>
@@ -7300,12 +8554,7 @@
             <span class="module-chip"><strong>Datenlage</strong><small>${esc(research.dataQuality.label)}</small></span>
           </div>
           <div class="asset-actions">
-            <button class="primary-button" type="button" data-watch-add="${escAttr(symbol)}">Zur Watchlist</button>
-            <button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>
-            <button class="ghost-button" type="button" data-journal-open="${escAttr(symbol)}" data-journal-context="asset">Journal-Eintrag</button>
             <button class="ghost-button" type="button" data-favorite-symbol="${escAttr(symbol)}">${isFavoriteSymbol(symbol) ? "Favorit entfernen" : "Favorit"}</button>
-            <button class="ghost-button" type="button" data-compare-open="${escAttr(symbol)}">Vergleichen</button>
-            <button class="ghost-button" type="button" data-report="asset" data-symbol="${escAttr(symbol)}">Report exportieren</button>
             <a class="ghost-button" href="${tradingViewUrl(asset)}" target="_blank" rel="noreferrer">Chart bei TradingView</a>
           </div>
         </div>
@@ -7314,6 +8563,23 @@
           <strong>${formatMoney(quote.price, asset.currency)}</strong>
           <span class="${toneClass(quote.changePct)}">${formatPercent(quote.changePct)} heute</span>
           ${renderDataMeta(quote.meta)}
+          <div class="asset-context-list">
+            <div>
+              <span>Nächstes Event</span>
+              <strong>${nextEventForAsset ? esc(eventTimingLabel(nextEventForAsset)) : "kein naher Termin"}</strong>
+              <small>${nextEventForAsset ? esc(nextEventForAsset.title) : "Event-Hub bleibt verfügbar"}</small>
+            </div>
+            <div>
+              <span>Watchlist / Favorit</span>
+              <strong>${state.watchlist.includes(symbol) ? "Watchlist" : "nicht vorgemerkt"}</strong>
+              <small>${isFavoriteSymbol(symbol) ? "Favorit gesetzt" : "Favorit optional"}</small>
+            </div>
+            <div>
+              <span>Alerts</span>
+              <strong>${activeAlertsForAsset.length ? `${activeAlertsForAsset.length} Regel${activeAlertsForAsset.length === 1 ? "" : "n"}` : "keine Regel"}</strong>
+              <small>${activeAlertsForAsset[0] ? esc(alertStatusLabel(activeAlertsForAsset[0])) : "Preis- oder Event-Alert möglich"}</small>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -7331,12 +8597,14 @@
             `}
         </div>
         ${renderAssetDataStatusStrip({ quote, profile, fundamentals, news, events })}
+        ${renderAssetLimitedDataNotice(symbol, { quote, profile, fundamentals, news, asset })}
         ${renderAssetAlertStrip(symbol)}
       </section>
 
       <section class="section asset-research-section">
         ${renderAssetResearchSnapshot(assetContext, research)}
         ${assetEtf ? renderEtfAssetSnapshot(assetEtf) : ""}
+        ${renderCommodityCotAssetCard(symbol)}
       </section>
 
       <section class="section">
@@ -7359,6 +8627,141 @@
     }
   }
 
+  function renderUnknownAssetPage(symbol) {
+    const query = symbol || state.assetSearch.query || "";
+    if (query && state.assetSearch.lastQuery !== query && !state.assetSearch.loading) {
+      runAssetSearch(query, { immediate: true });
+    }
+    app.innerHTML = `
+      ${renderAssetSearchPanel(query)}
+      <section class="section">
+        <article class="card asset-limited-data-card">
+          <div class="card-topline">
+            <div>
+              <p class="eyebrow">Asset-Suche</p>
+              <h1>${esc(symbol || "Asset")} wurde noch nicht lokal erkannt.</h1>
+              <p>Wähle ein Suchergebnis aus Finnhub, Alpha Vantage oder dem lokalen Asset-Universum. Unbekannte Werte werden nicht mit erfundenen Profilen angezeigt.</p>
+            </div>
+            ${renderStatusBadge("unknown")}
+          </div>
+          <div class="row-actions">
+            <button class="primary-button" type="button" data-asset-search-submit>Erneut suchen</button>
+            <button class="ghost-button" type="button" data-route="screener">Screener öffnen</button>
+            <button class="ghost-button" type="button" data-route="compare">Quick Compare</button>
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderAssetSearchPanel(activeSymbol = "") {
+    const query = state.assetSearch.query || activeSymbol || "";
+    const results = state.assetSearch.results.length ? state.assetSearch.results : localAssetSearchResults(query).slice(0, 8);
+    return `
+      <section class="section asset-search-section">
+        <article class="card asset-search-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Globale Asset-Suche</span>
+              <h2>Aktie, ETF, Index, Rohstoff oder Krypto öffnen</h2>
+              <p>Suche nach Symbol, Name oder bekannten Kürzeln. Live-Suche läuft nur über eigene serverseitige Routen; lokale Treffer bleiben klar als Local Structured gekennzeichnet.</p>
+            </div>
+            ${renderStatusBadge(state.assetSearch.source === "server" ? getOverallDataStatus() : "local")}
+          </div>
+          <div class="asset-search-input-row">
+            <label class="global-search asset-search-input" data-asset-search-root>
+              <input data-asset-search-input type="search" value="${escAttr(query)}" placeholder="z. B. Apple, AAPL, Rheinmetall, RHM, ASML, VWCE, QQQ" autocomplete="off">
+            </label>
+            <button class="primary-button" type="button" data-asset-search-submit>Suchen</button>
+          </div>
+          <div class="asset-search-examples">
+            ${["NVDA", "Apple", "Microsoft", "Rheinmetall", "SAP", "Siemens", "ASML", "MSCI World ETF", "VWCE", "QQQ", "GLD", "BTC"].map((item) => `<button class="chip" type="button" data-asset-search-query="${escAttr(item)}">${esc(item)}</button>`).join("")}
+          </div>
+          <div class="asset-search-state" data-asset-search-state>
+            ${renderAssetSearchState()}
+          </div>
+          <div class="asset-search-results" data-asset-search-results>
+            ${renderAssetSearchResults(results)}
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderAssetSearchState() {
+    if (state.assetSearch.loading) {
+      return `<span class="pill">Suche läuft über /api/finnhub, danach /api/alphavantage</span>`;
+    }
+    if (state.assetSearch.error) {
+      return `<span class="pill bear">${esc(state.assetSearch.error)}</span>`;
+    }
+    if (state.assetSearch.source === "server") {
+      return `<span class="pill bull">Serverseitige Suche + Local Structured</span>`;
+    }
+    return `<span class="pill">Local Structured / Favoriten zuerst</span>`;
+  }
+
+  function renderAssetSearchResults(results) {
+    if (!results.length) {
+      return `
+        <div class="empty-state guided-empty">
+          <p>Keine Treffer. Prüfe Schreibweise, versuche Symbol statt Name oder nutze einen lokalen Vorschlag.</p>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-asset-search-query="AAPL">Apple</button>
+            <button class="ghost-button" type="button" data-asset-search-query="Rheinmetall">Rheinmetall</button>
+            <button class="ghost-button" type="button" data-asset-search-query="VWCE">VWCE</button>
+          </div>
+        </div>
+      `;
+    }
+    return results.slice(0, 10).map((result) => `
+      <button class="asset-search-result" type="button" data-asset-search-symbol="${escAttr(result.symbol)}">
+        <span>
+          <strong>${esc(result.displaySymbol || result.symbol)}</strong>
+          <small>${esc(result.name || "Name nicht verfügbar")}</small>
+        </span>
+        <span>
+          <strong>${esc(result.exchange || "Exchange offen")}</strong>
+          <small>${esc(result.region || result.country || "Region offen")}</small>
+        </span>
+        <span>
+          <strong>${esc(result.type || "Asset")}</strong>
+          <small>${esc(result.currency || "Währung offen")}</small>
+        </span>
+        <span>
+          ${renderStatusBadge(result.status || "local")}
+          <small>${esc(result.source || "Local Structured")}</small>
+        </span>
+      </button>
+    `).join("");
+  }
+
+  function renderAssetLimitedDataNotice(symbol, context) {
+    const statuses = [context.quote?.meta?.status, context.profile?.meta?.status, context.fundamentals?.meta?.status, context.news?.meta?.status].filter(Boolean);
+    const asset = context.asset || getAsset(symbol);
+    const quoteMissing = !Number.isFinite(Number(context.quote?.price));
+    if (!asset.dynamic && !quoteMissing) {
+      return "";
+    }
+    return `
+      <article class="card asset-limited-data-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Eingeschränkte Datenlage</span>
+            <h3>Für ${esc(symbol)} sind aktuell nur eingeschränkte Daten verfügbar.</h3>
+            <p>MH Analytics versucht Quote, Profil, News, Events und Technik über serverseitige Routen. Wenn nichts belastbar zurückkommt, werden keine Fantasieprofile erzeugt.</p>
+          </div>
+          ${renderStatusBadge(bestDataStatus(statuses))}
+        </div>
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-asset-refresh="${escAttr(symbol)}">Andere Quelle erneut versuchen</button>
+          <button class="ghost-button" type="button" data-compare-open="${escAttr(symbol)}">Compare</button>
+          <button class="ghost-button" type="button" data-watch-add="${escAttr(symbol)}">Watchlist</button>
+        </div>
+      </article>
+    `;
+  }
+
   function renderAssetTab(tab, label, activeTab) {
     return `<button class="asset-tab ${activeTab === tab ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === tab}" data-asset-tab="${escAttr(tab)}">${esc(label)}</button>`;
   }
@@ -7369,7 +8772,7 @@
       ["Profil", context.profile.meta],
       ["Fundamentals", context.fundamentals.meta],
       ["News", context.news.meta],
-      ["Events", context.events[0] ? context.events[0].meta : makeMeta("Event-Kalender", "fallback", BOOT_TIME)]
+      ["Events", context.events[0] ? context.events[0].meta : makeMeta("Event-Kalender", "local", null)]
     ];
     return `
       <div class="asset-data-strip">
@@ -7506,7 +8909,7 @@
   function renderSecFilingsCard(symbol) {
     const cik = SEC_CIK_MAP[symbol];
     const url = cik ? `https://www.sec.gov/edgar/browse/?CIK=${encodeURIComponent(cik)}&owner=exclude` : "https://www.sec.gov/edgar/search/";
-    const meta = makeMeta("SEC / EDGAR offizieller Filings-Link", "fallback", BOOT_TIME, "Browserkritische Open-Data-Quelle: direkte SEC-JSON-Abrufe bleiben für öffentliche Frontends bewusst vorsichtig.");
+    const meta = makeMeta("SEC / EDGAR offizieller Filings-Link", "unavailable", null, "Browserkritische Open-Data-Quelle: direkte SEC-JSON-Abrufe bleiben für öffentliche Frontends bewusst vorsichtig.");
     return `
       <article class="card">
         <div class="card-topline">
@@ -7514,7 +8917,7 @@
             <span class="card-label">SEC / Filings</span>
             <h3>${cik ? `CIK ${esc(cik)}` : "Filings-Suche"}</h3>
           </div>
-          ${renderStatusBadge("fallback")}
+          ${renderStatusBadge("unavailable")}
         </div>
         <p>Offizielle Filings werden über SEC/EDGAR verlinkt. JSON/XBRL bleibt im Browser bewusst nicht als grüner Live-Status markiert, weil SEC-Zugriffe in öffentlichen Frontends robust über einen späteren Datenadapter laufen sollten.</p>
         <a class="ghost-button" href="${escAttr(url)}" target="_blank" rel="noreferrer">SEC Filings öffnen</a>
@@ -7533,7 +8936,7 @@
             <h3>In 5 Minuten verstanden</h3>
             <p>Verdichteter Research-Snapshot aus Kurs, Profil, Bewertung, Technik, News, Events, Alerts und Datenqualität.</p>
           </div>
-          ${renderDataMeta(makeMeta("5-Minuten-Research: Daten + Produktlogik", snapshot.dataStatus, Date.now(), snapshot.dataQuality.text), true)}
+          ${renderDataMeta(makeMeta("5-Minuten-Research: Daten + Produktlogik", derivedDataStatus(snapshot.dataStatus), Date.now(), snapshot.dataQuality.text), true)}
         </div>
 
         <div class="research-summary-band">
@@ -7614,7 +9017,7 @@
           <button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>
           <button class="ghost-button" type="button" data-journal-open="${escAttr(symbol)}" data-journal-context="research">These festhalten</button>
           <button class="ghost-button" type="button" data-route="events">Events prüfen</button>
-          <button class="ghost-button" type="button" data-route="data-health">Datenqualität ansehen</button>
+          <span class="pill">Datenstatus im Snapshot</span>
         </div>
       </article>
     `;
@@ -8132,7 +9535,7 @@
               <span class="card-label">Insider Trades</span>
               <h3>Insider Score ${data.insiderScore}/100</h3>
             </div>
-            ${renderStatusBadge("fallback")}
+            ${renderStatusBadge("local")}
           </div>
           <div class="metric-grid">
             ${renderMiniMetric("Buy/Sell Ratio", `${formatNumber(data.buySellRatio)}x`)}
@@ -8143,7 +9546,7 @@
           <div class="stack-list">${data.buys.map((row) => renderDataRow(row)).join("")}</div>
           <h4>Insider Verkäufe</h4>
           <div class="stack-list">${data.sells.map((row) => renderDataRow(row)).join("")}</div>
-          ${renderDataMeta(makeMeta("Lokale Insider-Fallback-Datenbank / SEC-Finnhub-Zuordnung", "fallback", BOOT_TIME))}
+          ${renderDataMeta(makeMeta("Lokale Insider-Strukturdatenbank / SEC-Finnhub-Zuordnung", "local", null))}
         </article>
         <article class="card">
           <div class="card-topline">
@@ -8151,7 +9554,7 @@
               <span class="card-label">Institutionelle Anleger</span>
               <h3>Smart Money / Fondsbewegungen</h3>
             </div>
-            ${renderStatusBadge("fallback")}
+            ${renderStatusBadge("local")}
           </div>
           <h4>Top Shareholder</h4>
           <div class="mini-bars">${data.topShareholders.map(([name, weight]) => renderMiniBar(name, weight)).join("")}</div>
@@ -8159,7 +9562,7 @@
           <div class="stack-list">${data.holdings.map((row) => renderDataRow(row)).join("")}</div>
           <h4>Positionsveränderungen</h4>
           <div class="stack-list">${data.changes.map((row) => renderDataRow(row)).join("")}</div>
-          ${renderDataMeta(makeMeta("Lokale Institutionals-Fallback-Datenbank / SEC-Finnhub-Zuordnung", "fallback", BOOT_TIME))}
+          ${renderDataMeta(makeMeta("Lokale Institutionals-Strukturdatenbank / SEC-Finnhub-Zuordnung", "local", null))}
         </article>
       </div>
     `;
@@ -8267,7 +9670,7 @@
             <span class="card-label">Transparenz</span>
             <h3>Wie wird das Rating berechnet?</h3>
           </div>
-          ${renderStatusBadge("fallback")}
+          ${renderStatusBadge("modelled")}
         </div>
         <p>Das Rating ist eine einfache, transparente Heuristik. Es kombiniert RSI, Momentum, Volumen/Aktivität, Trend, Sentiment und Risiko. Es ist kein KI-Orakel und keine Anlageberatung.</p>
         <div class="stack-list">
@@ -8282,7 +9685,7 @@
             </div>
           `).join("")}
         </div>
-        ${renderDataMeta(makeMeta("Lokale Rating Engine V1", "fallback", BOOT_TIME))}
+        ${renderDataMeta(makeMeta("Lokale Rating Engine V1", "modelled", null))}
       </article>
     `;
   }
@@ -8328,7 +9731,7 @@
             </label>
             <button class="primary-button" type="button">Eintragen</button>
           </form>
-          ${renderDataMeta(makeMeta("Brevo Fallback", "fallback", BOOT_TIME, "Newsletter-Backend ist in der statischen Version nicht aktiv."))}
+          ${renderDataMeta(makeMeta("Newsletter-Backend nicht aktiv", "unavailable", null, "Newsletter-Backend ist in der statischen Version nicht aktiv."))}
         </article>
       </section>
     `;
@@ -8995,8 +10398,7 @@
     const module = HOME_MODULE_CATALOG.find((item) => item.route === route);
     if (module) return module.label;
     if (route === "legal") return "Rechtliches";
-    if (route === "settings") return "Datenquellen";
-    if (route === "data-health") return "Data Health";
+    if (route === "settings" || route === "data-health") return "Datenstatus-Hinweis";
     return capitalize(route);
   }
 
@@ -9050,6 +10452,44 @@
     `;
   }
 
+  function renderPublicDataStatusNoticePage() {
+    app.innerHTML = `
+      <section class="section">
+        <article class="card public-status-notice-card">
+          <div class="card-topline">
+            <div>
+              <p class="eyebrow">Datenstatus</p>
+              <h1>Statushinweise stehen jetzt direkt in den Modulen.</h1>
+              <p>Die öffentliche Hauptnavigation zeigt keinen Entwickler- oder Providerbereich mehr. Normale Nutzer sehen Live, Cached, Hybrid, Local Structured, Modelled und Unavailable als kurze Badges dort, wo sie für Analyse, Reports, Portfolio, ETF oder Makro relevant sind.</p>
+            </div>
+            ${renderStatusBadge(getOverallDataStatus())}
+          </div>
+          <div class="grid three">
+            <div class="snapshot-tile">
+              <span>Markt & Research</span>
+              <strong>Modul-Badges</strong>
+              <p>Preis-, News-, Event- und Research-Daten werden direkt im jeweiligen Bereich gekennzeichnet.</p>
+            </div>
+            <div class="snapshot-tile">
+              <span>Portfolio, Journal, Lernen</span>
+              <strong>Lokal / Hybrid</strong>
+              <p>Nutzerdaten bleiben lokal im Browser; Kurs- und Kontextdaten können live, hybrid oder fallback sein.</p>
+            </div>
+            <div class="snapshot-tile">
+              <span>Betreiber-Konfiguration</span>
+              <strong>Nicht öffentlich</strong>
+              <p>Provider-Keys gehören ausschließlich in die Backend-/Vercel-Konfiguration und nicht in die Website-Oberfläche.</p>
+            </div>
+          </div>
+          <div class="row-actions">
+            <button class="primary-button" type="button" data-route="home">Startseite öffnen</button>
+            <button class="ghost-button" type="button" data-route="research">Reports öffnen</button>
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
   function renderSettingsPage() {
     const publicProviders = visibleProviders();
     const serverSideCount = publicProviders.filter((provider) => provider.keyMode === "serverEnv").length;
@@ -9059,18 +10499,18 @@
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Datenquellen</p>
-            <h1>Datenquellen und Quellenstatus.</h1>
+            <p class="eyebrow">Interner Quellenstatus</p>
+            <h1>Quellenstatus für Betreiber-Dokumentation.</h1>
             <p>Normale Nutzer sehen hier ausschließlich lesbare Informationen: welche Quellen welche Module bedienen, ob sie serverseitig, als Open Data oder hybrid eingeordnet sind und ob gerade Live-, Fallback- oder Teilstatus aktiv ist.</p>
           </div>
           <div class="row-actions">
-            <button class="ghost-button" type="button" data-route="data-health">Datenstatus öffnen</button>
+            <span class="pill">Intern dokumentiert</span>
           </div>
         </div>
         <div class="provider-summary-grid">
           ${renderProviderSummary("Kernquellen", publicProviders.length, "Öffentliche Quellenübersicht ohne Eingabefelder")}
           ${renderProviderSummary("Serverseitig", serverSideCount, "FRED, Finnhub, Alpha Vantage und EIA laufen über eigene /api/... Routen")}
-          ${renderProviderSummary("Open Data", openDataCount, "Offizielle Datenquellen ohne Nutzerkonfiguration")}
+          ${renderProviderSummary("Open Data", openDataCount, "Offizielle Quellen ohne Nutzerkonfiguration")}
           ${renderProviderSummary("Hybrid / später", hybridCount, "Eingeordnet, aber nicht vollständig live in allen Modulen")}
         </div>
         ${renderProviderHealthPreview()}
@@ -9079,7 +10519,7 @@
             <h3>Reine Transparenzseite</h3>
             <p>Diese öffentliche Ansicht ist bewusst nicht editierbar. Sensible Betreiber-Einstellungen bleiben außerhalb der Nutzeroberfläche; Open-Data-Quellen werden zentral normalisiert. Das Frontend erhält nur Daten und Statushinweise.</p>
           </div>
-          ${renderDataMeta(makeMeta("Serverseitige Datenebene", "fallback", BOOT_TIME), true)}
+          ${renderDataMeta(makeMeta("Serverseitige Datenebene", "unavailable", null), true)}
         </article>
       </section>
       <section class="section">
@@ -9096,12 +10536,12 @@
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Data Health</p>
+            <p class="eyebrow">Interner Datenstatus</p>
             <h1>Quellen, Frische und Modulstatus transparent.</h1>
             <p>Diese Seite zeigt f\u00fcr normale Nutzer, woher Daten kommen, wie belastbar sie gerade sind und welche Module live, hybrid oder fallback-gest\u00fctzt arbeiten. Sie ist eine reine Transparenzansicht ohne Betreiber-Konfiguration.</p>
           </div>
           <div class="row-actions">
-            <button class="ghost-button" type="button" data-route="settings">Datenquellen ansehen</button>
+            <button class="ghost-button" type="button" data-route="home">Startseite öffnen</button>
           </div>
         </div>
         ${renderDataHealthOverview(snapshot)}
@@ -9137,10 +10577,10 @@
         <div class="provider-summary-grid">
           ${renderProviderSummary("Aktive Quellen", snapshot.counts.active, "Im \u00f6ffentlichen Kernstack sichtbar")}
           ${renderProviderSummary("Live", snapshot.counts.live, "Erfolgreiche Abrufe in dieser Sitzung")}
-          ${renderProviderSummary("Hybrid/Fallback", snapshot.counts.hybridFallback, "Eingeschr\u00e4nkt oder fallback-gest\u00fctzt")}
-          ${renderProviderSummary("Problematisch", snapshot.counts.problematic, "Offline, Fehler oder fehlend")}
+          ${renderProviderSummary("Cached/Lokal", snapshot.counts.hybridFallback, "Cached, hybrid, lokal oder modelliert")}
+          ${renderProviderSummary("Unavailable", snapshot.counts.problematic, "Kein belastbarer Abruf")}
           ${renderProviderSummary("Module gesund", snapshot.counts.healthyModules, "Gute oder belastbare Datenlage")}
-          ${renderProviderSummary("Module eingeschr\u00e4nkt", snapshot.counts.limitedModules, "Hybrid, fallback oder lokal")}
+          ${renderProviderSummary("Module eingeschr\u00e4nkt", snapshot.counts.limitedModules, "Hybrid, local structured oder modelled")}
         </div>
         <div class="data-health-meta health-summary-meta">
           <span><strong>Letzter Statuscheck:</strong> ${esc(formatTimestamp(snapshot.lastGlobalUpdate))}</span>
@@ -9153,17 +10593,19 @@
 
   function renderDataHealthLegend() {
     const statusItems = [
-      ["Live", "Frische Antwort einer Quelle oder frischer Cache aus erfolgreichem Abruf."],
-      ["Hybrid", "Mindestens eine Quelle liefert, andere Teile nutzen Fallback oder lokale Logik."],
-      ["Fallback", "Kein erfolgreicher Live-Abruf in dieser Sitzung; strukturierte lokale Daten sichern das Modul."],
-      ["Offline", "Quelle meldet Fehler, fehlt oder ist bewusst nicht erreichbar."],
-      ["Unbekannt", "Noch kein belastbarer Laufzeitstatus ableitbar."]
+      ["Live", "Echter aktueller API-Abruf in dieser Sitzung."],
+      ["Cached", "Echter API-Abruf, aber zwischengespeichert."],
+      ["Hybrid", "Mischung aus echten Daten und lokaler Produktlogik."],
+      ["Local Structured", "Lokal gepflegte strukturierte Daten, zum Beispiel ETF-Holdings."],
+      ["Demo", "Reine Beispieldaten fuer Demo-Modus."],
+      ["Modelled", "Berechnete oder heuristische Einordnung."],
+      ["Unavailable", "Keine belastbaren Daten vorhanden."]
     ];
     const healthItems = [
       ["Gesund", "Datenlage wirkt belastbar."],
       ["Eingeschr\u00e4nkt", "Nutzbar, aber teilweise Cache, Hybrid oder nur Zusatzquelle."],
-      ["Degradiert", "Fallback steht im Vordergrund."],
-      ["Gest\u00f6rt", "Fehler, fehlende Konfiguration oder offline."]
+      ["Begrenzt", "Lokale, Demo- oder modellierte Daten stehen im Vordergrund."],
+      ["Unbekannt", "Keine belastbare Laufzeitinformation vorhanden."]
     ];
     return `
       <article class="card data-health-legend">
@@ -9194,7 +10636,7 @@
             <span class="card-label">Modulstatus</span>
             <h3>Welche Bereiche sind datenstark?</h3>
           </div>
-          ${renderDataMeta(makeMeta("Zentrale Modul-/Quellenmatrix", aggregateModuleStatus(rows.map((row) => row.status)), Date.now()), true)}
+          ${renderDataMeta(makeMeta("Zentrale Modul-/Quellenmatrix", derivedDataStatus(aggregateModuleStatus(rows.map((row) => row.status))), Date.now()), true)}
         </div>
         <p>Diese Übersicht trennt Live-Daten, Hybrid-Logik, lokale Produktlogik und Fallbacks. Ein Modul wird nur als belastbar markiert, wenn seine zugeordneten Quellen oder stabilen lokalen Daten das seriös tragen.</p>
         <div class="source-overview-grid">
@@ -9242,7 +10684,7 @@
     const statuses = healthItems.map((health) => health.status);
     const status = aggregateHealthStatus(statuses);
     const lastSuccess = Math.max(...healthItems.map((health) => Number(health.lastSuccess || 0)), 0);
-    const timestamp = Math.max(...healthItems.map((health) => Number(health.lastSuccess || health.timestamp || BOOT_TIME)), BOOT_TIME);
+    const timestamp = lastSuccess || null;
     const freshness = freshnessForHealth({ status, timestamp, lastSuccess });
     const healthState = healthStateForStatus(status);
     return {
@@ -9270,24 +10712,26 @@
         source: sourceRegistryFor(provider.id)
       }));
     const modules = dataHealthModuleRows();
-    const live = providers.filter((item) => item.health.status === "live").length;
-    const stale = providers.filter((item) => item.health.status === "stale").length;
-    const fallback = providers.filter((item) => ["fallback", "prepared", "mapped", "notUsed"].includes(item.health.status)).length;
-    const problematic = providers.filter((item) => ["error", "missing", "disabled"].includes(item.health.status)).length;
+    const live = providers.filter((item) => normalizeDataStatus(item.health.status) === "live").length;
+    const cached = providers.filter((item) => normalizeDataStatus(item.health.status) === "cached").length;
+    const local = providers.filter((item) => ["local", "hybrid", "modelled", "demo"].includes(normalizeDataStatus(item.health.status))).length;
+    const unavailable = providers.filter((item) => normalizeDataStatus(item.health.status) === "unavailable").length;
     const healthyModules = modules.filter((row) => ["live", "hybrid"].includes(normalizedDataStatus(row.status)) || row.healthLabel === "Gesund").length;
     const limitedModules = modules.length - healthyModules;
     const lastGlobalUpdate = Math.max(
-      ...providers.map((item) => Number(item.health.lastSuccess || item.health.timestamp || BOOT_TIME)),
-      ...modules.map((row) => Number(row.timestamp || BOOT_TIME)),
-      BOOT_TIME
+      ...providers.map((item) => Number(item.health.lastSuccess || 0)),
+      ...modules.map((row) => Number(row.timestamp || 0)),
+      0
     );
-    const overallStatus = live ? "hybrid" : problematic ? "fallback" : "fallback";
+    const overallStatus = live ? "hybrid" : cached ? "cached" : local ? "local" : "unavailable";
     const overall = {
       status: overallStatus,
-      label: live ? "Datenlage überwiegend hybrid belastbar" : "Fallback-Sicherheitsnetz aktiv",
+      label: live ? "Datenlage hybrid belastbar" : cached ? "Cached-Daten aktiv" : "Lokale oder nicht verfuegbare Datenbasis",
       text: live
         ? "Mehrere Kernbereiche nutzen echte Abrufe oder frischen Cache; lokale Fallbacks bleiben als Schutzschicht sichtbar."
-        : "Die Plattform bleibt nutzbar, aber viele Bereiche arbeiten aktuell fallback- oder lokal gestützt. Das wird bewusst offengelegt."
+        : cached
+          ? "Einige echte Abrufe liegen aus dem Cache vor. Wo keine echten Daten vorhanden sind, bleibt die lokale Struktur klar gekennzeichnet."
+          : "Die Plattform bleibt nutzbar, aber viele Bereiche arbeiten aktuell lokal, modelliert oder ohne belastbaren Live-Abruf. Das wird bewusst offengelegt."
     };
     return {
       providers,
@@ -9297,9 +10741,11 @@
       counts: {
         active: providers.length,
         live,
-        stale,
-        hybridFallback: stale + fallback,
-        problematic,
+        cached,
+        local,
+        unavailable,
+        hybridFallback: cached + local,
+        problematic: unavailable,
         healthyModules,
         limitedModules
       }
@@ -9318,18 +10764,22 @@
   }
 
   function aggregateModuleStatus(statuses) {
-    if (statuses.includes("live")) return "hybrid";
-    if (statuses.includes("stale")) return "stale";
-    if (statuses.includes("error") || statuses.includes("missing")) return "fallback";
-    return "fallback";
+    const normalized = statuses.map(normalizeDataStatus);
+    if (normalized.includes("live")) {
+      return normalized.every((status) => status === "live") ? "live" : "hybrid";
+    }
+    if (normalized.includes("cached")) {
+      return normalized.every((status) => status === "cached") ? "cached" : "hybrid";
+    }
+    if (normalized.includes("hybrid")) return "hybrid";
+    if (normalized.includes("local")) return "local";
+    if (normalized.includes("modelled")) return "modelled";
+    if (normalized.includes("demo")) return "demo";
+    return "unavailable";
   }
 
   function normalizedDataStatus(status) {
-    if (status === "live") return "live";
-    if (status === "stale") return "hybrid";
-    if (["fallback", "prepared", "mapped", "notUsed"].includes(status)) return "fallback";
-    if (["error", "missing", "disabled"].includes(status)) return "offline";
-    return "unknown";
+    return normalizeDataStatus(status);
   }
 
   function healthStateForStatus(status) {
@@ -9337,90 +10787,82 @@
     if (normalized === "live") {
       return { label: "Gesund", status: "live" };
     }
+    if (normalized === "cached") {
+      return { label: "Eingeschraenkt", status: "cached" };
+    }
     if (normalized === "hybrid") {
-      return { label: "Eingeschränkt", status: "hybrid" };
+      return { label: "Eingeschraenkt", status: "hybrid" };
     }
-    if (normalized === "fallback") {
-      return { label: "Degradiert", status: "fallback" };
+    if (["local", "modelled", "demo"].includes(normalized)) {
+      return { label: "Begrenzt", status: normalized };
     }
-    if (normalized === "offline") {
-      return { label: "Gestört", status: "offline" };
+    if (normalized === "unavailable") {
+      return { label: "Unbekannt", status: "unavailable" };
     }
-    return { label: "Unbekannt", status: "unknown" };
+    return { label: "Unbekannt", status: "unavailable" };
   }
 
   function freshnessForHealth(health) {
-    const status = health.status || "unknown";
+    const status = normalizeDataStatus(health.status);
     if (status === "live") {
-      const ageMinutes = Math.max(0, Math.round((Date.now() - Number(health.lastSuccess || health.timestamp || Date.now())) / 60000));
+      const successTime = Number(health.lastSuccess || health.timestamp || 0);
+      if (!successTime) {
+        return { label: "Live ohne Zeit", status: "live", text: "kein exakter Live-Timestamp verfuegbar" };
+      }
+      const ageMinutes = Math.max(0, Math.round((Date.now() - successTime) / 60000));
       if (ageMinutes <= 30) {
         return { label: "Frisch", status: "live", text: `vor ${ageMinutes} Min.` };
       }
-      return { label: "Leicht verzögert", status: "hybrid", text: formatTimestamp(health.lastSuccess || health.timestamp) };
+      return { label: "Live, aber aelter", status: "cached", text: formatTimestamp(successTime) };
     }
-    if (status === "stale") {
-      return { label: "Veraltet / stale", status: "stale", text: "Cache statt frischer Antwort" };
+    if (status === "cached") {
+      const successTime = Number(health.lastSuccess || health.timestamp || 0);
+      return { label: "Cached", status: "cached", text: successTime ? formatTimestamp(successTime) : "echter Abruf aus Cache, kein neuer Live-Abruf" };
     }
-    if (["fallback", "prepared", "mapped", "notUsed"].includes(status)) {
-      return { label: "Nur Fallback", status: "fallback", text: "kein erfolgreicher Live-Timestamp in dieser Sitzung" };
+    if (status === "hybrid") {
+      return { label: "Hybrid", status: "hybrid", text: "echte Datenpfade plus lokale Produktlogik" };
     }
-    if (["error", "missing", "disabled"].includes(status)) {
-      return { label: "Unbekannt", status: "offline", text: "Quelle meldet Fehler, fehlt oder ist deaktiviert" };
+    if (status === "local") {
+      return { label: "Local Structured", status: "local", text: "lokale strukturierte Datenbasis, kein Live-Timestamp" };
     }
-    return { label: "Unbekannt", status: "unknown", text: "keine belastbare Aktualitätsinformation" };
+    if (status === "demo") {
+      return { label: "Demo", status: "demo", text: "reine Beispieldaten, kein Live-Abruf" };
+    }
+    if (status === "modelled") {
+      return { label: "Modelled", status: "modelled", text: "heuristische Einordnung, kein Live-Timestamp" };
+    }
+    return { label: "Unavailable", status: "unavailable", text: "keine belastbare Aktualitaetsinformation" };
   }
 
   function aggregateHealthStatus(statuses) {
-    if (statuses.includes("live")) {
-      return "live";
-    }
-    if (statuses.includes("stale")) {
-      return "stale";
-    }
-    if (statuses.includes("fallback")) {
-      return "fallback";
-    }
-    if (statuses.every((status) => status === "missing")) {
-      return "missing";
-    }
-    if (statuses.includes("error") && !statuses.some((status) => ["prepared", "mapped", "notUsed"].includes(status))) {
-      return "error";
-    }
-    return "fallback";
+    return aggregateModuleStatus(statuses);
   }
 
   function moduleStatusText(statuses) {
-    if (statuses.includes("live")) {
+    const normalized = statuses.map(normalizeDataStatus);
+    if (normalized.includes("live")) {
       return "Mindestens eine Quelle hat in dieser Sitzung live geliefert.";
     }
-    if (statuses.includes("stale")) {
+    if (normalized.includes("cached")) {
       return "Es gibt Daten, aber sie stammen aus Cache oder sind nicht frisch.";
     }
-    if (statuses.includes("fallback")) {
-      return "Fallback aktiv, Live-Abruf fehlt oder ist noch nicht erfolgt.";
+    if (normalized.includes("hybrid")) {
+      return "Hybrid aktiv: echte Datenpfade werden mit lokaler Produktlogik kombiniert.";
     }
-    if (statuses.includes("missing")) {
-      return "Für mindestens eine Quelle fehlt die serverseitige Konfiguration oder ein erfolgreicher Abruf.";
+    if (normalized.includes("local")) {
+      return "Local Structured aktiv: gepflegte lokale Datenbasis ohne Live-Timestamp.";
     }
-    if (statuses.includes("error")) {
-      return "Mindestens ein Abruf ist fehlgeschlagen.";
+    if (normalized.includes("modelled")) {
+      return "Modelled aktiv: transparente heuristische Einordnung ohne Live-Abruf.";
     }
-    return "Zugeordnet oder Open Data, aber aktuell nicht live genutzt.";
+    if (normalized.includes("demo")) {
+      return "Demo-Daten aktiv: reine Beispieldaten, keine echten Nutzerdaten.";
+    }
+    return "Unavailable: keine belastbare Datenbasis in dieser Sitzung.";
   }
 
   function providerHealthShortLabel(status) {
-    const labels = {
-      live: "live",
-      stale: "Cache",
-      fallback: "Fallback",
-      prepared: "zugeordnet",
-      mapped: "zugeordnet",
-      notUsed: "nicht genutzt",
-      missing: "Quelle fehlt",
-      error: "Fehler",
-      disabled: "deaktiviert"
-    };
-    return labels[status] || status || "unklar";
+    return statusLabel(status);
   }
 
   function renderProviderHealthRow(entry) {
@@ -9453,7 +10895,7 @@
           <span><strong>Frische:</strong> ${esc(freshness.label)} - ${esc(freshness.text)}</span>
           <span><strong>Status:</strong> ${esc(health.message || "Noch keine Abrufhistorie.")}</span>
           <span><strong>Letzter Check:</strong> ${esc(formatTimestamp(health.timestamp))}</span>
-          <span><strong>Fallback:</strong> ${esc(source.fallback || "Fallback wird aus Modulstatus abgeleitet.")}</span>
+          <span><strong>Datenbasis:</strong> ${esc(source.fallback || "Datenklasse wird aus Modulstatus abgeleitet.")}</span>
         </div>
       </div>
     `;
@@ -9475,18 +10917,18 @@
       <article class="card provider-health-preview">
         <div class="card-topline">
           <div>
-            <span class="card-label">Data Health</span>
-            <h3>Provider-Nutzung sichtbar</h3>
+            <span class="card-label">Datenstatus</span>
+            <h3>Status direkt in Modulen sichtbar</h3>
           </div>
-          ${renderStatusBadge(health.live ? "live" : health.fallback ? "fallback" : "missing")}
+          ${renderStatusBadge(health.live ? "live" : health.cached ? "cached" : health.local ? "local" : "unavailable")}
         </div>
         <div class="metric-grid">
           ${renderMiniMetric("Live Provider", String(health.live))}
-          ${renderMiniMetric("Fallback aktiv", String(health.fallback))}
-          ${renderMiniMetric("Fehler/fehlend", String(health.error + health.missing))}
+          ${renderMiniMetric("Cached", String(health.cached))}
+          ${renderMiniMetric("Lokal/Modelled", String(health.local))}
+          ${renderMiniMetric("Unavailable", String(health.unavailable))}
         </div>
-        <p>Das Data-Health-Dashboard zeigt, welcher Provider welches Modul bedient, wann der letzte Abruf erfolgreich war und wo Fallbacks genutzt werden.</p>
-        <button class="ghost-button" type="button" data-route="data-health">Data Health ansehen</button>
+        <p>Live, Cached, Hybrid, Local Structured, Demo, Modelled und Unavailable werden als kurze Status-Badges an den relevanten Modulen gezeigt. Betreiber- und Providerdetails bleiben ausserhalb der oeffentlichen Hauptfuehrung.</p>
       </article>
     `;
   }
@@ -9606,41 +11048,29 @@
   }
 
   function renderProviderLiveBadge(health) {
-    const status = health.status || "notUsed";
-    const labels = {
-      live: "Live",
-      stale: "Hybrid",
-      fallback: "Fallback",
-      prepared: "Unbekannt",
-      mapped: "Unbekannt",
-      notUsed: "Unbekannt",
-      missing: "Offline",
-      error: "Offline",
-      disabled: "Offline"
-    };
-    const badgeStatus = status === "live" ? "live" : status === "stale" || status === "fallback" || status === "prepared" || status === "mapped" || status === "notUsed" ? "fallback" : "missing";
-    return `<span class="status-badge status-${badgeStatus}">${esc(labels[status] || status)}</span>`;
+    const status = normalizeDataStatus(health.status);
+    return `<span class="status-badge status-${escAttr(status)}">${esc(statusLabel(status))}</span>`;
   }
 
   function providerHealthFor(providerId) {
     const provider = providerById(providerId);
     if (!provider) {
-      return { status: "missing", timestamp: BOOT_TIME, message: "Provider nicht gefunden." };
+      return { status: "unavailable", timestamp: null, message: "Provider nicht gefunden." };
     }
     const health = state.providerHealth[providerId];
     if (health) {
       return health;
     }
     if (provider.status === "active") {
-      return { status: "fallback", timestamp: BOOT_TIME, message: "Im Datenlayer aktiv, aber in dieser Sitzung noch kein erfolgreicher Live-Abruf." };
+      return { status: "unavailable", timestamp: null, message: "Im Datenlayer aktiv, aber in dieser Sitzung noch kein erfolgreicher Live-Abruf." };
     }
     if (provider.status === "mapped") {
-      return { status: "notUsed", timestamp: BOOT_TIME, message: "Klar zugeordnet, aber noch nicht als Live-Modul verdrahtet." };
+      return { status: "unavailable", timestamp: null, message: "Klar zugeordnet, aber noch nicht als Live-Modul verdrahtet." };
     }
     if (provider.status === "disabled" || REMOVED_PUBLIC_PROVIDER_IDS.includes(providerId)) {
-      return { status: "disabled", timestamp: BOOT_TIME, message: "Aus der aktiven öffentlichen Provider-Seite entfernt." };
+      return { status: "unavailable", timestamp: null, message: "Aus der aktiven öffentlichen Provider-Seite entfernt." };
     }
-    return { status: "prepared", timestamp: BOOT_TIME, message: provider.usage || "Provider zugeordnet." };
+    return { status: "unavailable", timestamp: null, message: provider.usage || "Provider zugeordnet." };
   }
 
   function recordProviderHealth(providerId, status, message, timestamp = Date.now()) {
@@ -9648,14 +11078,17 @@
       return;
     }
     const previous = state.providerHealth[providerId] || {};
+    const dataStatus = normalizeDataStatus(status);
+    const safeTimestamp = LIVE_TIMESTAMP_STATUSES.has(dataStatus) && Number(timestamp) ? Number(timestamp) : null;
     const next = {
       ...previous,
-      status,
+      status: dataStatus,
+      rawStatus: status,
       message,
-      timestamp
+      timestamp: safeTimestamp
     };
-    if (status === "live") {
-      next.lastSuccess = timestamp;
+    if (LIVE_TIMESTAMP_STATUSES.has(dataStatus) && safeTimestamp) {
+      next.lastSuccess = safeTimestamp;
     }
     state.providerHealth = { ...state.providerHealth, [providerId]: next };
     storageSet(STORAGE_KEYS.providerHealth, state.providerHealth);
@@ -9664,18 +11097,18 @@
   function providerHealthSummary() {
     return DATA_HEALTH_PROVIDER_IDS.reduce((sum, providerId) => {
       const health = providerHealthFor(providerId);
-      if (health.status === "live" || health.status === "stale") {
-        sum.live += health.status === "live" ? 1 : 0;
-        sum.stale += health.status === "stale" ? 1 : 0;
-      } else if (["fallback", "prepared", "mapped", "notUsed"].includes(health.status)) {
-        sum.fallback += 1;
-      } else if (health.status === "missing") {
-        sum.missing += 1;
-      } else if (health.status === "error") {
-        sum.error += 1;
+      const status = normalizeDataStatus(health.status);
+      if (status === "live") {
+        sum.live += 1;
+      } else if (status === "cached") {
+        sum.cached += 1;
+      } else if (["hybrid", "local", "modelled", "demo"].includes(status)) {
+        sum.local += 1;
+      } else {
+        sum.unavailable += 1;
       }
       return sum;
-    }, { live: 0, stale: 0, fallback: 0, missing: 0, error: 0 });
+    }, { live: 0, cached: 0, local: 0, unavailable: 0 });
   }
 
   function renderProviderStatusBadge(status) {
@@ -9687,7 +11120,7 @@
       backendOnly: "Backend-only",
       disabled: "Deaktiviert"
     };
-    const className = status === "active" || status === "mapped" ? "status-fallback" : status === "optional" ? "status-fallback" : "status-stale";
+    const className = status === "active" ? "status-hybrid" : status === "mapped" || status === "optional" ? "status-local" : "status-unavailable";
     return `<span class="status-badge ${className}">${esc(labels[status] || status)}</span>`;
   }
 
@@ -9876,7 +11309,62 @@
     }
   }
 
+  async function ensureCftcData(force = false) {
+    if (state.loadingCftc) {
+      return;
+    }
+    const freshEnough = Date.now() - state.lastCftcRefresh < CACHE_TTL.openData;
+    if (!force && freshEnough && state.cftcCot) {
+      return;
+    }
+
+    state.loadingCftc = true;
+    try {
+      state.cftcCot = await api.getCftcCot();
+      state.lastCftcRefresh = Date.now();
+    } catch (error) {
+      logError(error);
+      const message = error.message || "CFTC COT ist aktuell nicht erreichbar.";
+      state.cftcCot = cftcUnavailableData(message);
+      state.lastCftcRefresh = Date.now();
+      recordProviderHealth("cftc", "unavailable", message, null);
+    } finally {
+      state.loadingCftc = false;
+      if (["asset", "macro", "liquidity", "research"].includes(state.route)) {
+        render();
+      }
+    }
+  }
+
   const api = {
+    async searchSymbols(query) {
+      const term = String(query || "").trim();
+      if (term.length < 2) {
+        return [];
+      }
+      const finnhubResults = [];
+      if (serverApiAvailable()) {
+        try {
+          const url = finnhubProxyUrl({ endpoint: "search", query: term });
+          const result = await cachedJson(`finnhub:search:${term.toLowerCase()}`, url, CACHE_TTL.search, "finnhub");
+          finnhubResults.push(...normalizeFinnhubSearchResults(result.data, result.status, result.timestamp));
+        } catch (error) {
+          logError(error);
+        }
+      }
+      if (finnhubResults.length >= 3) {
+        return finnhubResults;
+      }
+      try {
+        const url = alphaProxyUrl({ endpoint: "search", query: term });
+        const result = await cachedJson(`alpha:search:${term.toLowerCase()}`, url, CACHE_TTL.search, "alphaVantage");
+        return mergeAssetSearchResults(finnhubResults, normalizeAlphaSearchResults(result.data, result.status, result.timestamp));
+      } catch (error) {
+        logError(error);
+        return finnhubResults;
+      }
+    },
+
     async getQuote(symbol) {
       const asset = getAsset(symbol);
 
@@ -10226,6 +11714,28 @@
       }
     },
 
+    async getCftcCot() {
+      if (!serverApiAvailable()) {
+        recordProviderHealth("cftc", "unavailable", "CFTC OpenData-Route ist im lokalen Datei-Modus nicht verfuegbar.");
+        return cftcUnavailableData("CFTC OpenData-Route ist im lokalen Datei-Modus nicht verfuegbar.");
+      }
+      const result = await cachedJson("opendata:cftc-cot", openDataProxyUrl({ source: "cftc-cot" }), CACHE_TTL.openData, "cftc");
+      const payload = result.data?.data || {};
+      const meta = makeMeta(
+        result.data?.meta?.source || "CFTC Commitments of Traders via /api/opendata",
+        result.status,
+        result.timestamp,
+        "Commercial-/Non-Commercial-Positionierung; Kontextdaten, keine Prognose."
+      );
+      return {
+        report: payload.report || "Legacy Futures-Only Commitments of Traders",
+        reportDate: payload.reportDate || "",
+        sourceUrl: payload.sourceUrl || "https://www.cftc.gov/dea/newcot/deafut.txt",
+        rows: Array.isArray(payload.rows) ? payload.rows : [],
+        meta
+      };
+    },
+
     async getMacro() {
       const rows = [];
 
@@ -10243,6 +11753,7 @@
 
       const openDataRows = await Promise.allSettled([
         fetchBlsMacroRows(),
+        fetchEurostatMacroRows(),
         fetchTreasuryRows(),
         fetchFxMacroRows()
       ]);
@@ -10366,7 +11877,7 @@
           value: inflation,
           display: `${formatNumber(inflation)}%`,
           trend: "Serverseitig aus BLS CPI-Serie berechnet",
-          meta: makeMeta(cpiResult.data?.meta?.source || "BLS via Vercel Open-Data-Normalisierung", cpiResult.status, cpiResult.timestamp || Date.now())
+          meta: makeMeta(cpiResult.data?.meta?.source || "BLS via Vercel Open-Data-Normalisierung", cpiResult.status, cpiResult.timestamp)
         });
       }
     } catch (error) {
@@ -10384,7 +11895,7 @@
           value: latest.value,
           display: `${formatNumber(latest.value)}%`,
           trend: "Serverseitig aus BLS Labor-Serie",
-          meta: makeMeta(unrateResult.data?.meta?.source || "BLS via Vercel Open-Data-Normalisierung", unrateResult.status, unrateResult.timestamp || Date.now())
+          meta: makeMeta(unrateResult.data?.meta?.source || "BLS via Vercel Open-Data-Normalisierung", unrateResult.status, unrateResult.timestamp)
         });
       }
     } catch (error) {
@@ -10392,6 +11903,38 @@
       recordProviderHealth("bls", "fallback", "BLS Arbeitsmarkt nicht erreichbar, FRED/Fallback bleibt aktiv.");
     }
     return rows;
+  }
+
+  async function fetchEurostatMacroRows() {
+    const rows = [];
+    const requests = await Promise.allSettled([
+      cachedJson("opendata:eurostat:hicp", openDataProxyUrl({ source: "eurostat-hicp" }), CACHE_TTL.openData, "eurostat"),
+      cachedJson("opendata:eurostat:unemployment", openDataProxyUrl({ source: "eurostat-unemployment" }), CACHE_TTL.openData, "eurostat")
+    ]);
+
+    requests.forEach((result, index) => {
+      if (result.status !== "fulfilled") {
+        logError(result.reason);
+        recordProviderHealth("eurostat", "unavailable", "Eurostat Open-Data-Abruf nicht erreichbar; lokale Euro-Makro-Basis bleibt aktiv.");
+        return;
+      }
+      const payload = result.value;
+      const items = Array.isArray(payload.data?.data) ? payload.data.data : [];
+      const type = index === 0 ? "inflation" : "unemployment";
+      items.forEach((item) => {
+        const geoCode = String(item.geo || "").toUpperCase();
+        const idPrefix = geoCode === "DE" ? "DE" : "EA";
+        rows.push({
+          id: type === "inflation" ? `${idPrefix}_HICP` : `${idPrefix}_UNRATE`,
+          label: `${item.country || geoCode} ${type === "inflation" ? "Inflation" : "Arbeitslosenquote"}`,
+          value: Number(item.value),
+          display: `${formatNumber(Number(item.value))}%`,
+          trend: `Eurostat ${item.indicator || ""} · Stand ${item.date || "offen"}`,
+          meta: makeMeta(payload.data?.meta?.source || "Eurostat via Vercel Open-Data-Normalisierung", payload.status, payload.timestamp)
+        });
+      });
+    });
+    return rows.filter((row) => Number.isFinite(row.value));
   }
 
   async function fetchTreasuryRows() {
@@ -10720,10 +12263,114 @@
     return fallback ? ((price / fallback) - 1) * 100 : 0;
   }
 
+  function cftcUnavailableData(message = "CFTC COT ist aktuell nicht erreichbar.") {
+    return {
+      report: "Legacy Futures-Only Commitments of Traders",
+      reportDate: "",
+      sourceUrl: "https://www.cftc.gov/dea/newcot/deafut.txt",
+      rows: CFTC_COMMODITIES.map((commodity) => ({
+        ...commodity,
+        status: "unavailable",
+        openInterest: null,
+        commercialLong: null,
+        commercialShort: null,
+        commercialNet: null,
+        commercialNetChange: null,
+        nonCommercialLong: null,
+        nonCommercialShort: null,
+        nonCommercialNet: null,
+        nonCommercialNetChange: null,
+        sentiment: {
+          label: "unbekannt",
+          signal: "unbekannt",
+          tone: "neutral",
+          ratio: null,
+          explanation: message
+        }
+      })),
+      meta: makeMeta("CFTC Commitments of Traders", "unavailable", null, message)
+    };
+  }
+
+  function cftcCotMeta() {
+    if (state.cftcCot?.meta) {
+      return state.cftcCot.meta;
+    }
+    if (state.loadingCftc) {
+      return makeMeta("CFTC Commitments of Traders", "unavailable", null, "CFTC-Abruf laeuft serverseitig.");
+    }
+    return makeMeta("CFTC Commitments of Traders", "unavailable", null, "Noch kein belastbarer CFTC-Abruf in dieser Sitzung.");
+  }
+
+  function cftcCotRowsForView() {
+    const payload = state.cftcCot || cftcUnavailableData();
+    const meta = payload.meta || cftcCotMeta();
+    return CFTC_COMMODITIES.map((commodity) => {
+      const row = (payload.rows || []).find((item) => item.id === commodity.id);
+      return normalizeCftcCotRowForView(row || commodity, commodity, meta);
+    });
+  }
+
+  function normalizeCftcCotRowForView(row, commodity, meta) {
+    const status = normalizeDataStatus(row?.status === "live" ? meta.status : row?.status || meta.status);
+    const sentiment = row?.sentiment || {};
+    return {
+      ...commodity,
+      ...row,
+      label: row?.label || commodity.label,
+      assetSymbols: row?.assetSymbols || commodity.assetSymbols,
+      status,
+      sentiment: {
+        label: sentiment.label || "unbekannt",
+        signal: sentiment.signal || "unbekannt",
+        tone: sentiment.tone || "neutral",
+        ratio: Number.isFinite(sentiment.ratio) ? sentiment.ratio : null,
+        explanation: sentiment.explanation || "Keine belastbare Positionierung verfuegbar."
+      },
+      meta: status === "unavailable" ? makeMeta("CFTC Commitments of Traders", "unavailable", null, row?.sentiment?.explanation || meta.message) : meta
+    };
+  }
+
+  function cftcCotForSymbol(symbol) {
+    const id = cftcCommodityIdForSymbol(symbol);
+    if (!id) {
+      return null;
+    }
+    return cftcCotRowsForView().find((row) => row.id === id) || null;
+  }
+
+  function cftcCommodityIdForSymbol(symbol) {
+    const normalized = normalizeSymbol(symbol);
+    const match = CFTC_COMMODITIES.find((commodity) => (commodity.assetSymbols || []).includes(normalized));
+    return match ? match.id : "";
+  }
+
+  function formatCftcContracts(value) {
+    if (!Number.isFinite(Number(value))) {
+      return "--";
+    }
+    const number = Number(value);
+    return `${number > 0 ? "+" : ""}${formatNumber(number)} Kontrakte`;
+  }
+
+  function formatCftcRatio(value) {
+    return Number.isFinite(Number(value)) ? `${formatNumber(Number(value) * 100)}% des Open Interest` : "--";
+  }
+
+  function cftcTrendText(row) {
+    if (!row || !Number.isFinite(Number(row.nonCommercialNetChange))) {
+      return "Veraenderung zur Vorwoche nicht verfuegbar.";
+    }
+    const change = Number(row.nonCommercialNetChange);
+    if (change > 0) return "Non-Commercial-Netto-Longs haben zur Vorwoche zugenommen.";
+    if (change < 0) return "Non-Commercial-Netto-Longs haben zur Vorwoche abgenommen.";
+    return "Non-Commercial-Netto-Positionierung ist zur Vorwoche unveraendert.";
+  }
+
   function fallbackGlobalMacro(message) {
     return FALLBACK_GLOBAL_MACRO.map((row) => ({
       ...row,
-      meta: makeMeta(row.source, row.status, BOOT_TIME, message)
+      meta: makeMeta(row.source, normalizeDataStatus(row.status), null, message)
     }));
   }
 
@@ -10744,8 +12391,8 @@
     const cached = cache[cacheKey];
 
     if (cached && Date.now() - cached.timestamp < maxAge) {
-      recordProviderHealth(providerId, "live", "Frische Daten aus lokalem Cache genutzt.", cached.timestamp);
-      return { data: cached.data, timestamp: cached.timestamp, status: "live" };
+      recordProviderHealth(providerId, "cached", "Echter API-Abruf aus lokalem Cache genutzt.", cached.timestamp);
+      return { data: cached.data, timestamp: cached.timestamp, status: "cached" };
     }
 
     try {
@@ -10757,8 +12404,8 @@
       return { data, timestamp: entry.timestamp, status: "live" };
     } catch (error) {
       if (cached) {
-        recordProviderHealth(providerId, "stale", "API nicht erreichbar, veralteter Cache genutzt.", cached.timestamp);
-        return { data: cached.data, timestamp: cached.timestamp, status: "stale" };
+        recordProviderHealth(providerId, "cached", "API nicht erreichbar, vorhandener echter Cache genutzt.", cached.timestamp);
+        return { data: cached.data, timestamp: cached.timestamp, status: "cached" };
       }
       recordProviderHealth(providerId, "error", error.message || "API-Fehler ohne Cache.");
       throw error;
@@ -10770,8 +12417,8 @@
     const cached = cache[cacheKey];
 
     if (cached && Date.now() - cached.timestamp < maxAge) {
-      recordProviderHealth(providerId, "live", "Frische CSV/Text-Daten aus lokalem Cache genutzt.", cached.timestamp);
-      return { data: cached.data, timestamp: cached.timestamp, status: "live" };
+      recordProviderHealth(providerId, "cached", "Echter CSV/Text-Abruf aus lokalem Cache genutzt.", cached.timestamp);
+      return { data: cached.data, timestamp: cached.timestamp, status: "cached" };
     }
 
     try {
@@ -10783,8 +12430,8 @@
       return { data, timestamp: entry.timestamp, status: "live" };
     } catch (error) {
       if (cached) {
-        recordProviderHealth(providerId, "stale", "API nicht erreichbar, veralteter CSV/Text-Cache genutzt.", cached.timestamp);
-        return { data: cached.data, timestamp: cached.timestamp, status: "stale" };
+        recordProviderHealth(providerId, "cached", "API nicht erreichbar, vorhandener echter CSV/Text-Cache genutzt.", cached.timestamp);
+        return { data: cached.data, timestamp: cached.timestamp, status: "cached" };
       }
       recordProviderHealth(providerId, "error", error.message || "API-Fehler ohne Cache.");
       throw error;
@@ -10996,11 +12643,12 @@
 
   function macroCountryComparisonForView() {
     const macroRows = new Map(macroEnhancedForView().map((item) => [item.id, item]));
-    const globalRows = state.globalMacro.length ? state.globalMacro : fallbackGlobalMacro("Globale Open-Data-Fallbacks aktiv.");
+    const globalRows = state.globalMacro.length ? state.globalMacro : fallbackGlobalMacro("Globale Local-Structured-Makrodaten aktiv.");
     const countries = MACRO_COUNTRY_BASELINES.map((baseline) => macroCountryForView(baseline, macroRows, globalRows));
     const control = macroControlForView(countries);
     const status = combinedDataStatus(countries.map((country) => country.meta.status));
     const sourceRows = macroSourceRowsForView(countries, macroRows, globalRows);
+    sourceRows.push({ label: "CFTC Rohstoff-Positionierung", meta: cftcCotMeta() });
     return {
       countries,
       control,
@@ -11014,7 +12662,7 @@
   }
 
   function macroCountryForView(baseline, macroRows, globalRows) {
-    const fallbackMeta = makeMeta(baseline.source, baseline.status, BOOT_TIME, "Strukturierter Länderfallback; Live/OpenData überschreibt einzelne Felder.");
+    const fallbackMeta = makeMeta(baseline.source, normalizeDataStatus(baseline.status), null, "Strukturierte lokale Laenderdaten; Live/OpenData ueberschreibt einzelne Felder.");
     const gdpRow = globalMacroRowFor(globalRows, baseline.name, "BIP");
     const debtRow = globalMacroRowFor(globalRows, baseline.name, "Staats");
     const country = {
@@ -11044,6 +12692,9 @@
       country.policyRate = macroFieldFromRow(macroRows.get("ECB"), country.policyRate);
       country.liquidity = macroFieldFromRow(macroRows.get("M3"), country.liquidity);
       country.fx = macroFieldFromRow(macroRows.get("EURUSD"), country.fx);
+      const prefix = baseline.id === "germany" ? "DE" : "EA";
+      country.inflation = macroFieldFromRow(macroRows.get(`${prefix}_HICP`), country.inflation);
+      country.unemployment = macroFieldFromRow(macroRows.get(`${prefix}_UNRATE`), country.unemployment);
     }
 
     if (baseline.id === "china") {
@@ -11072,7 +12723,7 @@
       label,
       value: Number.isFinite(number) ? number : 0,
       display: display || `${formatNumber(number)}${suffix}`,
-      meta: meta || makeMeta(source || "Lokaler Makro-Fallback", "fallback", BOOT_TIME),
+      meta: meta || makeMeta(source || "Lokale Makro-Strukturdaten", "local", null),
       source: source || meta?.source || "Lokaler Makro-Fallback",
       comment: "Datenlage eingeschränkt"
     };
@@ -11252,10 +12903,10 @@
   function macroSourceRowsForView(countries, macroRows, globalRows) {
     const globalStatus = combinedDataStatus(globalRows.map((row) => row.meta?.status || row.status));
     return [
-      { label: "US-Makro", meta: macroRows.get("FEDFUNDS")?.meta || macroRows.get("CPIAUCSL")?.meta || makeMeta("FRED/BLS Fallback", "fallback", BOOT_TIME) },
-      { label: "Treasury / Yield Curve", meta: macroRows.get("YCURVE")?.meta || macroRows.get("DGS10")?.meta || makeMeta("Treasury/FRED Fallback", "fallback", BOOT_TIME) },
+      { label: "US-Makro", meta: macroRows.get("FEDFUNDS")?.meta || macroRows.get("CPIAUCSL")?.meta || makeMeta("FRED/BLS Local Structured", "local", null) },
+      { label: "Treasury / Yield Curve", meta: macroRows.get("YCURVE")?.meta || macroRows.get("DGS10")?.meta || makeMeta("Treasury/FRED Local Structured", "local", null) },
       { label: "Globale Länder", meta: makeMeta("World Bank / IMF / lokale Länderbasis", globalStatus, latestMetaTimestamp(globalRows.map((row) => row.meta)), "Wachstum und Verschuldung nutzen OpenData, wo vorhanden.") },
-      { label: "FX / Liquidität", meta: macroRows.get("EURUSD")?.meta || macroRows.get("DXY")?.meta || makeMeta("Frankfurter/FRED/ECB Fallback", "fallback", BOOT_TIME) }
+      { label: "FX / Liquidität", meta: macroRows.get("EURUSD")?.meta || macroRows.get("DXY")?.meta || makeMeta("Frankfurter/FRED/ECB Local Structured", "local", null) }
     ];
   }
 
@@ -11412,13 +13063,16 @@
 
   function fallbackQuote(symbol, message) {
     const asset = getAsset(symbol);
+    const price = numberOrNull(asset.fallback.price);
+    const changePct = numberOrNull(asset.fallback.changePct);
+    const changeAbs = price !== null && changePct !== null ? price * changePct / 100 : null;
     return {
       symbol,
-      price: asset.fallback.price,
-      changePct: asset.fallback.changePct,
-      changeAbs: asset.fallback.price * asset.fallback.changePct / 100,
+      price,
+      changePct,
+      changeAbs,
       marketCap: asset.fallback.marketCap,
-      meta: makeMeta("Lokaler Quote-Fallback", "fallback", BOOT_TIME, message)
+      meta: makeMeta("Lokale Quote-Strukturdaten", "local", null, message)
     };
   }
 
@@ -11428,11 +13082,11 @@
       symbol,
       name: asset.name,
       sector: asset.sector,
-      exchange: "",
-      country: "",
+      exchange: asset.exchange || assetExchange(asset),
+      country: asset.region || asset.country || assetRegion(asset),
       marketCap: asset.fallback.marketCap,
       logo: "",
-      meta: makeMeta("Lokaler Profil-Fallback", "fallback", BOOT_TIME, message)
+      meta: makeMeta("Lokale Profil-Strukturdaten", "local", null, message)
     };
   }
 
@@ -11452,12 +13106,11 @@
       debt: analysis.debt,
       revenueGrowth: analysis.revenueGrowth,
       beta: null,
-      meta: makeMeta("Lokaler Fundamentals-Fallback", "fallback", BOOT_TIME, message)
+      meta: makeMeta("Lokale Fundamentals-Strukturdaten", "local", null, message)
     };
   }
 
   function fallbackNews(symbol, message) {
-    const now = Date.now();
     const filtered = FALLBACK_NEWS
       .filter((item) => item.symbols.includes(symbol) || item.symbols.includes(getAsset(symbol).sector))
       .concat(FALLBACK_NEWS.filter((item) => item.symbols.includes("SPY")))
@@ -11468,7 +13121,7 @@
         summary: item.summary,
         sentiment: item.sentiment,
         relevance: item.relevance,
-        datetime: now - item.ageHours * 60 * 60 * 1000,
+        datetime: null,
         url: ""
       }));
 
@@ -11479,17 +13132,17 @@
         summary: item.summary,
         sentiment: item.sentiment,
         relevance: item.relevance,
-        datetime: now - item.ageHours * 60 * 60 * 1000,
+        datetime: null,
         url: ""
       })),
-      meta: makeMeta("Lokaler News-Fallback", "fallback", BOOT_TIME, message)
+      meta: makeMeta("Lokale News-Strukturdaten", "local", null, message)
     };
   }
 
   function fallbackMacro(message) {
     return FALLBACK_MACRO.map((item) => ({
       ...item,
-      meta: makeMeta(item.source, item.status, BOOT_TIME, message)
+      meta: makeMeta(item.source, item.status, null, message)
     }));
   }
 
@@ -11499,17 +13152,15 @@
     const newsScore = news.items.reduce((sum, item) => sum + sentimentValue(item.sentiment), 0) / Math.max(news.items.length, 1);
     const score = Math.round(clamp((quoteScore * 0.45) + (asset.sentiment * 0.35) + (newsScore * 0.2), 0, 100));
     const label = score >= 65 ? "Bullish" : score <= 40 ? "Bearish" : "Neutral";
-    const status = quote.meta.status === "live" || news.meta.status === "live" ? "live" : quote.meta.status === "stale" ? "stale" : "fallback";
-
     return {
       score,
       label,
       drivers: [
         { kind: "Preis", text: `Tagesbewegung ${formatPercent(quote.changePct)} beeinflusst das kurzfristige Momentum.` },
-        { kind: "News", text: `${news.items.length} relevante Meldungen im aktuellen Feed/Fallback.` },
+        { kind: "News", text: `${news.items.length} relevante Meldungen im aktuellen Feed oder aus lokaler Struktur.` },
         { kind: "These", text: asset.thesis }
       ],
-      meta: makeMeta("Lokales Sentiment-Modell + verfügbare Daten", status, Date.now(), "Kein externes AI-Sentiment erforderlich.")
+      meta: makeMeta("Lokales Sentiment-Modell + verfügbare Daten", "modelled", null, "Kein externes AI-Sentiment erforderlich.")
     };
   }
 
@@ -11552,7 +13203,7 @@
         { label: "Sentiment", score: Math.round(sentimentScore), text: sentimentScore >= 65 ? "Sentiment unterstützt das Setup." : "Sentiment liefert kein klares Signal." },
         { label: "Volatilität / Risiko", score: Math.round(riskScore), text: analysis.volatility >= 70 ? "Erhöhtes Risiko und größere Schwankungen." : "Risiko im Modell kontrollierbar." }
       ],
-      meta: makeMeta("Hybrid: Regelmodell + Quote-/Zeitreihen-Inputs", bestDataStatus([quote.meta.status, analysis.meta?.status]), Math.max(Number(quote.meta.timestamp || 0), Number(analysis.meta?.timestamp || 0)) || Date.now(), "Rating bleibt Produktlogik; Inputs kommen bevorzugt aus Live-Quotes und Alpha-Zeitreihen.")
+      meta: makeMeta("Hybrid: Regelmodell + Quote-/Zeitreihen-Inputs", derivedDataStatus(bestDataStatus([quote.meta.status, analysis.meta?.status])), Math.max(Number(quote.meta.timestamp || 0), Number(analysis.meta?.timestamp || 0)) || Date.now(), "Rating bleibt Produktlogik; Inputs kommen bevorzugt aus Live-Quotes und Alpha-Zeitreihen.")
     };
   }
 
@@ -11570,12 +13221,13 @@
         performance1m: series.performance1m,
         performance6m: series.performance6m,
         meta: series.meta
-      } : { ...base, meta: makeMeta("Lokales Analysemodell", "fallback", BOOT_TIME) };
+      } : { ...base, meta: makeMeta("Lokales Analysemodell", "modelled", null) };
     }
 
-    const change = Number(asset.fallback.changePct || 0);
-    const marketCap = Number(asset.fallback.marketCap || 0);
-    const pe = Number(asset.fallback.pe || 0);
+    const fallbackPrice = numberOrNull(asset.fallback.price);
+    const change = numberOrNull(asset.fallback.changePct) ?? 0;
+    const marketCap = numberOrNull(asset.fallback.marketCap) ?? 0;
+    const pe = numberOrNull(asset.fallback.pe) ?? 0;
     const sectorBoost = sectorGrowthBias(asset.sector);
     const typeRisk = asset.type === "Crypto" ? 84 : asset.type === "Commodity" ? 62 : asset.type === "ETF" || asset.type === "Index" ? 34 : 50;
     const valueScore = pe ? clamp(78 - pe * 0.9 + (marketCap > 200000000000 ? 4 : 0), 20, 82) : asset.type === "ETF" ? 56 : 48;
@@ -11601,8 +13253,11 @@
       cashflow: null,
       debt: null,
       revenueGrowth: pe ? clamp(growthScore - 48, -10, 42) : null,
-      levels: { support: asset.fallback.price * 0.94, resistance: asset.fallback.price * 1.08 },
-      meta: series ? series.meta : makeMeta("Lokales Analysemodell", "fallback", BOOT_TIME)
+      levels: {
+        support: fallbackPrice !== null ? fallbackPrice * 0.94 : null,
+        resistance: fallbackPrice !== null ? fallbackPrice * 1.08 : null
+      },
+      meta: series ? series.meta : makeMeta("Lokales Analysemodell", "modelled", null)
     };
   }
 
@@ -12237,8 +13892,9 @@
 
   function recapNewsScore(item, symbol) {
     const watchlistBoost = state.watchlist.includes(symbol) || dashboardPrefs().favorites.includes(symbol) ? 20 : 0;
-    const ageHours = Math.max(0, (Date.now() - Number(item.datetime || Date.now())) / (60 * 60 * 1000));
-    const freshness = Math.max(0, 12 - ageHours);
+    const hasTimestamp = Boolean(item.datetime);
+    const ageHours = hasTimestamp ? Math.max(0, (Date.now() - Number(item.datetime)) / (60 * 60 * 1000)) : 24;
+    const freshness = hasTimestamp ? Math.max(0, 12 - ageHours) : 0;
     return clamp(Number(item.relevance || 50) + watchlistBoost + freshness, 0, 100);
   }
 
@@ -12428,7 +14084,7 @@
       return {
         ...eventItem,
         date,
-        meta: makeMeta("Lokaler Event-Fallback", "fallback", BOOT_TIME, message)
+        meta: makeMeta("Lokale Event-Strukturdaten", "local", null, message)
       };
     }).sort((a, b) => a.date - b.date);
   }
@@ -12493,12 +14149,11 @@
   function matchesEventSource(eventItem, filter) {
     if (!filter || filter === "all") return true;
     const source = String(eventItem.meta?.source || "").toLowerCase();
-    const status = String(eventItem.meta?.status || "").toLowerCase();
-    if (filter === "live") return status === "live" || status === "stale";
-    if (filter === "fallback") return status === "fallback";
+    const status = normalizeDataStatus(eventItem.meta?.status);
+    if (filter === "live") return status === "live" || status === "cached";
+    if (filter === "local" || filter === "fallback") return status === "local" || source.includes("lokal") || source.includes("local") || source.includes("mh");
     if (filter === "finnhub") return source.includes("finnhub");
     if (filter === "alpha") return source.includes("alpha");
-    if (filter === "local") return source.includes("lokal") || source.includes("local") || source.includes("mh");
     return true;
   }
 
@@ -12747,7 +14402,7 @@
         <div class="row-actions event-card-actions">
           <button class="ghost-button" type="button" data-route="events">Event-Hub öffnen</button>
         </div>
-        ${renderDataMeta(events[0] ? events[0].meta : makeMeta("Event-Kalender", "fallback", BOOT_TIME))}
+        ${renderDataMeta(events[0] ? events[0].meta : makeMeta("Event-Kalender", "local", null))}
       </article>
     `;
   }
@@ -13163,7 +14818,7 @@
     const focusItems = portfolioFocusItems({ rows: rowsWithWeights, riskItems, rebalancingHints });
     const dataStatus = portfolioDataStatus(rowsWithWeights);
     const health = portfolioHealthSnapshot({ riskScore, riskLevel, cashPct, style, rows: rowsWithWeights, maxSector, maxPosition });
-    const meta = makeMeta("Portfolio: lokale Positionen + Kurs-/Eventdaten", dataStatus, Date.now(), "Portfolio-Werte sind lokal gespeichert; Kurse, Events und Research-Inputs können live, hybrid oder fallback sein.");
+    const meta = makeMeta("Portfolio: lokale Positionen + Kurs-/Eventdaten", derivedDataStatus(dataStatus), Date.now(), "Portfolio-Werte sind lokal gespeichert; Kurse, Events und Research-Inputs können live, hybrid oder local structured sein.");
     return {
       totalValue,
       current,
@@ -13612,7 +15267,7 @@
   }
 
   function countryFor(symbol) {
-    if (["DAX", "SAP"].includes(symbol)) {
+    if (["DAX", "SAP", "SIE.DE", "RHM.DE", "ADS.DE"].includes(symbol)) {
       return "Deutschland";
     }
     if (["ASML"].includes(symbol)) {
@@ -13621,7 +15276,7 @@
     if (["NOVO"].includes(symbol)) {
       return "Dänemark";
     }
-    if (["AIR.PA"].includes(symbol)) {
+    if (["AIR.PA", "MC.PA"].includes(symbol)) {
       return "Frankreich";
     }
     if (["BTC", "ETH", "GOLD"].includes(symbol)) {
@@ -13966,20 +15621,7 @@
       <section class="section">
         <div class="journal-layout">
           ${renderJournalEntryForm(draft)}
-          <article class="card journal-list-card">
-            <div class="card-topline">
-              <div>
-                <span class="card-label">Journal-Liste</span>
-                <h3><span id="journalFilterCount">${filteredEntries.length}</span> gefilterte Entscheidungen</h3>
-                <p>Suche nach Asset, These, Emotion, Fehlerklasse oder Review-Status. Alles bleibt lokal im Browser gespeichert.</p>
-              </div>
-              ${renderDataMeta(journalDataMeta(entries), true)}
-            </div>
-            ${renderJournalFilters()}
-            <div class="journal-entry-list" id="journalResults">
-              ${filteredEntries.map(renderJournalEntryCard).join("") || renderEmptyState("Noch keine passenden Journal-Einträge. Lege links den ersten Eintrag an.")}
-            </div>
-          </article>
+          ${renderJournalSideColumn(entries, filteredEntries, stats)}
         </div>
       </section>
 
@@ -13997,6 +15639,98 @@
           ${renderJournalBestWorstCard(entries, "worst")}
         </div>
       </section>
+    `;
+  }
+
+  function renderJournalSideColumn(entries, filteredEntries, stats) {
+    const mistakes = journalMistakeStats(entries).slice(0, 3);
+    const emotions = countBy(entries.map((entry) => journalEmotionLabel(entry.emotion))).slice(0, 3);
+    const review = journalMonthlyReview(entries);
+    const best = journalBestWorst(entries, "best")[0];
+    const worst = journalBestWorst(entries, "worst")[0];
+    const openReviews = entries.filter((entry) => !journalReviewed(entry)).length;
+    const recent = entries.slice(0, 3);
+
+    return `
+      <div class="journal-side-column">
+        <article class="card journal-side-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Journal-Übersicht</span>
+              <h3>${entries.length ? `${entries.length} dokumentierte Entscheidungen` : "Noch keine Einträge"}</h3>
+              <p>${entries.length ? "Die rechte Spalte bündelt Status, Muster und Reviews, damit das Formular nicht allein im Raum steht." : "Dokumentiere deine erste Entscheidung oder lade einen lokalen Demo-Eintrag. Alles bleibt im Browser."}</p>
+            </div>
+            ${renderDataMeta(journalDataMeta(entries), true)}
+          </div>
+          <div class="metric-grid">
+            ${renderMiniMetric("Einträge", String(stats.count))}
+            ${renderMiniMetric("Offene Reviews", String(openReviews))}
+            ${renderMiniMetric("Top-Emotion", emotions[0]?.label || "offen")}
+            ${renderMiniMetric("Häufigster Fehler", mistakes[0]?.label || "offen")}
+          </div>
+          ${entries.length ? "" : renderJournalEmptyPrompt()}
+        </article>
+
+        <article class="card journal-list-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Journal-Liste</span>
+              <h3><span id="journalFilterCount">${filteredEntries.length}</span> gefilterte Entscheidungen</h3>
+              <p>Suche nach Asset, These, Emotion, Fehlerklasse oder Review-Status.</p>
+            </div>
+          </div>
+          ${renderJournalFilters()}
+          <div class="journal-entry-list" id="journalResults">
+            ${filteredEntries.map(renderJournalEntryCard).join("") || renderJournalEmptyPrompt("filter")}
+          </div>
+        </article>
+
+        <article class="card journal-side-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Muster & Bias</span>
+              <h3>${mistakes[0]?.label || "Noch kein Muster"}</h3>
+              <p>${journalBiasHints(entries)[0]?.text || "Sobald Einträge vorhanden sind, werden wiederkehrende Muster hier kompakt sichtbar."}</p>
+            </div>
+          </div>
+          <div class="chip-row">
+            ${mistakes.map((item) => `<span class="pill">${esc(item.label)} · ${item.count}</span>`).join("") || `<span class="pill">Fehlerklassen offen</span>`}
+            ${emotions.map((item) => `<span class="pill">${esc(item.label)} · ${item.count}</span>`).join("")}
+          </div>
+        </article>
+
+        <article class="card journal-side-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Monatsreview</span>
+              <h3>${esc(review.title)}</h3>
+              <p>${esc(review.learning)}</p>
+            </div>
+            ${renderStatusBadge("local")}
+          </div>
+          <div class="journal-side-list">
+            ${best ? `<button class="journal-side-row" type="button" data-journal-edit="${escAttr(best.id)}"><strong>Stärkster Prozess</strong><span>${esc(best.symbol)} · ${esc(best.reason)}</span></button>` : ""}
+            ${worst ? `<button class="journal-side-row" type="button" data-journal-edit="${escAttr(worst.id)}"><strong>Prüfen</strong><span>${esc(worst.symbol)} · ${esc(worst.reason)}</span></button>` : ""}
+            ${recent.map((entry) => `<button class="journal-side-row" type="button" data-journal-edit="${escAttr(entry.id)}"><strong>${esc(entry.symbol)} · ${esc(journalDecisionTypeLabel(entry.type))}</strong><span>${esc(formatTimestamp(entry.timestamp))} · ${esc(journalEmotionLabel(entry.emotion))}</span></button>`).join("")}
+            ${entries.length ? "" : `<div class="empty-state">Noch keine letzte Entscheidung vorhanden.</div>`}
+          </div>
+        </article>
+      </div>
+    `;
+  }
+
+  function renderJournalEmptyPrompt(kind = "empty") {
+    const text = kind === "filter"
+      ? "Keine passenden Einträge für diese Filter. Passe die Suche an oder starte mit einem Beispiel."
+      : "Noch keine Einträge. Dokumentiere deine erste Entscheidung oder lade einen lokalen Demo-Eintrag.";
+    return `
+      <div class="empty-state guided-empty">
+        <p>${esc(text)}</p>
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-journal-open="${escAttr(state.activeSymbol || "NVDA")}" data-journal-context="journal-empty">Erster Journal-Eintrag</button>
+          <button class="ghost-button" type="button" data-guidance-action="demo-journal">Demo-Eintrag laden</button>
+        </div>
+      </div>
     `;
   }
 
@@ -14643,7 +16377,7 @@
     if (target) {
       const entries = filteredJournalEntries(journalEntriesForView());
       const count = document.getElementById("journalFilterCount");
-      target.innerHTML = entries.map(renderJournalEntryCard).join("") || renderEmptyState("Noch keine passenden Journal-Einträge. Lege links den ersten Eintrag an.");
+      target.innerHTML = entries.map(renderJournalEntryCard).join("") || renderJournalEmptyPrompt("filter");
       if (count) {
         count.textContent = String(entries.length);
       }
@@ -14910,6 +16644,9 @@
 
   function openReport(type, symbol = "") {
     closeReport();
+    if (type === "macro" || cftcCommodityIdForSymbol(symbol || state.activeSymbol)) {
+      ensureCftcData();
+    }
     const html = buildReportHtml(type, symbol);
     document.body.classList.add("report-open");
     document.body.insertAdjacentHTML("beforeend", html);
@@ -15019,13 +16756,15 @@
     const context = { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events };
     const snapshot = buildAssetResearchSnapshot(context);
     const etf = snapshot.etf;
+    const cot = cftcCotForSymbol(symbol);
     const dataRows = [
       { label: "Preis", meta: quote.meta },
       { label: "Profil", meta: profile.meta },
       { label: "Fundamentals", meta: fundamentals.meta },
       { label: "News", meta: news.meta },
-      { label: "Events", meta: events[0]?.meta || makeMeta("Event-Kalender", "fallback", BOOT_TIME) }
-    ];
+      { label: "Events", meta: events[0]?.meta || makeMeta("Event-Kalender", "local", null) },
+      cot ? { label: "CFTC COT", meta: cot.meta } : null
+    ].filter(Boolean);
     return `
       ${reportExecutiveSummary(snapshot.headline, snapshot.summary, snapshot.conclusion)}
       ${reportSection("Wichtigste Kennzahlen", reportMetricGrid([
@@ -15048,6 +16787,7 @@
       ${reportSection("Risiken", reportInsightList(snapshot.risks))}
       ${reportSection("Trigger / nächste Termine", reportTriggerList(snapshot.triggers))}
       ${etf ? reportEtfAssetAddendum(etf) : reportSection("News- und Event-Hinweise", reportNewsAndEvents(news, events))}
+      ${cot ? reportCftcPositioningSection([cot], "Rohstoff-Positionierung / CFTC COT") : ""}
       ${reportDataStatusSection(dataRows)}
       ${reportSourceSection([
         "Quote/Profile/Fundamentals: Finnhub, Alpha Vantage oder Fallback je nach Status",
@@ -15173,6 +16913,7 @@
 
   function macroReportBody() {
     const snapshot = macroCountryComparisonForView();
+    const cftcRows = cftcCotRowsForView();
     return `
       ${reportExecutiveSummary(`Makroampel: ${snapshot.control.label}`, snapshot.control.summary, snapshot.control.drivers.map((driver) => `${driver.label}: ${driver.text}`).join(" "))}
       ${reportSection("Makro-Kontrollzentrum", reportMetricGrid([
@@ -15193,6 +16934,7 @@
         label: `${item.asset} · ${item.signal}`,
         text: item.text
       }))))}
+      ${reportCftcPositioningSection(cftcRows, "Rohstoff-Sentiment / CFTC COT")}
       ${reportDataStatusSection(snapshot.sourceRows)}
       ${reportSourceSection([
         "FRED: Fed Funds, CPI/FRED-Fallback, Arbeitsmarkt, US-Renditen, Geldmenge und Dollarindex, serverseitig über /api/fred.",
@@ -15215,7 +16957,7 @@
       ${reportSection("Was betrifft deine Watchlist?", reportRecapWatchlistRows(recap.watchlistItems.slice(0, 8)))}
       ${reportSection("News / Treiber", reportRecapNewsRows(recap.news.slice(0, 8)))}
       ${reportSection("Alerts / relevante Hinweise", reportAlertRows(recap.alerts.slice(0, 8)))}
-      ${reportDataStatusSection([{ label: "Tages-Recap", meta: makeMeta("Daily-Recap: Watchlist + Events + Alerts + News", recap.status, Date.now(), "Relevanz wird lokal aus vorhandenen Daten priorisiert.") }])}
+      ${reportDataStatusSection([{ label: "Tages-Recap", meta: makeMeta("Daily-Recap: Watchlist + Events + Alerts + News", derivedDataStatus(recap.status), Date.now(), "Relevanz wird lokal aus vorhandenen Daten priorisiert.") }])}
       ${reportSourceSection([
         "Marktbewegungen: Home-Ticker, Watchlist und vorhandene Quote-Pfade",
         "Events: Event-/Earnings-Hub mit Finnhub/Alpha-Vantage-Pfaden oder Fallback",
@@ -15298,7 +17040,7 @@
         { label: "Risk", text: "Volatilitaet, Bewertungsdruck, Event-Risiko, Datenqualitaet und ETF-Konzentration erzeugen eine transparente Warnlogik." },
         { label: "Event / Makro", text: "Event-Hub und Makro-V2 liefern Kontext. Das ist Einordnung, keine Prognose und keine Anlageberatung." }
       ]))}
-      ${reportDataStatusSection(rows.slice(0, 12).map((row) => ({ label: row.symbol, meta: makeMeta("Screener V2 Datenmix", row.dataStatus, Date.now(), row.explanation) })))}
+      ${reportDataStatusSection(rows.slice(0, 12).map((row) => ({ label: row.symbol, meta: makeMeta("Screener V2 Datenmix", derivedDataStatus(row.dataStatus), Date.now(), row.explanation) })))}
       ${reportSourceSection([
         "Quotes/Profile/Fundamentals: vorhandene serverseitige /api/... Pfade oder Fallbacks.",
         "Technik und Scores: lokale, transparente Produktlogik mit Live-/Hybrid-/Fallback-Kennzeichnung.",
@@ -15316,7 +17058,7 @@
       ${reportSection("Watch Picks", reportPickRows(picks.watch))}
       ${reportSection("Risk Picks", reportPickRows(picks.risk))}
       ${reportSection("Watchlist / Favoriten", reportPickRows(picks.personal))}
-      ${reportDataStatusSection([...picks.long, ...picks.watch, ...picks.risk, ...picks.personal].slice(0, 12).map((pick) => ({ label: pick.symbol, meta: makeMeta("Top Picks V2 Datenmix", pick.dataStatus, Date.now(), pick.explanation) })))}
+      ${reportDataStatusSection([...picks.long, ...picks.watch, ...picks.risk, ...picks.personal].slice(0, 12).map((pick) => ({ label: pick.symbol, meta: makeMeta("Top Picks V2 Datenmix", derivedDataStatus(pick.dataStatus), Date.now(), pick.explanation) })))}
       ${reportSourceSection(["Screener V2 Score-Komponenten: Momentum, Value, Growth, Quality, Risiko, Event, Makro und Datenqualitaet.", "Top Picks sind transparente Kandidatenlisten, keine Kauf-/Verkaufsempfehlungen."])}
     `;
 
@@ -15324,7 +17066,7 @@
       ${reportExecutiveSummary("Top Picks Research", "Die Picks kombinieren Technical Rating, Momentum, Value/Growth, Risiko, Sentiment und verfügbare Live-/Fallback-Daten.", "Research-Werkzeug, keine Anlageberatung. Scores bleiben lokale Produktlogik.")}
       ${reportSection("Long Picks", reportPickRows(picks.long))}
       ${reportSection("Risk Picks", reportPickRows(picks.risk))}
-      ${reportDataStatusSection([{ label: "Top Picks", meta: makeMeta("Lokale Top Picks Engine", "fallback", Date.now()) }])}
+      ${reportDataStatusSection([{ label: "Top Picks", meta: makeMeta("Lokale Top Picks Engine", "modelled", null) }])}
       ${reportSourceSection(["Technik, Momentum, Value/Growth, Risiko und Sentiment: lokale Scoring-Logik plus vorhandene Dateninputs"])}
     `;
   }
@@ -15431,6 +17173,22 @@
       `)}
       ${reportSection("Portfolio-Fit-Hinweise", reportInsightList(etfPortfolioFitHints(etf)))}
     `;
+  }
+
+  function reportCftcPositioningSection(rows, title = "CFTC Rohstoff-Positionierung") {
+    const usableRows = (rows || []).filter(Boolean);
+    return reportSection(title, `
+      ${reportMetricGrid(usableRows.flatMap((row) => ([
+        [`${row.label} Signal`, row.sentiment?.label || "unbekannt"],
+        [`${row.label} Non-Commercial netto`, formatCftcContracts(row.nonCommercialNet)],
+        [`${row.label} Commercial netto`, formatCftcContracts(row.commercialNet)],
+        [`${row.label} Datenstand`, row.reportDate || "nicht verfuegbar"]
+      ])).slice(0, 20))}
+      ${reportInsightList(usableRows.map((row) => ({
+        label: `${row.label} · ${row.sentiment?.signal || "unbekannt"}`,
+        text: `${row.sentiment?.explanation || "Keine belastbare Positionierung verfuegbar."} ${cftcTrendText(row)} Quelle: CFTC Legacy Futures-Only COT ueber /api/opendata?source=cftc-cot. Keine Prognose und keine Anlageberatung.`
+      })))}
+    `);
   }
 
   function reportDataStatusSection(rows = []) {
@@ -16370,10 +18128,141 @@
     });
   }
 
+  function updateAssetSearchInput(value) {
+    const query = String(value || "").trim();
+    state.assetSearch = {
+      ...state.assetSearch,
+      query,
+      results: localAssetSearchResults(query),
+      loading: query.length >= 2 && serverApiAvailable(),
+      error: "",
+      source: "local"
+    };
+    renderAssetSearchDom();
+    if (assetSearchTimer) {
+      window.clearTimeout(assetSearchTimer);
+    }
+    if (query.length >= 2) {
+      assetSearchTimer = window.setTimeout(() => runAssetSearch(query), 380);
+    }
+  }
+
+  function setAssetSearchQuery(query) {
+    state.assetSearch.query = String(query || "").trim();
+    document.querySelectorAll("[data-asset-search-input]").forEach((input) => {
+      input.value = state.assetSearch.query;
+    });
+    updateAssetSearchInput(state.assetSearch.query);
+    runAssetSearch(state.assetSearch.query, { immediate: true });
+  }
+
+  async function runAssetSearch(query, options = {}) {
+    const term = String(query || "").trim();
+    const local = localAssetSearchResults(term);
+    state.assetSearch = {
+      ...state.assetSearch,
+      query: term,
+      results: local,
+      loading: term.length >= 2 && serverApiAvailable(),
+      error: "",
+      source: "local",
+      lastQuery: term
+    };
+    renderAssetSearchDom();
+
+    if (term.length < 2) {
+      state.assetSearch.loading = false;
+      renderAssetSearchDom();
+      return local;
+    }
+
+    if (!serverApiAvailable()) {
+      state.assetSearch.loading = false;
+      state.assetSearch.error = "Live-Suche ist im Datei-Modus nicht aktiv. Local-Structured-Treffer werden genutzt.";
+      renderAssetSearchDom();
+      return local;
+    }
+
+    try {
+      const serverResults = await api.searchSymbols(term);
+      const merged = mergeAssetSearchResults(local, serverResults);
+      state.assetSearch = {
+        ...state.assetSearch,
+        results: merged,
+        loading: false,
+        error: merged.length ? "" : "Keine Treffer bei Finnhub/Alpha und lokal.",
+        source: serverResults.length ? "server" : "local",
+        lastQuery: term
+      };
+      renderAssetSearchDom();
+      return merged;
+    } catch (error) {
+      logError(error);
+      state.assetSearch = {
+        ...state.assetSearch,
+        results: local,
+        loading: false,
+        error: "Serverseitige Suche nicht erreichbar. Local-Structured-Treffer bleiben aktiv.",
+        source: "local",
+        lastQuery: term
+      };
+      renderAssetSearchDom();
+      return local;
+    }
+  }
+
+  function renderAssetSearchDom() {
+    const resultHtml = renderAssetSearchResults(state.assetSearch.results);
+    const stateHtml = renderAssetSearchState();
+    document.querySelectorAll("[data-asset-search-results]").forEach((target) => {
+      target.innerHTML = resultHtml;
+    });
+    document.querySelectorAll("[data-asset-search-state]").forEach((target) => {
+      target.innerHTML = stateHtml;
+    });
+  }
+
+  async function selectBestAssetSearchResult(query) {
+    const term = String(query || "").trim();
+    const current = state.assetSearch.results.length && state.assetSearch.query === term ? state.assetSearch.results : localAssetSearchResults(term);
+    const exact = current.find((item) => {
+      const symbol = normalizeSymbol(item.symbol || item.displaySymbol);
+      const display = normalizeSymbol(item.displaySymbol || item.symbol);
+      const name = String(item.name || "").trim().toLowerCase();
+      return symbol === normalizeSymbol(term) || display === normalizeSymbol(term) || name === term.toLowerCase();
+    });
+    if (exact) {
+      selectAssetSearchResult(exact.symbol);
+      return;
+    }
+    const results = term.length >= 2 ? await runAssetSearch(term, { immediate: true }) : current;
+    if (results[0]) {
+      selectAssetSearchResult(results[0].symbol);
+      return;
+    }
+    toast("Kein passendes Asset gefunden. Bitte Symbol, Name oder Exchange genauer angeben.");
+  }
+
+  function selectAssetSearchResult(symbol) {
+    const normalized = normalizeSymbol(symbol);
+    const result = state.assetSearch.results.find((item) => normalizeSymbol(item.symbol) === normalized)
+      || localAssetSearchResults(normalized).find((item) => normalizeSymbol(item.symbol) === normalized);
+    if (result) {
+      registerSearchResultAsset(result);
+    }
+    if (!assetMap.has(normalized)) {
+      toast("Asset nicht gefunden. Bitte ein konkretes Suchergebnis auswählen.");
+      return;
+    }
+    selectAsset(normalized);
+  }
+
   function searchAssets(query) {
+    const term = String(query || "").trim().toLowerCase();
     const favorites = dashboardPrefs().favorites.map(getAsset).filter(Boolean);
-    if (!query) {
+    if (!term) {
       return unique([...favorites.map((asset) => asset.symbol), ...state.recents])
+        .filter((symbol) => assetMap.has(symbol))
         .map(getAsset)
         .filter(Boolean)
         .concat(ASSETS.filter((asset) => !favorites.some((fav) => fav.symbol === asset.symbol) && !state.recents.includes(asset.symbol)))
@@ -16382,10 +18271,211 @@
 
     return ASSETS
       .filter((asset) => {
-        const haystack = `${asset.symbol} ${asset.name} ${asset.sector} ${asset.type}`.toLowerCase();
-        return haystack.includes(query);
+        const haystack = assetSearchHaystack(asset);
+        return haystack.includes(term);
       })
-      .sort((a, b) => scoreAssetMatch(a, query) - scoreAssetMatch(b, query));
+      .sort((a, b) => scoreAssetMatch(a, term) - scoreAssetMatch(b, term));
+  }
+
+  function localAssetSearchResults(query) {
+    return searchAssets(query).slice(0, 10).map((asset) => assetSearchResultFromAsset(asset));
+  }
+
+  function assetSearchResultFromAsset(asset) {
+    const quote = state.quotes[asset.symbol] || null;
+    return {
+      symbol: asset.symbol,
+      displaySymbol: asset.symbol,
+      name: asset.name,
+      type: asset.type,
+      exchange: assetExchange(asset),
+      region: assetRegion(asset),
+      currency: asset.currency || "",
+      source: asset.dynamic ? "Suchtreffer / eingeschränkte lokale Registrierung" : "Lokales Asset-Universum",
+      status: normalizeDataStatus(quote?.meta?.status || (asset.dynamic ? "unavailable" : "local")),
+      local: true,
+      dynamic: Boolean(asset.dynamic)
+    };
+  }
+
+  function mergeAssetSearchResults(...groups) {
+    const bySymbol = new Map();
+    groups.flat().filter(Boolean).forEach((result) => {
+      const symbol = normalizeSymbol(result.symbol || result.displaySymbol);
+      if (!symbol) return;
+      const current = bySymbol.get(symbol);
+      const normalized = { ...result, symbol, displaySymbol: result.displaySymbol || symbol };
+      if (!current || searchResultPriority(normalized) < searchResultPriority(current)) {
+        bySymbol.set(symbol, { ...current, ...normalized });
+      }
+    });
+    return [...bySymbol.values()]
+      .sort((a, b) => searchResultPriority(a) - searchResultPriority(b) || String(a.displaySymbol).localeCompare(String(b.displaySymbol)))
+      .slice(0, 12);
+  }
+
+  function searchResultPriority(result) {
+    const symbol = normalizeSymbol(result.symbol);
+    let score = result.local ? 1 : 3;
+    if (state.watchlist.includes(symbol)) score -= 0.45;
+    if (isFavoriteSymbol(symbol)) score -= 0.55;
+    if (state.recents.includes(symbol)) score -= 0.25;
+    if (result.status === "live") score -= 0.15;
+    return score;
+  }
+
+  function assetSearchHaystack(asset) {
+    return [
+      asset.symbol,
+      asset.symbol.replace(/\..+$/, ""),
+      asset.name,
+      asset.sector,
+      asset.type,
+      asset.tv,
+      asset.currency,
+      asset.isin,
+      ...(asset.aliases || []),
+      ...assetSearchAliases(asset)
+    ].filter(Boolean).join(" ").toLowerCase();
+  }
+
+  function assetSearchAliases(asset) {
+    const map = {
+      "RHM.DE": ["rhm", "rheinmetall", "rheinmetall ag"],
+      "ADS.DE": ["ads", "adidas", "adidas ag"],
+      "SIE.DE": ["sie", "siemens", "siemens ag"],
+      "SAP": ["sap.de", "sap se"],
+      "ASML": ["asml.as", "asml holding"],
+      "MC.PA": ["mc", "lvmh", "louis vuitton"],
+      NOVO: ["novo nordisk", "novo-b", "novo b", "nvo"],
+      VWCE: ["vanguard all world", "ftse all-world", "a2pkxg", "welt etf", "world etf", "msci world", "msci world etf"],
+      VTI: ["vanguard total stock market", "us total market"],
+      SPY: ["s&p 500", "sp500", "s&p500", "s&p 500 etf"],
+      QQQ: ["nasdaq 100", "nasdaq 100 etf"],
+      GLD: ["gold etf", "gold"],
+      BTC: ["bitcoin", "bitcoin btc"]
+    };
+    return map[asset.symbol] || [];
+  }
+
+  function assetExchange(asset) {
+    if (asset.exchange) return asset.exchange;
+    if (asset.tv && asset.tv.includes(":")) return asset.tv.split(":")[0];
+    if (asset.symbol.endsWith(".DE")) return "XETR";
+    if (asset.symbol.endsWith(".PA")) return "Euronext Paris";
+    return asset.type === "Crypto" ? "Crypto" : "";
+  }
+
+  function assetRegion(asset) {
+    if (asset.region) return asset.region;
+    if (asset.country) return asset.country;
+    return countryFor(asset.symbol);
+  }
+
+  function normalizeFinnhubSearchResults(data, status = "live", timestamp = null) {
+    const dataStatus = normalizeDataStatus(status);
+    const rows = Array.isArray(data?.result) ? data.result : [];
+    return rows.map((row) => {
+      const symbol = normalizeSymbol(row.symbol || row.displaySymbol || "");
+      if (!symbol) return null;
+      return {
+        symbol,
+        displaySymbol: row.displaySymbol || row.symbol || symbol,
+        name: row.description || row.name || symbol,
+        type: normalizeAssetType(row.type),
+        exchange: row.exchange || "",
+        region: providerRegionFromSymbol(symbol),
+        currency: "",
+        source: "Finnhub Symbol Search über /api/finnhub",
+        status: dataStatus,
+        timestamp: LIVE_TIMESTAMP_STATUSES.has(dataStatus) ? timestamp : null,
+        provider: "finnhub"
+      };
+    }).filter(Boolean).slice(0, 10);
+  }
+
+  function normalizeAlphaSearchResults(data, status = "live", timestamp = null) {
+    const dataStatus = normalizeDataStatus(status);
+    const rows = Array.isArray(data?.bestMatches) ? data.bestMatches : [];
+    return rows.map((row) => {
+      const symbol = normalizeSymbol(row["1. symbol"] || "");
+      if (!symbol) return null;
+      return {
+        symbol,
+        displaySymbol: row["1. symbol"] || symbol,
+        name: row["2. name"] || symbol,
+        type: normalizeAssetType(row["3. type"]),
+        exchange: row["4. region"] || "",
+        region: row["4. region"] || providerRegionFromSymbol(symbol),
+        currency: row["8. currency"] || "",
+        source: "Alpha Vantage SYMBOL_SEARCH über /api/alphavantage",
+        status: dataStatus,
+        timestamp: LIVE_TIMESTAMP_STATUSES.has(dataStatus) ? timestamp : null,
+        provider: "alphaVantage",
+        matchScore: Number(row["9. matchScore"] || 0)
+      };
+    }).filter(Boolean).slice(0, 10);
+  }
+
+  function normalizeAssetType(value) {
+    const text = String(value || "").toLowerCase();
+    if (text.includes("etf") || text.includes("fund")) return "ETF";
+    if (text.includes("index")) return "Index";
+    if (text.includes("crypto")) return "Crypto";
+    if (text.includes("commodity")) return "Commodity";
+    return "Stock";
+  }
+
+  function providerRegionFromSymbol(symbol) {
+    if (symbol.endsWith(".DE")) return "Deutschland";
+    if (symbol.endsWith(".PA")) return "Frankreich";
+    if (symbol.endsWith(".AS")) return "Niederlande";
+    if (symbol.endsWith(".CO")) return "Dänemark";
+    if (symbol.includes(".")) return "Europa / international";
+    return "USA / Global";
+  }
+
+  function registerSearchResultAsset(result) {
+    const symbol = normalizeSymbol(result.symbol);
+    if (!symbol || assetMap.has(symbol)) {
+      return assetMap.get(symbol) || null;
+    }
+    const asset = {
+      symbol,
+      name: result.name || result.displaySymbol || symbol,
+      type: normalizeAssetType(result.type),
+      sector: result.sector || result.region || "Nicht klassifiziert",
+      exchange: result.exchange || "",
+      region: result.region || providerRegionFromSymbol(symbol),
+      tv: tradingViewSymbolFromSearchResult(result),
+      currency: currencyFromSearchResult(result),
+      fallback: { price: null, changePct: null, marketCap: null, pe: null, eps: null, revenue: null },
+      thesis: "Für dieses Asset sind aktuell nur eingeschränkte Daten verfügbar. MH Analytics versucht Live-Daten über serverseitige Routen und zeigt keine erfundenen Profile.",
+      risks: "Datenabdeckung, Symbol-Mapping und Exchange prüfen. Diese Karte ist keine Anlageberatung.",
+      sentiment: 50,
+      dynamic: true,
+      source: result.source || "Serverseitige Symbolsuche"
+    };
+    assetMap.set(symbol, asset);
+    return asset;
+  }
+
+  function tradingViewSymbolFromSearchResult(result) {
+    const symbol = normalizeSymbol(result.symbol || result.displaySymbol);
+    const exchange = String(result.exchange || "").trim().toUpperCase();
+    if (symbol.endsWith(".DE")) return `XETR:${symbol.replace(".DE", "")}`;
+    if (symbol.endsWith(".PA")) return `EURONEXT:${symbol.replace(".PA", "")}`;
+    if (exchange.includes("NASDAQ")) return `NASDAQ:${symbol}`;
+    if (exchange.includes("NYSE")) return `NYSE:${symbol}`;
+    return symbol;
+  }
+
+  function currencyFromSearchResult(result) {
+    if (result.currency) return result.currency;
+    const symbol = normalizeSymbol(result.symbol || result.displaySymbol);
+    if (symbol.endsWith(".DE") || symbol.endsWith(".PA") || symbol.endsWith(".AS")) return "EUR";
+    if (symbol.endsWith(".CO")) return "DKK";
+    return "USD";
   }
 
   function findBestSymbol(query) {
@@ -16400,16 +18490,22 @@
   function scoreAssetMatch(asset, query) {
     const q = query.toLowerCase();
     const favoriteBoost = isFavoriteSymbol(asset.symbol) ? -0.5 : 0;
+    const watchBoost = state.watchlist.includes(asset.symbol) ? -0.35 : 0;
+    const recentBoost = state.recents.includes(asset.symbol) ? -0.2 : 0;
+    const personalBoost = favoriteBoost + watchBoost + recentBoost;
     if (asset.symbol.toLowerCase() === q) {
-      return favoriteBoost;
+      return personalBoost;
     }
     if (asset.symbol.toLowerCase().startsWith(q)) {
-      return 1 + favoriteBoost;
+      return 1 + personalBoost;
     }
     if (asset.name.toLowerCase().startsWith(q)) {
-      return 2 + favoriteBoost;
+      return 2 + personalBoost;
     }
-    return 5 + favoriteBoost;
+    if (assetSearchAliases(asset).some((alias) => alias.toLowerCase().startsWith(q))) {
+      return 2.4 + personalBoost;
+    }
+    return 5 + personalBoost;
   }
 
   function addToWatchlist(rawSymbol) {
@@ -16570,7 +18666,7 @@
       <article class="kpi-card">
         <span class="card-label">${esc(label)}</span>
         <strong>${value || "--"}</strong>
-        ${renderDataMeta(meta || makeMeta("Lokaler Fallback", "fallback", BOOT_TIME), true)}
+        ${renderDataMeta(meta || makeMeta("Lokale Strukturdaten", "local", null), true)}
       </article>
     `;
   }
@@ -16589,19 +18685,20 @@
     return `
       <div class="data-meta ${compact ? "compact-meta" : ""}" title="${escAttr(safeMeta.message || "")}">
         <span>${esc(safeMeta.source)}</span>
-        <span>${formatTimestamp(safeMeta.timestamp)}</span>
+        <span>${esc(dataFreshnessText(safeMeta))}</span>
         ${renderStatusBadge(safeMeta.status)}
       </div>
     `;
   }
 
   function renderStatusBadge(status) {
-    const safeStatus = status || "missing";
+    const safeStatus = normalizeDataStatus(status);
     return `<span class="status-badge status-${escAttr(safeStatus)}">${esc(statusLabel(safeStatus))}</span>`;
   }
 
   function renderTinyStatus(status) {
-    return `<span class="tiny-status status-${escAttr(status || "missing")}" aria-label="${escAttr(statusLabel(status || "missing"))}"></span>`;
+    const safeStatus = normalizeDataStatus(status);
+    return `<span class="tiny-status status-${escAttr(safeStatus)}" aria-label="${escAttr(statusLabel(safeStatus))}"></span>`;
   }
 
   function renderSymbolChip(symbol) {
@@ -16613,12 +18710,43 @@
   }
 
   function makeMeta(source, status, timestamp, message = "") {
+    const dataStatus = normalizeDataStatus(status);
+    const safeTimestamp = LIVE_TIMESTAMP_STATUSES.has(dataStatus) && Number(timestamp) ? Number(timestamp) : null;
     return {
       source,
-      status: status || "missing",
-      timestamp: timestamp || Date.now(),
+      status: dataStatus,
+      rawStatus: status || "missing",
+      timestamp: safeTimestamp,
       message
     };
+  }
+
+  function normalizeDataStatus(status) {
+    const value = String(status || "").trim().toLowerCase();
+    if (value === "live") return "live";
+    if (value === "cached" || value === "stale") return "cached";
+    if (value === "hybrid") return "hybrid";
+    if (["local", "fallback", "localstructured", "local-structured"].includes(value)) return "local";
+    if (value === "demo") return "demo";
+    if (value === "modelled" || value === "modeled") return "modelled";
+    if (["missing", "prepared", "mapped", "notused", "unknown", "disabled", "error", "offline", "unavailable"].includes(value)) return "unavailable";
+    return "unavailable";
+  }
+
+  function derivedDataStatus(status) {
+    const safeStatus = normalizeDataStatus(status);
+    return safeStatus === "live" || safeStatus === "cached" ? "hybrid" : safeStatus;
+  }
+
+  function dataFreshnessText(meta) {
+    const status = normalizeDataStatus(meta?.status);
+    if (status === "live" && meta?.timestamp) return `Abruf: ${formatTimestamp(meta.timestamp)}`;
+    if (status === "cached" && meta?.timestamp) return `Cache: ${formatTimestamp(meta.timestamp)}`;
+    if (status === "hybrid") return "Hybrid-Datenmix";
+    if (status === "local") return "Stand: lokale Datenbasis";
+    if (status === "demo") return "Demo-Daten";
+    if (status === "modelled") return "modellierte Einordnung";
+    return "kein belastbarer Live-Abruf";
   }
 
   function getOverallDataStatus() {
@@ -16626,21 +18754,30 @@
     if (quotes.some((quote) => quote.meta.status === "live")) {
       return "live";
     }
-    if (quotes.some((quote) => quote.meta.status === "stale")) {
-      return "stale";
+    if (quotes.some((quote) => quote.meta.status === "cached")) {
+      return "cached";
     }
-    return "fallback";
+    if (quotes.some((quote) => quote.meta.status === "hybrid")) {
+      return "hybrid";
+    }
+    return "local";
   }
 
   function getOverallDataStatusText() {
     const status = getOverallDataStatus();
     if (status === "live") {
-      return "Live-Daten aktiv, Fallbacks bleiben als Schutz bereit.";
+      return "Live-Daten aktiv; lokale Schutzschichten bleiben gekennzeichnet.";
     }
-    if (status === "stale") {
-      return "Veraltete Cache-Daten aktiv, API wird später erneut versucht.";
+    if (status === "cached") {
+      return "Zwischengespeicherte echte Abrufe aktiv; kein neuer Live-Abruf in diesem Moment.";
     }
-    return "Fallback-Daten aktiv. Live-Daten laufen über serverseitige Quellen, sobald das Deployment korrekt konfiguriert ist.";
+    if (status === "hybrid") {
+      return "Hybrid-Datenmix aktiv: echte Datenpfade plus lokale Produktlogik.";
+    }
+    if (status === "local") {
+      return "Local-Structured-Daten aktiv. Live-Daten laufen ueber serverseitige Quellen, sobald das Deployment korrekt konfiguriert ist.";
+    }
+    return "Keine belastbare Live-Datenbasis aktiv. Module kennzeichnen Local Structured, Modelled oder Unavailable.";
   }
 
   function countLiveQuotes() {
@@ -16648,40 +18785,7 @@
   }
 
   function statusLabel(status) {
-    if (status === "live") {
-      return "Live";
-    }
-    if (status === "stale") {
-      return "Fallback";
-    }
-    if (status === "missing") {
-      return "Unbekannt";
-    }
-    if (status === "prepared") {
-      return "Unbekannt";
-    }
-    if (status === "hybrid") {
-      return "Hybrid";
-    }
-    if (status === "local") {
-      return "Lokal";
-    }
-    if (status === "offline") {
-      return "Offline";
-    }
-    if (status === "unknown") {
-      return "Unbekannt";
-    }
-    if (status === "mapped" || status === "notUsed") {
-      return "Unbekannt";
-    }
-    if (status === "disabled") {
-      return "Offline";
-    }
-    if (status === "error") {
-      return "Offline";
-    }
-    return "Fallback-Daten aktiv";
+    return DATA_STATUS_LABELS[normalizeDataStatus(status)] || DATA_STATUS_LABELS.unavailable;
   }
 
   function applyTheme() {
@@ -16697,7 +18801,7 @@
   }
 
   function normalizeSymbol(value) {
-    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9.]/g, "");
+    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, "");
   }
 
   function storageGet(key, fallback) {
@@ -16719,12 +18823,18 @@
       if (!health || typeof health !== "object") {
         return;
       }
-      const status = health.status === "live" || health.status === "stale" ? "notUsed" : health.status;
+      const savedStatus = normalizeDataStatus(health.status);
+      const savedTimestamp = Number(health.lastSuccess || health.timestamp || 0);
+      const status = savedStatus === "live" || savedStatus === "cached"
+        ? savedTimestamp ? "cached" : "unavailable"
+        : savedStatus;
+      const safeTimestamp = LIVE_TIMESTAMP_STATUSES.has(status) && savedTimestamp ? savedTimestamp : null;
       next[providerId] = {
         ...health,
         status,
-        message: status === "notUsed" ? "Noch kein erfolgreicher Live-Abruf in dieser Sitzung." : health.message,
-        timestamp: BOOT_TIME
+        message: status === "cached" ? "Echter Abruf aus vorheriger Sitzung im Cache; kein neuer Live-Abruf." : health.message,
+        timestamp: safeTimestamp,
+        lastSuccess: safeTimestamp || null
       };
     });
     return next;
@@ -16872,7 +18982,13 @@
   }
 
   function formatTimestamp(timestamp) {
-    const time = timestamp ? new Date(timestamp) : new Date();
+    if (!timestamp) {
+      return "kein Live-Zeitstempel";
+    }
+    const time = new Date(timestamp);
+    if (Number.isNaN(time.getTime())) {
+      return "kein Live-Zeitstempel";
+    }
     return time.toLocaleString("de-DE", {
       day: "2-digit",
       month: "2-digit",
@@ -16882,7 +18998,14 @@
   }
 
   function formatRelativeTime(timestamp) {
-    const diff = Date.now() - Number(timestamp || Date.now());
+    if (!timestamp) {
+      return "Stand: lokale Datenbasis";
+    }
+    const time = Number(timestamp);
+    if (!Number.isFinite(time)) {
+      return "Stand: lokale Datenbasis";
+    }
+    const diff = Date.now() - time;
     const hours = Math.max(1, Math.round(diff / (60 * 60 * 1000)));
     if (hours < 24) {
       return `vor ${hours}h`;
@@ -16984,35 +19107,37 @@
   }
 
   function statusRank(status) {
-    const ranks = { live: 6, stale: 5, hybrid: 4, local: 3, fallback: 2, prepared: 2, mapped: 2, notUsed: 1, missing: 1, unknown: 1, error: 0, offline: 0 };
-    return ranks[status || ""] ?? 0;
+    const ranks = { live: 7, cached: 6, hybrid: 5, local: 4, demo: 3, modelled: 3, unavailable: 0 };
+    return ranks[normalizeDataStatus(status)] ?? 0;
   }
 
   function bestDataStatus(statuses) {
-    return statuses.filter(Boolean).sort((a, b) => statusRank(b) - statusRank(a))[0] || "fallback";
+    return statuses.filter(Boolean).map(normalizeDataStatus).sort((a, b) => statusRank(b) - statusRank(a))[0] || "unavailable";
   }
 
   function combinedDataStatus(statuses) {
-    const clean = statuses.filter(Boolean);
+    const clean = statuses.filter(Boolean).map(normalizeDataStatus);
     if (!clean.length) {
-      return "fallback";
+      return "unavailable";
     }
-    const hasLive = clean.some((status) => status === "live" || status === "stale");
-    const hasFallback = clean.some((status) => ["fallback", "local", "prepared", "mapped", "notUsed", "missing", "unknown"].includes(status));
-    const hasError = clean.some((status) => status === "error" || status === "offline");
-    if (hasLive && hasFallback) {
+    const hasLiveLike = clean.some((status) => status === "live" || status === "cached");
+    const hasLocalLike = clean.some((status) => ["local", "demo", "modelled", "unavailable"].includes(status));
+    if (hasLiveLike && hasLocalLike) {
       return "hybrid";
     }
-    if (hasLive) {
-      return clean.includes("stale") && !clean.includes("live") ? "stale" : "live";
-    }
-    if (hasError && !hasFallback) {
-      return "error";
+    if (hasLiveLike) {
+      return clean.includes("live") ? "live" : "cached";
     }
     if (clean.includes("local")) {
       return "local";
     }
-    return "fallback";
+    if (clean.includes("modelled")) {
+      return "modelled";
+    }
+    if (clean.includes("demo")) {
+      return "demo";
+    }
+    return "unavailable";
   }
 
   function esc(value) {
