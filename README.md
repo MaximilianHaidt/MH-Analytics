@@ -20,8 +20,9 @@ Lokal nutzt MH Analytics Fallback-Daten, wenn serverseitige Live-Quellen nicht v
 
 ## Was in dieser Datenarchitektur-Runde geändert wurde
 
-- Der öffentliche Bereich bleibt `Datenquellen`, nicht API-Key-Verwaltung.
-- Normale Nutzer sehen keine editierbaren API-Key-Felder, keine Key-Speicherbuttons und keine Key-Testbuttons.
+- Der öffentliche Bereich heißt `Datenquellen` und ist eine reine Quellen-/Data-Health-Ansicht.
+- Die frühere öffentliche Provider-Konfiguration ist entfernt: keine editierbaren API-Key-Felder, keine Key-Speicherbuttons, keine Key-Testbuttons und keine Browser-Diagnose.
+- Alte Browserdaten aus früheren API-Key-Versionen werden beim Start bereinigt; neue Provider-Keys werden nicht mehr im Frontend gespeichert.
 - EIA wurde serverseitig angebunden.
 - FX/Währungen laufen serverseitig über Frankfurter.
 - CoinGecko läuft als klarer Krypto-Datenpfad über eine eigene Vercel Function.
@@ -159,6 +160,12 @@ Die Health-Einordnung ist bewusst nutzerfreundlich:
 
 Wichtig: Diese Werte sind Transparenz- und Vertrauensinformationen. Sie sind keine Garantie für Vollständigkeit, Echtzeit oder Fehlerfreiheit.
 
+## Betreiber-Konfiguration
+
+Normale Website-Besucher konfigurieren keine Provider. Betreiber tragen sensible Anbieter-Schlüssel ausschließlich in Vercel unter `Settings` -> `Environment Variables` ein. Nach Änderungen an diesen Variablen ist ein neues Deployment nötig.
+
+Keys dürfen nicht in `app.js`, nicht in `index.html`, nicht in `localStorage` und nicht in öffentliche Formulare geschrieben werden.
+
 ## Live, Fallback oder hybrid
 
 - Start-Ticker: bevorzugt Finnhub über `/api/finnhub`, danach Alpha Vantage über `/api/alphavantage`, Krypto über `/api/coingecko`, sonst Fallback.
@@ -181,6 +188,30 @@ Wichtig: Diese Werte sind Transparenz- und Vertrauensinformationen. Sie sind kei
 - `api/coingecko.js` ist die Vercel Function für Krypto-Preise.
 - `api/opendata.js` normalisiert ausgewählte Open-Data-Quellen.
 - `DEPLOYMENT.md` erklärt GitHub und Vercel Schritt für Schritt.
+
+## Launch-Readiness / rechtliche Platzhalter
+
+Die Website enthaelt einen oeffentlichen Bereich `Rechtliches` mit Platzhaltern fuer:
+
+- Impressum
+- Datenschutz
+- Disclaimer
+
+Diese Inhalte sind bewusst nicht final. Der Betreiber muss Name, Adresse, Kontakt, Unternehmensangaben und Datenschutzdetails vor Veroeffentlichung rechtlich pruefen und ausfuellen lassen. MH Analytics gibt keine Rechtsberatung.
+
+## Roadmap, nicht als Versprechen
+
+Spaetere Bloecke bleiben bewusst offen und wurden in dieser QA-Runde nicht neu gebaut:
+
+- Journal / Psychologie / Fehleranalyse V2
+- tiefere Live-Daten in Spezialbereichen
+- ETF-Live-Holdings, falls eine geeignete Quelle gefunden wird
+- Login / Cloud-Sync
+- echte Push- oder E-Mail-Benachrichtigungen
+- serverseitige Alert-Pruefung
+- Community spaeter
+- finale rechtliche Pruefung
+- Datenqualitaet und Plausibilitaetspruefungen weiter vertiefen.
 
 ## Disclaimer
 

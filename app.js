@@ -21,8 +21,8 @@
 
   const STORAGE_KEYS = {
     theme: "mh.theme.v2",
-    providerTests: "mh.providerTests.v1",
     providerHealth: "mh.providerHealth.v1",
+    userPreferences: "mh.userPreferences.v1",
     watchlist: "mh.watchlist.v2",
     portfolios: "mh.portfolios.v1",
     activePortfolioId: "mh.activePortfolioId.v1",
@@ -30,6 +30,11 @@
     alerts: "mh.alerts.v2",
     alertInbox: "mh.alertInbox.v2",
     journal: "mh.journal.v1",
+    onboarding: "mh.onboarding.v1",
+    activity: "mh.activity.v1",
+    learning: "mh.learning.v1",
+    level: "mh.level.v1",
+    demoState: "mh.demoState.v1",
     recents: "mh.recents.v2",
     activeSymbol: "mh.activeSymbol.v2",
     cache: "mh.apiCache.v2"
@@ -77,10 +82,8 @@
       keyMode: "serverEnv",
       security: "backend-only",
       description: "Aktien-Quotes, Firmenprofile, Company News, Basic Financials und Earnings/Events.",
-      usage: "Primärquelle für Aktien, Profile, News und Earnings. Läuft öffentlich nur noch serverseitig über /api/finnhub mit FINNHUB_API_KEY.",
-      testHint: "Kein öffentlicher Browser-Key. Status entsteht über echte Modulabrufe auf /api/finnhub.",
-      testRequest: buildFinnhubProxyTestRequest,
-      validateTest: validateFinnhubQuote
+      usage: "Primärquelle für Aktien, Profile, News und Earnings. Läuft öffentlich nur über die eigene serverseitige Route /api/finnhub.",
+      testHint: "Status entsteht über echte Modulabrufe auf /api/finnhub."
     },
     {
       id: "alphaVantage",
@@ -91,10 +94,8 @@
       keyMode: "serverEnv",
       security: "backend-only",
       description: "FX, Rohstoffe, technische Indikatoren, IPO-/Earnings-Zusatz und optionaler Aktienkurs-Fallback.",
-      usage: "Eigener Zuständigkeitsbereich für FX, Rohstoffe, Indikatoren, Zeitreihen sowie IPO-/Earnings-Zusatz. Läuft öffentlich nur noch serverseitig über /api/alphavantage mit ALPHA_VANTAGE_API_KEY.",
-      testHint: "Kein öffentlicher Browser-Key. Status entsteht über echte Modulabrufe auf /api/alphavantage.",
-      testRequest: buildAlphaProxyTestRequest,
-      validateTest: validateAlphaVantageQuote
+      usage: "Eigener Zuständigkeitsbereich für FX, Rohstoffe, Indikatoren, Zeitreihen sowie IPO-/Earnings-Zusatz. Läuft öffentlich nur über die eigene serverseitige Route /api/alphavantage.",
+      testHint: "Status entsteht über echte Modulabrufe auf /api/alphavantage."
     },
     {
       id: "frankfurter",
@@ -105,7 +106,7 @@
       keyMode: "none",
       security: "server-normalized",
       description: "Offene FX-Quelle für Basis-Währungspaare und einfache Umrechnung.",
-      usage: "Währungsdaten laufen über /api/fx. Kein öffentliches Key-Feld, keine direkte Browser-Abhängigkeit.",
+      usage: "Währungsdaten laufen über /api/fx. Die öffentliche App zeigt nur Daten und Status.",
       testHint: "Status entsteht über echte Modulabrufe auf /api/fx."
     },
     {
@@ -130,7 +131,7 @@
       security: "backend-recommended",
       description: "Profile, Fundamentaldaten, Kennzahlen und später Earnings-Kalender.",
       usage: "Aus der aktiven öffentlichen Provider-Seite entfernt; keine Live-Pfade im Public-Start-Kernstack.",
-      testHint: "Aus der öffentlichen API-Key-Seite entfernt; kein Browser-Test im Public Start."
+      testHint: "Aus der öffentlichen Quellenliste entfernt."
     },
     {
       id: "eodhd",
@@ -153,10 +154,8 @@
       keyMode: "serverEnv",
       security: "backend-only",
       description: "US-Makrodaten wie Fed Funds, CPI, Arbeitslosenquote, Geldmengen, Zinsserien und Spreads.",
-      usage: "Zuständig für US-Makro und Geldmengen. FRED läuft nicht mehr direkt im Browser, sondern über die Vercel Function /api/fred mit FRED_API_KEY als Environment Variable.",
-      testHint: "Testet die Vercel Function /api/fred?action=test. Kein FRED-Key im Frontend.",
-      testRequest: buildFredProxyTestRequest,
-      validateTest: validateFredSeriesUpdates
+      usage: "Zuständig für US-Makro und Geldmengen. FRED läuft nicht direkt im Browser, sondern über die serverseitige Route /api/fred.",
+      testHint: "Status entsteht über echte Makroabrufe auf /api/fred."
     },
     {
       id: "ecb",
@@ -168,9 +167,7 @@
       security: "browser-ok-public",
       description: "Vorbereiteter Slot für EZB-Zinsen, FX-Referenzkurse und europäische Makrodaten.",
       usage: "Open-Data-Quelle für Eurozone/EZB. Zugeordnet, aber erst nach echtem Abruf als live markiert.",
-      testHint: "Open-Data-Test: ECB Dataflow-Verzeichnis.",
-      testRequest: () => ({ url: "https://data-api.ecb.europa.eu/service/dataflow/ECB/all/latest?detail=allstubs", responseType: "text" }),
-      validateTest: validateNonEmptyText("ECB Data API")
+      testHint: "Open-Data-Quelle; Status entsteht erst durch Modulabrufe."
     },
     {
       id: "newsApi",
@@ -181,7 +178,7 @@
       keyMode: "required",
       security: "backend-only",
       description: "Vorbereiteter Slot für allgemeine News-Aggregation.",
-      usage: "Noch nicht aktiv. NewsAPI sollte wegen Key-Schutz und CORS später serverseitig laufen.",
+      usage: "Noch nicht aktiv. NewsAPI sollte später serverseitig und geschützt laufen.",
       testHint: "Backend-only empfohlen."
     },
     {
@@ -192,7 +189,7 @@
       status: "disabled",
       keyMode: "required",
       security: "backend-recommended",
-      description: "Company News und Earnings Calendar. Nutzt in der App denselben Finnhub-Key wie Market Data.",
+      description: "Company News und Earnings Calendar. In der App durch den Hauptprovider Finnhub gebündelt.",
       usage: "Nicht mehr als separater Provider sichtbar; Finnhub bündelt Quotes, News und Earnings.",
       testHint: "Kein separater Test: Finnhub News nutzt den Hauptprovider Finnhub."
     },
@@ -228,8 +225,8 @@
       status: "active",
       keyMode: "none",
       security: "server-normalized",
-      description: "Krypto-Preise für BTC/ETH. Public/Demo nutzbar; produktionsnah besser mit Key oder Proxy.",
-      usage: "Krypto-Daten laufen über /api/coingecko. COINGECKO_API_KEY ist optional und wird, falls gesetzt, nur serverseitig genutzt.",
+      description: "Krypto-Preise für BTC/ETH. Öffentlich über die eigene Route normalisiert.",
+      usage: "Krypto-Daten laufen über /api/coingecko. Falls eine Betreiber-Konfiguration gesetzt ist, bleibt sie serverseitig.",
       testHint: "Status entsteht über echte Crypto-Abrufe auf /api/coingecko."
     },
     {
@@ -302,7 +299,7 @@
       security: "backend-only",
       description: "Newsletter, Listen, Double-Opt-In und später CRM-Automation.",
       usage: "UI vorbereitet, API-Aufrufe später nur über Backend.",
-      testHint: "Backend-only wegen geheimem API Key."
+      testHint: "Backend-only; nicht öffentlich konfigurierbar."
     },
     {
       id: "supabase",
@@ -314,7 +311,7 @@
       security: "backend-ready",
       description: "Vorbereiteter Slot für User-Daten, Watchlists, Kommentare, Auth und Edge Functions.",
       usage: "Noch nicht aktiv. In Phase statisch bleibt localStorage primär.",
-      testHint: "Anon Key kann später genutzt werden; Service Role niemals im Browser speichern."
+      testHint: "Spätere Auth-/Storage-Konfiguration gehört nicht in die öffentliche UI."
     },
     {
       id: "bls",
@@ -325,7 +322,7 @@
       keyMode: "none",
       security: "server-normalized",
       description: "Offizielle Open-Data-Quelle für US-Arbeitsmarkt, CPI und Labor-Daten.",
-      usage: "Kein Key nötig. Wird über /api/opendata normalisiert und ergänzt CPI sowie Arbeitsmarkt.",
+      usage: "Open Data. Wird über /api/opendata normalisiert und ergänzt CPI sowie Arbeitsmarkt.",
       testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
@@ -337,7 +334,7 @@
       keyMode: "none",
       security: "server-normalized",
       description: "Offizielle Open-Data-Quelle für Treasury-Rates, Yield Curve und Zinsstruktur.",
-      usage: "Kein Key nötig. Wird über /api/opendata normalisiert und für 10Y-Rendite sowie Yield Curve genutzt.",
+      usage: "Open Data. Wird über /api/opendata normalisiert und für 10Y-Rendite sowie Yield Curve genutzt.",
       testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
@@ -349,8 +346,8 @@
       keyMode: "none",
       security: "browser-critical",
       description: "Offizielle Open-Data-Quelle für EDGAR Submissions, XBRL und spätere Fundamentaldatenbasis.",
-      usage: "Kein Key nötig. data.sec.gov ist offiziell, aber im Browser CORS-kritisch; daher aktuell zugeordnet, nicht als Frontend-Livequelle beworben.",
-      testHint: "Kein Browser-Test: SEC data.sec.gov unterstützt CORS nicht zuverlässig für öffentliche Frontends."
+      usage: "Open Data. data.sec.gov ist offiziell, aber im Browser CORS-kritisch; daher aktuell zugeordnet, nicht als Frontend-Livequelle beworben.",
+      testHint: "Browserkritisch; später besser kontrolliert serverseitig normalisieren."
     },
     {
       id: "eia",
@@ -361,8 +358,8 @@
       keyMode: "serverEnv",
       security: "backend-only",
       description: "Offizielle Energiequelle für Öl, Gas, Strom und Energiemarktdaten.",
-      usage: "EIA läuft über /api/eia mit EIA_API_KEY als Vercel Environment Variable. Öl wird aktiv für Rohstoffdaten genutzt; Gas/Energie sind serverseitig vorbereitet.",
-      testHint: "Kein öffentliches Key-Feld. Status entsteht über echte Modulabrufe auf /api/eia."
+      usage: "EIA läuft über /api/eia. Öl wird aktiv für Rohstoffdaten genutzt; Gas/Energie sind serverseitig vorbereitet.",
+      testHint: "Status entsteht über echte Modulabrufe auf /api/eia."
     },
     {
       id: "worldBank",
@@ -373,7 +370,7 @@
       keyMode: "none",
       security: "server-normalized",
       description: "Open-Data-Quelle für globale Länder-, Entwicklungs- und Strukturdaten.",
-      usage: "Kein Key nötig. Wird über /api/opendata normalisiert und für globale BIP-/Ländervergleiche genutzt.",
+      usage: "Open Data. Wird über /api/opendata normalisiert und für globale BIP-/Ländervergleiche genutzt.",
       testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
@@ -385,7 +382,7 @@
       keyMode: "none",
       security: "server-normalized",
       description: "Offizielle internationale Makroergänzung über IMF DataMapper und IMF APIs.",
-      usage: "Kein Key nötig für DataMapper. Wird über /api/opendata normalisiert und ergänzt globale Makrovergleiche.",
+      usage: "Open Data über DataMapper. Wird über /api/opendata normalisiert und ergänzt globale Makrovergleiche.",
       testHint: "Status entsteht über Open-Data-Abrufe auf /api/opendata."
     },
     {
@@ -397,8 +394,8 @@
       keyMode: "none",
       security: "browser-critical",
       description: "OECD Open Data über SDMX-APIs für Länder- und Wirtschaftsvergleiche.",
-      usage: "Kein Key nötig. Wegen SDMX-Komplexität und Browser-/Rate-Limit-Fragen zugeordnet, aber nicht als Live-Frontendquelle markiert.",
-      testHint: "Kein Browser-Test in dieser statischen Startphase. Später besser über kontrollierten Datenadapter."
+      usage: "Open Data. Wegen SDMX-Komplexität und Browser-/Rate-Limit-Fragen zugeordnet, aber nicht als Live-Frontendquelle markiert.",
+      testHint: "Später besser über kontrollierten Datenadapter."
     },
     {
       id: "eurostat",
@@ -409,8 +406,8 @@
       keyMode: "none",
       security: "browser-ok-public",
       description: "Offizielle Open-Data-Quelle für EU-Statistiken, Eurozone-Kennzahlen und Länderprofile.",
-      usage: "Kein Key nötig. In dieser Runde als transparenter Quellenstatus eingeordnet; Live-Module werden später gezielt angebunden.",
-      testHint: "Kein öffentlicher Testbutton. Status entsteht später über echte Modulabrufe."
+      usage: "Open Data. In dieser Runde als transparenter Quellenstatus eingeordnet; Live-Module werden später gezielt angebunden.",
+      testHint: "Status entsteht später über echte Modulabrufe."
     },
     {
       id: "openfigi",
@@ -421,8 +418,8 @@
       keyMode: "none",
       security: "backend-ready",
       description: "Referenzdatenquelle für spätere Symbol-, FIGI- und Instrumenten-Zuordnung.",
-      usage: "Kein öffentliches Key-Feld. Für diese Runde nur als Datenquellenstatus eingeordnet; spätere Nutzung erfolgt kontrolliert serverseitig.",
-      testHint: "Kein öffentlicher Testbutton. Nicht als Live-Modul beworben."
+      usage: "Für diese Runde nur als Datenquellenstatus eingeordnet; spätere Nutzung erfolgt kontrolliert serverseitig.",
+      testHint: "Nicht als Live-Modul beworben."
     }
   ];
 
@@ -471,7 +468,7 @@
   const DATA_SOURCE_REGISTRY = [
     { id: "finnhub", role: "Primärquelle", type: "Serverseitig", category: "Markt / Unternehmen", description: "Aktienkurse, Unternehmensprofile, Company News und Earnings laufen über die eigene Vercel Function.", fallback: "Bei Fehlern bleiben lokale Quotes, Profile und Event-Fallbacks aktiv." },
     { id: "alphaVantage", role: "Zusatzquelle", type: "Serverseitig", category: "FX / Rohstoffe / Zeitreihen", description: "Ergänzt FX, Rohstoffe, technische Indikatoren sowie IPO- und Earnings-Zusatzdaten.", fallback: "Wird bei Aktien auch als Quote-Fallback genutzt, wenn Finnhub nicht liefert." },
-    { id: "frankfurter", role: "Primärquelle FX", type: "Serverseitig normalisiert", category: "Währungen", description: "Offene FX-Kurse laufen zentral über /api/fx, ohne öffentliches Key-Feld.", fallback: "Bei Ausfall nutzt die App strukturierte lokale FX-Kontexte." },
+    { id: "frankfurter", role: "Primärquelle FX", type: "Serverseitig normalisiert", category: "Währungen", description: "Offene FX-Kurse laufen zentral über /api/fx, ohne öffentliche Konfigurationsfelder.", fallback: "Bei Ausfall nutzt die App strukturierte lokale FX-Kontexte." },
     { id: "fred", role: "Primärquelle US-Makro", type: "Serverseitig", category: "US-Makro / Geldmengen", description: "FRED versorgt Zinsen, Geldmengen, Spreads und US-Makroserien ausschließlich serverseitig.", fallback: "Makro- und Liquiditätskarten bleiben fallback-gestützt nutzbar." },
     { id: "ecb", role: "Euro-Makro", type: "Open Data", category: "Eurozone", description: "ECB ist als offene Quelle für Eurozone, EZB-Zinsen und EUR-Kontext eingeordnet.", fallback: "Noch nicht jede ECB-Reihe ist live verdrahtet; lokale Euro-Makro-Basis bleibt sichtbar." },
     { id: "bls", role: "Offizielle US-Daten", type: "Serverseitig normalisiert", category: "Inflation / Arbeit", description: "BLS ergänzt CPI und Arbeitsmarkt über die Open-Data-Normalisierung.", fallback: "CPI und Arbeitsmarkt bleiben mit lokalen Makro-Fallbacks verfügbar." },
@@ -493,14 +490,15 @@
     { id: "asset", name: "Asset-Seiten", providers: ["finnhub", "sec", "alphaVantage"], mode: "Hybrid", quality: "hoch", description: "Preis, Profil, News und Events bevorzugen Live-Daten; Research bleibt Produktlogik." },
     { id: "events", name: "Event-/Earnings-Hub", providers: ["finnhub", "alphaVantage"], mode: "Hybrid / Fallback", quality: "mittel", description: "Earnings und IPO-Zusatzdaten werden providerbasiert geladen; lokaler Kalender bleibt Backup." },
     { id: "compare", name: "Quick Compare", providers: ["finnhub", "alphaVantage"], mode: "Hybrid", quality: "mittel", description: "Quotes und Fundamentals speisen den Vergleich; ETF-Struktur bleibt lokal modelliert." },
+    { id: "screener", name: "Screener / Ratings / Top Picks", providers: ["finnhub", "alphaVantage"], mode: "Hybrid / lokal transparent", quality: "mittel", description: "Ranking nutzt Quote-, Profil-, Fundamental- und Zeitreihenpfade, bleibt aber eine nachvollziehbare lokale Score-Logik mit Datenstatus je Wert." },
     { id: "watchlist", name: "Watchlist", providers: ["finnhub", "alphaVantage"], mode: "Hybrid / lokal", quality: "mittel", description: "Gespeicherte Assets sind lokal, Kurs- und Newsdaten kommen soweit möglich live." },
     { id: "alerts", name: "Alerts V2", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "Regeln, Snooze und Historie sind lokal; Auslösung nutzt vorhandene Kurs- und Eventdaten." },
-    { id: "macro", name: "Makro / Liquidität / Geldmengen", providers: ["fred", "bls", "treasury", "ecb"], mode: "Hybrid / Fallback", quality: "hoch", description: "US-Makro, CPI, Arbeitsmarkt, Renditen und Euro-Kontext werden offiziellen Quellen zugeordnet." },
+    { id: "macro", name: "Makro / Ländervergleich / Liquidität", providers: ["fred", "bls", "treasury", "ecb", "worldBank", "imf", "frankfurter", "eurostat", "oecd"], mode: "Hybrid / Fallback", quality: "hoch", description: "US-Makro, CPI, Arbeitsmarkt, Renditen, FX, Ländervergleich und Euro-/China-Kontext werden offiziellen Quellen zugeordnet." },
     { id: "energy", name: "Energie / Rohstoffe / FX", providers: ["eia", "alphaVantage", "frankfurter"], mode: "Hybrid", quality: "mittel", description: "EIA, Alpha Vantage und FX-Normalisierung speisen Cross-Asset-Kontexte." },
-    { id: "etf", name: "ETF", providers: ["finnhub"], mode: "Lokal / Hybrid", quality: "mittel", description: "ETF-Struktur, TER und Holdings sind strukturiert lokal; Marktpreise können über Quote-Pfade kommen." },
+    { id: "etf", name: "ETF V2", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "ETF-Struktur, TER, Holdings, Regionen, Sektoren, Overlap und Kostenrechnung sind strukturiert lokal; Marktpreise können über Quote-Pfade kommen." },
     { id: "portfolio", name: "Portfolio", providers: ["finnhub", "alphaVantage"], mode: "Lokal / Hybrid", quality: "mittel", description: "Positionen und Notizen sind lokal; Marktdaten werden soweit verfügbar live ergänzt." },
-    { id: "research", name: "Research / Report", providers: ["finnhub", "fred", "sec"], mode: "Hybrid / Synthese", quality: "mittel", description: "Reports kombinieren echte Inputs, lokale Fallbacks und eigene Research-Synthese." },
-    { id: "sources", name: "Datenquellen", providers: DATA_HEALTH_PROVIDER_IDS, mode: "Transparenz", quality: "hoch", description: "Zeigt Quellen, Status, Frische, Health und betroffene Module ohne öffentliche Key-Konfiguration." }
+    { id: "research", name: "Research / Report", providers: ["finnhub", "fred", "sec", "worldBank", "treasury"], mode: "Hybrid / Synthese", quality: "mittel", description: "Reports kombinieren echte Inputs, lokale Fallbacks und eigene Research-Synthese inklusive Makro-Report." },
+    { id: "sources", name: "Datenquellen", providers: DATA_HEALTH_PROVIDER_IDS, mode: "Transparenz", quality: "hoch", description: "Zeigt Quellen, Status, Frische, Health und betroffene Module ohne öffentliche Betreiber-Konfiguration." }
   ];
 
   const ASSETS = [
@@ -1263,6 +1261,18 @@
       sentiment: 50
     },
     {
+      symbol: "VWCE",
+      name: "Vanguard FTSE All-World UCITS ETF",
+      type: "ETF",
+      sector: "Global Equity",
+      tv: "XETR:VWCE",
+      currency: "EUR",
+      fallback: { price: 119.40, changePct: 0.18, marketCap: null, pe: null, eps: null, revenue: null },
+      thesis: "Ein-Fonds-Weltportfolio mit breiter Länder- und Sektorstreuung.",
+      risks: "USA-Gewichtung, Aktienmarktrisiko, Währungsrisiko trotz EUR-Handel.",
+      sentiment: 59
+    },
+    {
       symbol: "OIL",
       name: "WTI Crude Oil",
       type: "Commodity",
@@ -1515,25 +1525,45 @@
     {
       symbol: "SPY",
       name: "SPDR S&P 500 ETF Trust",
+      isin: "US78462F1030",
+      category: "US Large Cap",
+      role: "Core / US-Baustein",
+      benchmark: "S&P 500",
       ter: 0.09,
       distribution: "Ausschüttend",
       currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
       region: [["USA", 96], ["Europa", 2], ["Sonstige", 2]],
+      sectors: [["Technologie", 31], ["Finanzwerte", 13], ["Gesundheit", 12], ["Konsum", 10], ["Industrie", 8]],
       holdings: [["MSFT", 7.1], ["AAPL", 6.4], ["NVDA", 5.8], ["AMZN", 3.7], ["META", 2.5]],
+      top10: 34,
       risk: "Breiter US-Markt, aber Mega-Cap-Konzentration.",
       fxRisk: "USD-Risiko für EUR-Anleger",
       useCase: "US-Kernbaustein für breite Large-Cap-Exposure.",
       structure: "Physisch replizierend, sehr liquide, stark USA-lastig.",
-      dataNote: "Lokales ETF-Modell mit TER, Holdings und Regionen."
+      dataNote: "Strukturierte lokale ETF-Datenbasis mit TER, Holdings, Regionen und Sektoren."
     },
     {
       symbol: "QQQ",
       name: "Invesco QQQ Trust",
+      isin: "US46090E1038",
+      category: "Nasdaq / Growth",
+      role: "Satellite / Growth",
+      benchmark: "Nasdaq 100",
       ter: 0.20,
       distribution: "Ausschüttend",
       currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
       region: [["USA", 97], ["Global", 3]],
+      sectors: [["Technologie", 50], ["Kommunikation", 16], ["Konsum", 15], ["Gesundheit", 6], ["Industrie", 5]],
       holdings: [["MSFT", 8.7], ["NVDA", 7.9], ["AAPL", 7.4], ["AMZN", 5.1], ["META", 4.8]],
+      top10: 49,
       risk: "Tech- und Growth-Konzentration.",
       fxRisk: "USD-Risiko, hohe Zins-Sensitivität",
       useCase: "Satellit für Nasdaq-, AI- und Growth-Exposure.",
@@ -1543,11 +1573,21 @@
     {
       symbol: "VTI",
       name: "Vanguard Total Stock Market ETF",
+      isin: "US9229087690",
+      category: "US Total Market",
+      role: "Core / US-Gesamtmarkt",
+      benchmark: "CRSP US Total Market",
       ter: 0.03,
       distribution: "Ausschüttend",
       currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
       region: [["USA", 99], ["Sonstige", 1]],
+      sectors: [["Technologie", 29], ["Finanzwerte", 12], ["Gesundheit", 12], ["Konsum", 10], ["Industrie", 9]],
       holdings: [["MSFT", 6.2], ["AAPL", 5.6], ["NVDA", 5.0], ["AMZN", 3.2], ["META", 2.1]],
+      top10: 29,
       risk: "US-Gesamtmarkt mit Small-/Mid-Cap-Anteil.",
       fxRisk: "USD-Risiko für EUR-Anleger",
       useCase: "Sehr günstiger US-Gesamtmarkt-Baustein.",
@@ -1557,16 +1597,170 @@
     {
       symbol: "VWCE",
       name: "Vanguard FTSE All-World UCITS ETF",
+      isin: "IE00BK5BQT80",
+      category: "Global / Weltportfolio",
+      role: "Core / Weltportfolio",
+      benchmark: "FTSE All-World",
       ter: 0.22,
       distribution: "Thesaurierend",
       currency: "EUR",
+      fundCurrency: "USD",
+      domicile: "Irland",
+      replication: "Physisch",
+      structureType: "UCITS",
       region: [["USA", 61], ["Europa", 16], ["Asien", 17], ["Sonstige", 6]],
+      sectors: [["Technologie", 24], ["Finanzwerte", 15], ["Gesundheit", 11], ["Industrie", 10], ["Konsum", 10]],
       holdings: [["MSFT", 4.2], ["AAPL", 3.8], ["NVDA", 3.4], ["AMZN", 2.4], ["META", 1.6]],
+      top10: 21,
       risk: "Globaler Aktienmarkt, USA trotzdem dominierend.",
       fxRisk: "Mehrwährungs-Exposure im Fonds",
       useCase: "Ein-Fonds-Weltportfolio für langfristige Kernanlage.",
       structure: "UCITS, thesaurierend, global diversifiziert.",
       dataNote: "Lokales UCITS-ETF-Modell."
+    },
+    {
+      symbol: "IWM",
+      name: "iShares Russell 2000 ETF",
+      isin: "US4642876555",
+      category: "US Small Cap",
+      role: "Satellite / Small Caps",
+      benchmark: "Russell 2000",
+      ter: 0.19,
+      distribution: "Ausschüttend",
+      currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
+      region: [["USA", 98], ["Sonstige", 2]],
+      sectors: [["Finanzwerte", 18], ["Industrie", 17], ["Gesundheit", 16], ["Technologie", 14], ["Konsum", 11]],
+      holdings: [["FTAI", 0.5], ["INSM", 0.4], ["VST", 0.4], ["SFM", 0.4], ["ANF", 0.3]],
+      top10: 4.2,
+      risk: "Sehr breit nach Einzeltiteln, aber zyklisch und zinssensitiv.",
+      fxRisk: "USD-Risiko für EUR-Anleger",
+      useCase: "Small-Cap-Satellit für Konjunktur- und Zinswendeszenarien.",
+      structure: "Physisch replizierend, viele kleine Positionen, höhere Schwankung.",
+      dataNote: "Lokale strukturierte ETF-Datenbasis; Holdings können sich stärker ändern."
+    },
+    {
+      symbol: "DIA",
+      name: "SPDR Dow Jones Industrial Average ETF",
+      isin: "US78467X1090",
+      category: "US Blue Chips",
+      role: "Satellite / defensivere US-Blue-Chips",
+      benchmark: "Dow Jones Industrial Average",
+      ter: 0.16,
+      distribution: "Ausschüttend",
+      currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
+      region: [["USA", 98], ["Sonstige", 2]],
+      sectors: [["Industrie", 20], ["Finanzwerte", 18], ["Gesundheit", 17], ["Technologie", 16], ["Konsum", 13]],
+      holdings: [["UNH", 8.4], ["GS", 7.0], ["MSFT", 6.8], ["HD", 5.8], ["CAT", 5.1]],
+      top10: 52,
+      risk: "Nur 30 Werte; dadurch deutlich konzentrierter als breite Markt-ETFs.",
+      fxRisk: "USD-Risiko für EUR-Anleger",
+      useCase: "Blue-Chip-Satellit mit stärkerer Einzelwertgewichtung.",
+      structure: "Physisch replizierend, preisgewichteter Index, kein breiter Marktquerschnitt.",
+      dataNote: "Lokale strukturierte ETF-Datenbasis."
+    },
+    {
+      symbol: "GLD",
+      name: "SPDR Gold Shares",
+      isin: "US78463V1070",
+      category: "Gold / Rohstoff",
+      role: "Absicherung / Realzins-Hedge",
+      benchmark: "Gold Spot",
+      ter: 0.40,
+      distribution: "Keine Ausschüttung",
+      currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch besichert",
+      structureType: "Rohstoff-ETP",
+      region: [["Gold", 100]],
+      sectors: [["Edelmetalle", 100]],
+      holdings: [["Physisches Gold", 100]],
+      top10: 100,
+      risk: "Keine Unternehmensdiversifikation; Preis hängt stark an Realzins, USD und Risikoappetit.",
+      fxRisk: "Gold notiert in USD; EUR-Anleger haben zusätzlich Währungsbewegungen.",
+      useCase: "Portfolio-Hedge gegen Realzins-, Dollar- und Stressphasen.",
+      structure: "Physisch besichert, kein Aktien-ETF, kein laufender Cashflow.",
+      dataNote: "Lokales Rohstoff-ETF/ETP-Modell."
+    },
+    {
+      symbol: "SLV",
+      name: "iShares Silver Trust",
+      isin: "US46428Q1094",
+      category: "Silber / Rohstoff",
+      role: "Satellite / Edelmetall",
+      benchmark: "Silver Spot",
+      ter: 0.50,
+      distribution: "Keine Ausschüttung",
+      currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch besichert",
+      structureType: "Rohstoff-ETP",
+      region: [["Silber", 100]],
+      sectors: [["Edelmetalle", 100]],
+      holdings: [["Physisches Silber", 100]],
+      top10: 100,
+      risk: "Höhere Volatilität als Gold, zusätzlich Industriezyklus- und Liquiditätsrisiko.",
+      fxRisk: "Silber notiert in USD; EUR-Anleger haben zusätzlich Währungseinfluss.",
+      useCase: "Taktischer Edelmetall-Satellit, nicht als breiter Core-Baustein gedacht.",
+      structure: "Physisch besichert, kein Aktien-ETF, keine laufenden Ausschüttungen.",
+      dataNote: "Lokales Rohstoff-ETF/ETP-Modell."
+    },
+    {
+      symbol: "TLT",
+      name: "iShares 20+ Year Treasury Bond ETF",
+      isin: "US4642874329",
+      category: "US Staatsanleihen",
+      role: "Duration / Rezessions-Hedge",
+      benchmark: "ICE U.S. Treasury 20+ Year",
+      ter: 0.15,
+      distribution: "Ausschüttend",
+      currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
+      region: [["USA", 100]],
+      sectors: [["Staatsanleihen", 100]],
+      holdings: [["US Treasury 20+Y", 100]],
+      top10: 58,
+      risk: "Sehr hohes Duration-Risiko: steigende Renditen können stark belasten.",
+      fxRisk: "USD-Risiko für EUR-Anleger",
+      useCase: "Zins- und Rezessionsbaustein, nicht mit Aktien-ETF-Risiko vergleichbar.",
+      structure: "Langlaufende US-Staatsanleihen; stark zinssensitiv.",
+      dataNote: "Lokales Anleihe-ETF-Modell."
+    },
+    {
+      symbol: "EEM",
+      name: "iShares MSCI Emerging Markets ETF",
+      isin: "US4642872349",
+      category: "Emerging Markets",
+      role: "Satellite / Schwellenländer",
+      benchmark: "MSCI Emerging Markets",
+      ter: 0.70,
+      distribution: "Ausschüttend",
+      currency: "USD",
+      fundCurrency: "USD",
+      domicile: "USA",
+      replication: "Physisch",
+      structureType: "Nicht-UCITS",
+      region: [["Asien", 76], ["Lateinamerika", 9], ["EMEA", 9], ["Sonstige", 6]],
+      sectors: [["Technologie", 22], ["Finanzwerte", 21], ["Konsum", 13], ["Kommunikation", 10], ["Rohstoffe", 8]],
+      holdings: [["TSM", 8.5], ["Tencent", 4.0], ["Samsung", 3.6], ["Alibaba", 2.4], ["Reliance", 1.4]],
+      top10: 26,
+      risk: "Schwellenländer-, China-/Taiwan-, Politik- und Währungsrisiken.",
+      fxRisk: "USD-Notierung plus lokale EM-Währungen im Fonds",
+      useCase: "EM-Satellit für globale Diversifikation, aber kein ruhiger Core-Ersatz.",
+      structure: "Breit über Schwellenländer, aber mit Asien- und Taiwan-Schwerpunkt.",
+      dataNote: "Lokale strukturierte ETF-Datenbasis."
     }
   ];
 
@@ -1658,11 +1852,243 @@
   ];
 
   const DASHBOARD_MODES = {
-    standard: ["macro", "liquidity", "topPicks", "watchlist", "sentiment"],
-    investor: ["watchlist", "macro", "liquidity", "etf", "portfolio"],
-    trader: ["topPicks", "screener", "watchlist", "alerts", "sentiment"],
-    learning: ["research", "macro", "liquidity", "etf", "watchlist"]
+    investor: {
+      label: "Investor",
+      description: "Research, Watchlist, Portfolio, Events, Makro und Reports werden nach vorne gezogen.",
+      modules: { portfolio: "high", watchlist: "high", assetResearch: "high", events: "normal", macro: "normal", reports: "normal", dailyRecap: "normal", dataHealth: "normal" },
+      shortcuts: ["watchlist", "portfolio", "asset", "events", "reports"],
+      profile: { goal: "wealth", horizon: "long", risk: "medium", experience: "advanced", focus: ["stocks", "portfolio", "macro"] }
+    },
+    trader: {
+      label: "Trader",
+      description: "Tages-Recap, Bewegungen, Alerts, Events, Compare und Screener dominieren die Startseite.",
+      modules: { dailyRecap: "high", dailyBriefing: "high", alerts: "high", events: "normal", quickCompare: "normal", screener: "normal", watchlist: "normal", macro: "normal" },
+      shortcuts: ["today", "alerts", "events", "compare", "screener"],
+      profile: { goal: "trading", horizon: "short", risk: "high", experience: "advanced", focus: ["stocks", "tech", "crypto"] }
+    },
+    etf: {
+      label: "ETF-Anleger",
+      description: "ETF V2, Portfolio-Fit, Kosten, Overlap, Makro und Reports werden priorisiert.",
+      modules: { etf: "high", portfolio: "high", quickCompare: "normal", macro: "normal", reports: "normal", watchlist: "normal", dailyRecap: "normal" },
+      shortcuts: ["etf", "compare", "portfolio", "reports", "macro"],
+      profile: { goal: "wealth", horizon: "long", risk: "medium", experience: "beginner", focus: ["etfs", "portfolio", "macro"] }
+    },
+    macro: {
+      label: "Makro",
+      description: "Makroampel, Ländervergleich, Zinsen, FX, Liquidität und Asset-Implikationen stehen vorne.",
+      modules: { macro: "high", liquidity: "high", dailyBriefing: "normal", dailyRecap: "normal", etf: "normal", reports: "normal", dataHealth: "normal" },
+      shortcuts: ["macro", "dataHealth", "reports", "events", "watchlist"],
+      profile: { goal: "learning", horizon: "medium", risk: "medium", experience: "advanced", focus: ["macro", "commodities", "portfolio"] }
+    },
+    learning: {
+      label: "Anfänger / Learning",
+      description: "Tagesüberblick, Research-Snapshot, einfache Kennzahlen und Erklärtexte werden sichtbarer.",
+      modules: { dailyBriefing: "high", dailyRecap: "high", assetResearch: "normal", macro: "normal", etf: "normal", watchlist: "normal", reports: "normal", dataHealth: "normal" },
+      shortcuts: ["today", "asset", "watchlist", "macro", "dataHealth"],
+      profile: { goal: "learning", horizon: "long", risk: "low", experience: "beginner", focus: ["etfs", "macro", "portfolio"] }
+    },
+    portfolio: {
+      label: "Portfolio-Fokus",
+      description: "Portfolio, Risiko, Exposure, Rebalancing, Watchlist, Alerts und Reports werden priorisiert.",
+      modules: { portfolio: "high", watchlist: "high", alerts: "normal", dailyRecap: "normal", events: "normal", macro: "normal", reports: "normal" },
+      shortcuts: ["portfolio", "alerts", "watchlist", "reports", "dataHealth"],
+      profile: { goal: "capital_preservation", horizon: "long", risk: "low", experience: "advanced", focus: ["portfolio", "etfs", "dividends"] }
+    }
   };
+
+  const HOME_MODULE_CATALOG = [
+    { id: "dailyRecap", label: "Tages-Recap", description: "Was habe ich heute verpasst?", route: "home" },
+    { id: "dailyBriefing", label: "Tagesüberblick", description: "Marktphase, Bewegungen und Termine", route: "home" },
+    { id: "portfolio", label: "Portfolio", description: "Wert, Risiko, Exposure und Rebalancing", route: "portfolio" },
+    { id: "watchlist", label: "Watchlist", description: "Beobachtete und favorisierte Assets", route: "portfolio" },
+    { id: "events", label: "Events", description: "Earnings, Makrotermine und Kalender", route: "events" },
+    { id: "alerts", label: "Alerts", description: "Offene, ausgelöste und wichtige Hinweise", route: "alerts" },
+    { id: "etf", label: "ETF", description: "ETF-Kosten, Overlap und Portfolio-Fit", route: "etf" },
+    { id: "macro", label: "Makro", description: "Makroampel und Ländervergleich", route: "macro" },
+    { id: "liquidity", label: "Liquidität", description: "Geldmengen, Realzins und Kurve", route: "liquidity" },
+    { id: "quickCompare", label: "Quick Compare", description: "Zwei Assets direkt vergleichen", route: "compare" },
+    { id: "screener", label: "Screener", description: "Datengetriebene Asset-Auswahl", route: "screener" },
+    { id: "reports", label: "Reports", description: "Research als Browser-PDF exportieren", route: "research" },
+    { id: "assetResearch", label: "Asset-Research", description: "5-Minuten-Research für den aktiven Wert", route: "asset" },
+    { id: "dataHealth", label: "Data Health", description: "Quellen, Status und Datenqualität", route: "data-health" }
+  ];
+
+  const SHORTCUT_CATALOG = [
+    { id: "watchlist", label: "Meine Watchlist", route: "portfolio" },
+    { id: "portfolio", label: "Mein Portfolio", route: "portfolio" },
+    { id: "asset", label: "Aktives Asset", route: "asset" },
+    { id: "today", label: "Heute wichtig", route: "home" },
+    { id: "alerts", label: "Alerts", route: "alerts" },
+    { id: "etf", label: "ETF-Bereich", route: "etf" },
+    { id: "etfCompare", label: "ETF Compare", route: "etf" },
+    { id: "macro", label: "Makroampel", route: "macro" },
+    { id: "reports", label: "Report erstellen", route: "research" },
+    { id: "events", label: "Event-Hub", route: "events" },
+    { id: "compare", label: "Quick Compare", route: "compare" },
+    { id: "screener", label: "Screener", route: "screener" },
+    { id: "dataHealth", label: "Data Health", route: "data-health" }
+  ];
+
+  const PROFILE_OPTION_LABELS = {
+    goal: {
+      wealth: "Vermögensaufbau",
+      trading: "Trading",
+      income: "Einkommen / Dividenden",
+      capital_preservation: "Kapitalerhalt",
+      learning: "Lernen / Bildung"
+    },
+    horizon: { short: "kurzfristig", medium: "mittelfristig", long: "langfristig" },
+    risk: { low: "niedrig", medium: "mittel", high: "hoch" },
+    experience: { beginner: "Anfänger", advanced: "fortgeschritten", experienced: "erfahren" },
+    focus: {
+      stocks: "Aktien",
+      etfs: "ETFs",
+      macro: "Makro",
+      dividends: "Dividenden",
+      tech: "Tech",
+      commodities: "Rohstoffe",
+      crypto: "Krypto",
+      portfolio: "Portfolio"
+    }
+  };
+
+  const SCREENER_DEFAULT_FILTERS = {
+    search: "",
+    preset: "all",
+    assetType: "all",
+    region: "all",
+    style: "all",
+    dataStatus: "all",
+    personal: "all",
+    eventContext: "all",
+    rating: "all",
+    momentum: "all",
+    value: "all",
+    growth: "all",
+    marketCap: "all",
+    sector: "all",
+    performance: "all",
+    sort: "score"
+  };
+
+  const SCREENER_PRESETS = [
+    { id: "all", label: "Alle Assets", text: "Breiter Scan ohne Spezialfilter.", filters: {} },
+    { id: "momentum", label: "Momentum-Stars", text: "Starke technische und kurzfristige relative Stärke.", filters: { style: "momentum", momentum: "70", sort: "momentum" } },
+    { id: "value", label: "Value-Kandidaten", text: "Bewertung wirkt im lokalen Modell attraktiver.", filters: { style: "value", value: "60", sort: "value" } },
+    { id: "growth", label: "Growth-Kandidaten", text: "Wachstum und Qualität stehen im Vordergrund.", filters: { style: "growth", growth: "70", sort: "growth" } },
+    { id: "quality", label: "Quality-Werte", text: "Qualität, Stabilität und Datenlage stärker gewichtet.", filters: { style: "quality", sort: "quality" } },
+    { id: "risk", label: "Risk-Warnungen", text: "Volatilität, schwache Technik oder Datenlücken prüfen.", filters: { style: "highVolatility", sort: "risk" } },
+    { id: "eventWeek", label: "Event-Woche", text: "Assets mit relevanten Terminen in dieser Woche.", filters: { eventContext: "week", sort: "event" } },
+    { id: "watchlist", label: "Watchlist-Auffälligkeiten", text: "Persönliche Beobachtungsliste mit V2-Signalen.", filters: { personal: "watchlist", sort: "score" } },
+    { id: "etf", label: "ETF-Check", text: "ETF-Struktur, Kosten, Risiko und Datenstatus.", filters: { assetType: "ETF", sort: "quality" } },
+    { id: "favorites", label: "Favoriten-Scan", text: "Deine Favoriten mit transparenten Score-Treibern.", filters: { personal: "favorites", sort: "score" } }
+  ];
+
+  function defaultUserPreferences(mode = "investor") {
+    const safeMode = DASHBOARD_MODES[mode] ? mode : "investor";
+    const config = DASHBOARD_MODES[safeMode];
+    return {
+      version: 2,
+      mode: safeMode,
+      modules: normalizedModulePreferences(config.modules, "hidden"),
+      favorites: ["NVDA", "MSFT", "SPY"],
+      shortcuts: config.shortcuts.slice(0, 6),
+      profile: {
+        goal: config.profile.goal,
+        horizon: config.profile.horizon,
+        risk: config.profile.risk,
+        experience: config.profile.experience,
+        focus: [...config.profile.focus]
+      },
+      display: {
+        detail: "normal",
+        numberFormat: "de",
+        currency: "EUR",
+        performanceView: "percentFirst",
+        beginnerHelp: config.profile.experience === "beginner",
+        dataStatus: "normal"
+      },
+      defaults: {
+        screener: { ...SCREENER_DEFAULT_FILTERS },
+        eventHub: { window: "week", type: "all", scope: "all", relevance: "all" },
+        etf: { left: "SPY", right: "QQQ", amount: 10000, monthly: 250, years: 10, returnRate: 5 },
+        portfolio: { activePortfolioId: "core", view: "overview" },
+        compare: { left: "NVDA", right: "MSFT" },
+        reports: { type: "asset", showDataStatus: true }
+      }
+    };
+  }
+
+  function normalizeUserPreferences(saved, legacy = null) {
+    const legacyMode = legacy?.mode === "standard" ? "investor" : legacy?.mode;
+    const base = defaultUserPreferences(saved?.mode || legacyMode || "investor");
+    const merged = {
+      ...base,
+      ...(saved && typeof saved === "object" ? saved : {}),
+      favorites: sanitizeFavoriteSymbols(saved?.favorites || legacy?.favorites || base.favorites),
+      shortcuts: sanitizeShortcuts(saved?.shortcuts || base.shortcuts),
+      modules: normalizedModulePreferences({ ...base.modules, ...(saved?.modules || legacyModulesToPreferences(legacy?.modules) || {}) }, "hidden"),
+      profile: {
+        ...base.profile,
+        ...(saved?.profile && typeof saved.profile === "object" ? saved.profile : {}),
+        focus: sanitizeFocusList(saved?.profile?.focus || base.profile.focus)
+      },
+      display: {
+        ...base.display,
+        ...(saved?.display && typeof saved.display === "object" ? saved.display : {})
+      },
+      defaults: {
+        ...base.defaults,
+        ...(saved?.defaults && typeof saved.defaults === "object" ? saved.defaults : {}),
+        screener: { ...base.defaults.screener, ...(saved?.defaults?.screener || {}) },
+        eventHub: { ...base.defaults.eventHub, ...(saved?.defaults?.eventHub || {}) },
+        etf: { ...base.defaults.etf, ...(saved?.defaults?.etf || {}) },
+        portfolio: { ...base.defaults.portfolio, ...(saved?.defaults?.portfolio || {}) },
+        compare: { ...base.defaults.compare, ...(saved?.defaults?.compare || {}) },
+        reports: { ...base.defaults.reports, ...(saved?.defaults?.reports || {}) }
+      }
+    };
+    merged.mode = DASHBOARD_MODES[merged.mode] ? merged.mode : base.mode;
+    merged.display.detail = ["compact", "normal", "detailed"].includes(merged.display.detail) ? merged.display.detail : "normal";
+    merged.display.numberFormat = ["de", "en"].includes(merged.display.numberFormat) ? merged.display.numberFormat : "de";
+    merged.display.currency = ["EUR", "USD"].includes(merged.display.currency) ? merged.display.currency : "EUR";
+    merged.display.performanceView = ["percentFirst", "amountFirst"].includes(merged.display.performanceView) ? merged.display.performanceView : "percentFirst";
+    merged.display.dataStatus = ["compact", "normal", "detailed"].includes(merged.display.dataStatus) ? merged.display.dataStatus : "normal";
+    merged.display.beginnerHelp = Boolean(merged.display.beginnerHelp);
+    return merged;
+  }
+
+  function normalizedModulePreferences(modules = {}, fallbackPriority = "normal") {
+    const source = Array.isArray(modules)
+      ? Object.fromEntries(modules.map((id, index) => [id, index < 3 ? "high" : "normal"]))
+      : modules;
+    return HOME_MODULE_CATALOG.reduce((acc, module) => {
+      const value = source?.[module.id];
+      acc[module.id] = ["high", "normal", "hidden"].includes(value) ? value : fallbackPriority;
+      return acc;
+    }, {});
+  }
+
+  function legacyModulesToPreferences(modules) {
+    if (!Array.isArray(modules)) {
+      return null;
+    }
+    return Object.fromEntries(modules.map((id, index) => [id, index < 3 ? "high" : "normal"]));
+  }
+
+  function sanitizeFavoriteSymbols(symbols = []) {
+    return unique(symbols.map(normalizeSymbol).filter((symbol) => ASSETS.some((asset) => asset.symbol === symbol))).slice(0, 12);
+  }
+
+  function sanitizeShortcuts(shortcuts = []) {
+    const valid = new Set(SHORTCUT_CATALOG.map((shortcut) => shortcut.id));
+    return [...new Set(shortcuts.map(String).filter((id) => valid.has(id)))].slice(0, 6);
+  }
+
+  function sanitizeFocusList(focus = []) {
+    const valid = new Set(Object.keys(PROFILE_OPTION_LABELS.focus));
+    return [...new Set(focus.map(String).filter((item) => valid.has(item)))].slice(0, 5);
+  }
 
   const DEFAULT_PORTFOLIOS = [
     {
@@ -1786,6 +2212,15 @@
       status: "fallback"
     },
     {
+      id: "DGS2",
+      label: "US 2Y Yield",
+      value: 4.7,
+      display: "4.70%",
+      trend: "2Y spiegelt Leitzins- und Senkungserwartungen",
+      source: "Lokaler Treasury/FRED-Fallback",
+      status: "fallback"
+    },
+    {
       id: "DGS10",
       label: "US 10Y Yield",
       value: 4.35,
@@ -1809,6 +2244,7 @@
     { id: "FEDFUNDS", seriesId: "FEDFUNDS", label: "Fed Funds Rate", suffix: "%", mode: "level" },
     { id: "CPIAUCSL", seriesId: "CPIAUCSL", label: "US CPI / Inflation", suffix: "%", mode: "inflation" },
     { id: "UNRATE", seriesId: "UNRATE", label: "Arbeitslosenquote", suffix: "%", mode: "level" },
+    { id: "DGS2", seriesId: "DGS2", label: "US 2Y Yield", suffix: "%", mode: "level" },
     { id: "DGS10", seriesId: "DGS10", label: "US 10Y Yield", suffix: "%", mode: "level" },
     { id: "M1", seriesId: "M1SL", label: "Geldmenge M1", suffix: "%", mode: "yoy" },
     { id: "M2", seriesId: "M2SL", label: "Geldmenge M2", suffix: "%", mode: "yoy" },
@@ -1820,8 +2256,96 @@
 
   const FALLBACK_GLOBAL_MACRO = [
     { country: "USA", indicator: "BIP-Wachstum", value: 2.5, display: "+2.5%", source: "Lokaler World-Bank-Fallback", status: "fallback" },
+    { country: "Eurozone", indicator: "BIP-Wachstum", value: 0.8, display: "+0.8%", source: "Lokaler Eurozone-Fallback", status: "fallback" },
     { country: "Deutschland", indicator: "BIP-Wachstum", value: 0.2, display: "+0.2%", source: "Lokaler World-Bank-Fallback", status: "fallback" },
-    { country: "China", indicator: "BIP-Wachstum", value: 4.8, display: "+4.8%", source: "Lokaler World-Bank-Fallback", status: "fallback" }
+    { country: "China", indicator: "BIP-Wachstum", value: 4.8, display: "+4.8%", source: "Lokaler World-Bank-Fallback", status: "fallback" },
+    { country: "USA", indicator: "Staatsverschuldung", value: 121, display: "121%", source: "Lokaler World-Bank/IMF-Fallback", status: "fallback" },
+    { country: "Eurozone", indicator: "Staatsverschuldung", value: 88, display: "88%", source: "Lokaler Eurozone-Fallback", status: "fallback" },
+    { country: "Deutschland", indicator: "Staatsverschuldung", value: 64, display: "64%", source: "Lokaler World-Bank/Eurostat-Fallback", status: "fallback" },
+    { country: "China", indicator: "Staatsverschuldung", value: 84, display: "84%", source: "Lokaler World-Bank/IMF-Fallback", status: "fallback" }
+  ];
+
+  const MACRO_COUNTRY_BASELINES = [
+    {
+      id: "usa",
+      name: "USA",
+      currency: "USD",
+      region: "Nordamerika",
+      dataRole: "US-Makro live/hybrid",
+      source: "FRED, BLS, Treasury, World Bank/IMF",
+      gdp: 2.5,
+      inflation: 3.1,
+      unemployment: 4.0,
+      policyRate: 4.5,
+      yield2: 4.7,
+      yield10: 4.35,
+      debt: 121,
+      liquidity: 1.8,
+      fxLabel: "DXY / EURUSD",
+      fxValue: 104.2,
+      fxDisplay: "DXY 104,2",
+      status: "hybrid"
+    },
+    {
+      id: "eurozone",
+      name: "Eurozone",
+      currency: "EUR",
+      region: "Europa",
+      dataRole: "Euro-Makro hybrid",
+      source: "ECB, Eurostat/OECD zugeordnet, lokale Strukturwerte",
+      gdp: 0.8,
+      inflation: 2.4,
+      unemployment: 6.4,
+      policyRate: 4.0,
+      yield2: 2.7,
+      yield10: 2.55,
+      debt: 88,
+      liquidity: 0.9,
+      fxLabel: "EUR/USD",
+      fxValue: 1.08,
+      fxDisplay: "EUR/USD 1,08",
+      status: "fallback"
+    },
+    {
+      id: "germany",
+      name: "Deutschland",
+      currency: "EUR",
+      region: "Europa",
+      dataRole: "Länderprofil hybrid",
+      source: "World Bank/IMF, Eurostat/OECD zugeordnet, lokale Strukturwerte",
+      gdp: 0.2,
+      inflation: 2.2,
+      unemployment: 3.2,
+      policyRate: 4.0,
+      yield2: 2.55,
+      yield10: 2.35,
+      debt: 64,
+      liquidity: 0.9,
+      fxLabel: "EUR/USD",
+      fxValue: 1.08,
+      fxDisplay: "EUR/USD 1,08",
+      status: "fallback"
+    },
+    {
+      id: "china",
+      name: "China",
+      currency: "CNY",
+      region: "Asien",
+      dataRole: "China-Makro fallback/hybrid",
+      source: "World Bank/IMF plus lokale Strukturwerte",
+      gdp: 4.8,
+      inflation: 0.2,
+      unemployment: 5.2,
+      policyRate: 3.45,
+      yield2: 2.0,
+      yield10: 2.4,
+      debt: 84,
+      liquidity: 6.2,
+      fxLabel: "USD/CNY",
+      fxValue: 7.2,
+      fxDisplay: "USD/CNY 7,20",
+      status: "fallback"
+    }
   ];
 
   const SEC_CIK_MAP = {
@@ -1895,19 +2419,136 @@
     { title: "Watchlist-Disziplin statt News-Chaos", tag: "Workflow", detail: "So wird aus Research ein wiederholbarer Entscheidungsprozess." }
   ];
 
+  const JOURNAL_DECISION_TYPES = [
+    { value: "buy", label: "Kauf" },
+    { value: "sell", label: "Verkauf" },
+    { value: "observe", label: "Beobachtung" },
+    { value: "skip", label: "Nicht-Kauf / ausgelassen" },
+    { value: "rebalance", label: "Rebalancing" },
+    { value: "portfolio", label: "Portfolio-Änderung" }
+  ];
+
+  const JOURNAL_CATEGORIES = [
+    { value: "trading", label: "Trading" },
+    { value: "longterm", label: "Langfrist-Investment" },
+    { value: "etf", label: "ETF / Sparplan" },
+    { value: "macro", label: "Makro-/Themenentscheidung" }
+  ];
+
+  const JOURNAL_EMOTIONS = [
+    { value: "calm", label: "Ruhig" },
+    { value: "convinced", label: "Überzeugt" },
+    { value: "unsure", label: "Unsicher" },
+    { value: "fomo", label: "FOMO" },
+    { value: "fear", label: "Angst" },
+    { value: "stress", label: "Stress" },
+    { value: "euphoria", label: "Euphorie" },
+    { value: "frustration", label: "Frust" },
+    { value: "neutral", label: "Neutral" }
+  ];
+
+  const JOURNAL_RULE_OPTIONS = [
+    { value: "yes", label: "Ja" },
+    { value: "partial", label: "Teilweise" },
+    { value: "no", label: "Nein" }
+  ];
+
+  const JOURNAL_MISTAKE_TAGS = [
+    { value: "fomo", label: "FOMO-Einstieg" },
+    { value: "overconfidence", label: "Overconfidence" },
+    { value: "loss_aversion", label: "Verlustaversion" },
+    { value: "early_sell", label: "Zu früh verkauft" },
+    { value: "late_reaction", label: "Zu spät reagiert" },
+    { value: "position_size", label: "Positionsgröße" },
+    { value: "no_thesis", label: "Fehlende These" },
+    { value: "news_chasing", label: "News/Hype gejagt" },
+    { value: "impatience", label: "Mangelnde Geduld" },
+    { value: "rule_break", label: "Regelbruch" }
+  ];
+
+  const GUIDANCE_DEMO_SYMBOLS = ["NVDA", "AAPL", "MSFT", "TSLA", "SPY", "QQQ", "GLD", "BTC"];
+
+  const GUIDED_START_ITEMS = [
+    { id: "watchlist", label: "Watchlist anlegen", text: "Speichere 3 bis 5 Werte, die du wirklich beobachten willst.", route: "portfolio", action: "demo-add", xp: 20 },
+    { id: "asset", label: "Erstes Asset analysieren", text: "Oeffne eine Asset-Seite und lies den 5-Minuten-Research-Snapshot.", route: "asset", xp: 15 },
+    { id: "portfolio", label: "Testportfolio pruefen", text: "Sieh dir Risiko, Exposure und groesste Positionen im Portfolio an.", route: "portfolio", xp: 25 },
+    { id: "etf", label: "ETF vergleichen", text: "Pruefe Kosten, Overlap und Portfolio-Fit zweier ETFs.", route: "etf", xp: 20 },
+    { id: "alert", label: "Alert setzen", text: "Lege eine einfache Preis- oder Watchlist-Regel an.", route: "alerts", xp: 20 },
+    { id: "report", label: "Report exportieren", text: "Erstelle einen Tages-, Asset- oder Portfolio-Report als Druckansicht.", route: "research", xp: 30 }
+  ];
+
+  const GLOSSARY_TERMS = [
+    { id: "kgv", term: "KGV", aliases: ["pe", "price earnings"], text: "Kurs-Gewinn-Verhaeltnis: Preis im Verhaeltnis zum Gewinn je Aktie.", why: "Hilft, Bewertung grob einzuordnen, ist aber ohne Wachstum und Qualitaet unvollstaendig.", where: "Asset-Seite, Screener Value Score, Reports" },
+    { id: "eps", term: "EPS", aliases: ["gewinn je aktie"], text: "Earnings per Share: Gewinn je Aktie.", why: "Zeigt, wie viel Gewinn auf eine Aktie entfaellt.", where: "Asset-Seite und Fundamentaldaten" },
+    { id: "ter", term: "TER", aliases: ["kostenquote", "etf kosten"], text: "Total Expense Ratio: laufende jaehrliche Kostenquote eines ETFs.", why: "Kleine Kostenunterschiede koennen langfristig spuerbar werden.", where: "ETF V2, ETF-Report, ETF-Asset-Seiten" },
+    { id: "yield-curve", term: "Yield Curve", aliases: ["zinskurve", "inverse yield curve"], text: "Vergleicht Renditen verschiedener Laufzeiten, z. B. 2J gegen 10J.", why: "Eine inverse Kurve kann Wachstumssorgen und restriktive Bedingungen signalisieren.", where: "Makro V2, Makro-Report" },
+    { id: "realzins", term: "Realzins", aliases: ["real rate"], text: "Zinsniveau abzüglich Inflation, hier bewusst als Naeherung gezeigt.", why: "Hohe Realzinsen koennen Bewertungsdruck auf Gold, Growth und Krypto erhoehen.", where: "Makro V2 und Asset-Implikationen" },
+    { id: "drawdown", term: "Drawdown", aliases: ["verlust vom hoch"], text: "Rueckgang vom Zwischenhoch bis zum Tief.", why: "Macht Risiko und emotionale Belastung sichtbarer als nur Rendite.", where: "Portfolio, Risiko, Research-Kontext" },
+    { id: "volatilitaet", term: "Volatilitaet", aliases: ["vola", "schwankung"], text: "Schwankungsintensitaet eines Assets.", why: "Hohe Volatilitaet kann Chancen, aber auch Positionsrisiko erhoehen.", where: "Screener Risk Score, Asset-Technik, Portfolio" },
+    { id: "overlap", term: "Overlap", aliases: ["ueberschneidung", "doppelt"], text: "Ueberschneidung zwischen zwei ETFs oder Positionen.", why: "Zu viel Overlap kann Diversifikation nur scheinbar verbessern.", where: "ETF V2, Quick Compare, Portfolio-Fit" },
+    { id: "free-cashflow", term: "Free Cashflow", aliases: ["fcf"], text: "Geldfluss, der nach Investitionen uebrig bleibt.", why: "Wichtig fuer Qualitaet, Dividenden, Rueckkaeufe und Schuldentragfaehigkeit.", where: "Asset-Research und Quality Score, soweit Daten vorhanden" },
+    { id: "debt-to-gdp", term: "Debt-to-GDP", aliases: ["staatsverschuldung", "verschuldung"], text: "Staatsschulden im Verhaeltnis zur Wirtschaftsleistung.", why: "Gibt Kontext zu fiskalischem Spielraum und Zinslast.", where: "Makro-/Laendervergleich V2" },
+    { id: "momentum", term: "Momentum", aliases: ["trendstaerke"], text: "Relative Staerke aus Bewegung, Trend und Aktivitaet.", why: "Hilft, starke oder schwache Setups zu erkennen, kann aber ueberhitzen.", where: "Screener, Top Picks, Asset-Technik" },
+    { id: "value", term: "Value", aliases: ["bewertung"], text: "Bewertungsorientierte Einordnung eines Assets.", why: "Kann guenstige Kandidaten zeigen, ist aber ohne Qualitaet kein Signal.", where: "Screener Value Score und Asset-Research" },
+    { id: "growth", term: "Growth", aliases: ["wachstum"], text: "Wachstumsorientierte Einordnung aus Umsatz-/Gewinn- oder Modellnaehe.", why: "Starkes Wachstum kann hohe Bewertung erklaeren, aber auch Erwartungen erhoehen.", where: "Screener Growth Score und Asset-Seiten" },
+    { id: "hybrid", term: "Hybrid-Daten", aliases: ["hybrid daten"], text: "Mischung aus echten Datenpfaden und lokaler Produktlogik oder Fallbacks.", why: "Zeigt transparent, dass nicht jeder Baustein voll live ist.", where: "Data Health, Reports, Asset-Seiten" },
+    { id: "fallback", term: "Fallback-Daten", aliases: ["fallback"], text: "Strukturierte lokale Ersatzdaten, wenn Live-Daten fehlen.", why: "Die App bleibt nutzbar, verkauft Fallback aber nicht als Live-Wahrheit.", where: "Data Health und Status-Badges" },
+    { id: "etf", term: "ETF", aliases: ["fonds"], text: "Boersengehandelter Fonds, oft als breiter Baustein fuer Regionen oder Themen.", why: "Kann Diversifikation bieten, aber Kosten, Overlap und Konzentration bleiben wichtig.", where: "ETF V2, Portfolio, Quick Compare" },
+    { id: "dividende", term: "Dividende", aliases: ["ausschuettung"], text: "Ausschuettung eines Unternehmens oder Fonds an Anleger.", why: "Relevant fuer Einkommen, Termine und ETF-Ausschuettungslogik.", where: "Event-Hub, ETF V2, Alerts" },
+    { id: "market-cap", term: "Marktkapitalisierung", aliases: ["market cap"], text: "Boersenwert eines Unternehmens: Aktienkurs mal Anzahl Aktien.", why: "Hilft bei Groesse, Liquiditaet und Risikoklasse.", where: "Asset-Seiten, Screener-Filter" }
+  ];
+
+  const QUIZ_QUESTIONS = [
+    { id: "q-kgv", question: "Was beschreibt das KGV?", options: ["Preis im Verhaeltnis zum Gewinn", "Jaehrliche ETF-Kosten", "Schwankung eines Assets"], answer: 0, explain: "KGV steht fuer Kurs-Gewinn-Verhaeltnis." },
+    { id: "q-ter", question: "Warum ist TER bei ETFs wichtig?", options: ["Sie beeinflusst laufende Kosten", "Sie ist ein Kursziel", "Sie misst die Arbeitslosenquote"], answer: 0, explain: "TER sind laufende Kosten und wirken langfristig auf das Endvermoegen." },
+    { id: "q-curve", question: "Was kann eine inverse Yield Curve signalisieren?", options: ["Wachstums- oder Stresssignal", "Garantiert steigende Aktien", "Keine Aussage moeglich, weil Zinsen irrelevant sind"], answer: 0, explain: "Eine inverse Kurve ist kein Garant, aber ein relevantes Makro-Stresssignal." },
+    { id: "q-realzins", question: "Was ist Realzins in der einfachen MH-Logik?", options: ["Zins minus Inflation", "Inflation plus Umsatz", "ETF-Kosten minus Dividende"], answer: 0, explain: "Realzins wird hier als grobe Naeherung aus Rendite/Zins minus Inflation genutzt." },
+    { id: "q-overlap", question: "Was bedeutet ETF-Overlap?", options: ["Ueberschneidung der enthaltenen Werte", "Steuerliche Behandlung", "Chartfarbe im ETF-Modul"], answer: 0, explain: "Overlap zeigt, ob zwei ETFs aehnliche Holdings oder Regionen kaufen." },
+    { id: "q-vola", question: "Was beschreibt Volatilitaet?", options: ["Schwankungsintensitaet", "Umsatzsteuer", "Dividendentermin"], answer: 0, explain: "Volatilitaet zeigt, wie stark ein Asset schwankt." }
+  ];
+
+  const FEATURE_COMMANDS = [
+    { id: "asset-nvda", label: "Nvidia analysieren", text: "Oeffnet die Asset-Seite fuer NVDA.", route: "asset", symbol: "NVDA", keywords: ["nvidia", "nvda", "aktie analysieren"] },
+    { id: "etf-compare", label: "ETF vergleichen", text: "Kosten, Overlap, Holdings und Portfolio-Fit pruefen.", route: "etf", keywords: ["etf", "ter", "overlap", "kosten", "vwce", "vti"] },
+    { id: "report", label: "Report erstellen", text: "Oeffnet das Research-/Report-Center.", route: "research", keywords: ["report", "pdf", "drucken", "export"] },
+    { id: "portfolio", label: "Portfolio pruefen", text: "Risiko, Exposure, Cash und Rebalancing ansehen.", route: "portfolio", keywords: ["portfolio", "depot", "risiko", "exposure"] },
+    { id: "macro", label: "Makro ansehen", text: "Inflation, Zinsen, Yield Curve, Realzins und Laendervergleich.", route: "macro", keywords: ["makro", "zinsen", "inflation", "yield curve", "realzins"] },
+    { id: "alert", label: "Alert setzen", text: "Preis-, Earnings-, Event- oder Watchlist-Alert anlegen.", route: "alerts", keywords: ["alert", "alarm", "benachrichtigung", "preis"] },
+    { id: "watchlist", label: "Watchlist oeffnen", text: "Beobachtete Werte und Watchlist-Report ansehen.", route: "portfolio", keywords: ["watchlist", "beobachten"] },
+    { id: "data-health", label: "Data Health ansehen", text: "Quellen, Live/Hybrid/Fallback und Modulstatus pruefen.", route: "data-health", keywords: ["data health", "daten", "quellen", "fallback", "hybrid"] },
+    { id: "screener", label: "Screener starten", text: "Ratings, Top Picks, Filter und transparente Scores nutzen.", route: "screener", keywords: ["screener", "rating", "top picks", "momentum"] },
+    { id: "demo-add", label: "Demo-Daten laden", text: "Lokales Beispielsetup mit Watchlist, Testportfolio und Alerts.", action: "demo-add", keywords: ["demo", "beispiel", "start"] },
+    { id: "glossary-kgv", label: "KGV erklaeren", text: "Kurze Glossar-Erklaerung zu Bewertung.", glossary: "kgv", keywords: ["kgv", "pe", "erklaeren"] },
+    { id: "glossary-hybrid", label: "Hybrid-Daten erklaeren", text: "Was Live, Hybrid und Fallback in MH Analytics bedeuten.", glossary: "hybrid", keywords: ["hybrid", "fallback", "datenstatus"] }
+  ];
+
+  const LEVELS = [
+    { level: 1, xp: 0, label: "Starter" },
+    { level: 2, xp: 50, label: "Watchlist-Nutzer" },
+    { level: 3, xp: 110, label: "Researcher" },
+    { level: 4, xp: 190, label: "Portfolio-Analyst" },
+    { level: 5, xp: 290, label: "Macro Thinker" },
+    { level: 6, xp: 420, label: "Advanced Researcher" }
+  ];
+
   const state = {
     route: "home",
     activeSymbol: storageGet(STORAGE_KEYS.activeSymbol, "NVDA"),
     theme: storageGet(STORAGE_KEYS.theme, "dark"),
-    providerTests: storageGet(STORAGE_KEYS.providerTests, {}),
     providerHealth: sanitizeProviderHealth(storageGet(STORAGE_KEYS.providerHealth, {})),
     watchlist: storageGet(STORAGE_KEYS.watchlist, DEFAULT_WATCHLIST),
     portfolios: storageGet(STORAGE_KEYS.portfolios, DEFAULT_PORTFOLIOS),
     activePortfolioId: storageGet(STORAGE_KEYS.activePortfolioId, "core"),
-    dashboardPrefs: storageGet(STORAGE_KEYS.dashboardPrefs, { mode: "standard", favorites: ["NVDA", "MSFT"], modules: DASHBOARD_MODES.standard }),
+    userPreferences: normalizeUserPreferences(storageGet(STORAGE_KEYS.userPreferences, null), storageGet(STORAGE_KEYS.dashboardPrefs, null)),
+    dashboardPrefs: storageGet(STORAGE_KEYS.dashboardPrefs, null),
     alerts: storageGet(STORAGE_KEYS.alerts, []),
     alertInbox: storageGet(STORAGE_KEYS.alertInbox, []),
     journal: storageGet(STORAGE_KEYS.journal, []),
+    onboarding: normalizeOnboardingState(storageGet(STORAGE_KEYS.onboarding, {})),
+    activity: normalizeActivityState(storageGet(STORAGE_KEYS.activity, [])),
+    learning: normalizeLearningState(storageGet(STORAGE_KEYS.learning, {})),
+    level: normalizeLevelState(storageGet(STORAGE_KEYS.level, {})),
+    demoState: storageGet(STORAGE_KEYS.demoState, { loaded: false, updatedAt: null }),
     recents: storageGet(STORAGE_KEYS.recents, ["NVDA", "MSFT", "AAPL", "BTC"]),
     assetTab: "overview",
     compare: {
@@ -1934,21 +2575,23 @@
       symbol: "",
       type: "price"
     },
-    screener: {
+    journalFilters: {
       search: "",
-      momentum: "all",
-      value: "all",
-      growth: "all",
-      marketCap: "all",
-      sector: "all",
-      performance: "all",
-      sort: "score"
+      type: "all",
+      category: "all",
+      emotion: "all",
+      mistake: "all",
+      review: "all"
     },
+    journalDraft: null,
+    screener: { ...SCREENER_DEFAULT_FILTERS },
     etf: {
       left: "SPY",
       right: "QQQ",
       amount: 10000,
-      years: 10
+      monthly: 250,
+      years: 10,
+      returnRate: 5
     },
     portfolioScenario: {
       shock: -10,
@@ -1958,6 +2601,11 @@
       avgPrice: "",
       cashChange: 0
     },
+    commandQuery: "",
+    helpOpen: false,
+    helpQuery: "",
+    helpAnswer: null,
+    importPreview: null,
     quotes: {},
     profiles: {},
     fundamentals: {},
@@ -1982,6 +2630,8 @@
 
   function init() {
     removeLegacyBrowserApiKeys();
+    persistUserPreferences();
+    applyPreferenceDefaults();
     applyTheme();
     bindGlobalEvents();
     syncRouteFromHash();
@@ -2026,9 +2676,89 @@
       return;
     }
 
+    const etfPortfolioFit = event.target.closest("[data-etf-portfolio-fit]");
+    if (etfPortfolioFit) {
+      openEtfPortfolioFit(etfPortfolioFit.dataset.etfPortfolioFit);
+      return;
+    }
+
+    const journalOpen = event.target.closest("[data-journal-open]");
+    if (journalOpen) {
+      openJournalDraft(journalOpen.dataset.journalOpen, journalOpen.dataset.journalContext || "");
+      return;
+    }
+
+    const journalEdit = event.target.closest("[data-journal-edit]");
+    if (journalEdit) {
+      editJournalEntry(journalEdit.dataset.journalEdit);
+      return;
+    }
+
+    const journalDelete = event.target.closest("[data-journal-delete]");
+    if (journalDelete) {
+      deleteJournalEntry(journalDelete.dataset.journalDelete);
+      return;
+    }
+
+    const journalClearDraft = event.target.closest("[data-journal-clear-draft]");
+    if (journalClearDraft) {
+      state.journalDraft = null;
+      render();
+      return;
+    }
+
     const compareSwap = event.target.closest("[data-compare-swap]");
     if (compareSwap) {
       swapCompareAssets();
+      return;
+    }
+
+    const reportButton = event.target.closest("[data-report]");
+    if (reportButton) {
+      openReport(reportButton.dataset.report, reportButton.dataset.symbol || "");
+      return;
+    }
+
+    const guidanceAction = event.target.closest("[data-guidance-action]");
+    if (guidanceAction) {
+      runGuidanceAction(guidanceAction.dataset.guidanceAction, guidanceAction.dataset);
+      return;
+    }
+
+    const commandAction = event.target.closest("[data-command-action]");
+    if (commandAction) {
+      runCommandAction(commandAction.dataset.commandAction);
+      return;
+    }
+
+    const quizAnswer = event.target.closest("[data-quiz-answer]");
+    if (quizAnswer) {
+      answerQuizQuestion(quizAnswer.dataset.quizAnswer, Number(quizAnswer.dataset.quizIndex || 0));
+      return;
+    }
+
+    const glossaryButton = event.target.closest("[data-glossary]");
+    if (glossaryButton) {
+      focusGlossaryTerm(glossaryButton.dataset.glossary);
+      return;
+    }
+
+    const helpPrompt = event.target.closest("[data-help-prompt]");
+    if (helpPrompt) {
+      state.helpQuery = helpPrompt.dataset.helpPrompt || "";
+      askHelpAssistant(state.helpQuery);
+      return;
+    }
+
+    const printButton = event.target.closest("[data-print-report]");
+    if (printButton) {
+      window.print();
+      return;
+    }
+
+    const closeReportButton = event.target.closest("[data-close-report]");
+    if (closeReportButton) {
+      closeReport();
       return;
     }
 
@@ -2050,21 +2780,27 @@
       return;
     }
 
-    const reportButton = event.target.closest("[data-report]");
-    if (reportButton) {
-      openReport(reportButton.dataset.report, reportButton.dataset.symbol || "");
+    const modulePrefButton = event.target.closest("[data-module-pref]");
+    if (modulePrefButton) {
+      setHomeModulePreference(modulePrefButton.dataset.modulePref, modulePrefButton.dataset.modulePriority || "normal");
       return;
     }
 
-    const printButton = event.target.closest("[data-print-report]");
-    if (printButton) {
-      window.print();
+    const shortcutToggle = event.target.closest("[data-shortcut-toggle]");
+    if (shortcutToggle) {
+      togglePreferenceShortcut(shortcutToggle.dataset.shortcutToggle);
       return;
     }
 
-    const closeReportButton = event.target.closest("[data-close-report]");
-    if (closeReportButton) {
-      closeReport();
+    const focusToggle = event.target.closest("[data-profile-focus]");
+    if (focusToggle) {
+      toggleProfileFocus(focusToggle.dataset.profileFocus);
+      return;
+    }
+
+    const resetPreferences = event.target.closest("[data-preferences-reset]");
+    if (resetPreferences) {
+      resetUserPreferences();
       return;
     }
 
@@ -2093,18 +2829,6 @@
       return;
     }
 
-    const clearCache = event.target.closest("[data-clear-cache]");
-    if (clearCache) {
-      storageSet(STORAGE_KEYS.cache, {});
-      state.lastHomeRefresh = 0;
-      state.lastScreenerRefresh = 0;
-      state.lastEventsRefresh = 0;
-      state.assetLoadedAt = {};
-      toast("Daten-Cache geleert. Live-Daten werden erneut angefragt.");
-      render();
-      return;
-    }
-
     const tabButton = event.target.closest("[data-asset-tab]");
     if (tabButton) {
       state.assetTab = tabButton.dataset.assetTab || "overview";
@@ -2114,17 +2838,15 @@
 
     const resetScreener = event.target.closest("[data-screener-reset]");
     if (resetScreener) {
-      state.screener = {
-        search: "",
-        momentum: "all",
-        value: "all",
-        growth: "all",
-        marketCap: "all",
-        sector: "all",
-        performance: "all",
-        sort: "score"
-      };
+      state.screener = { ...SCREENER_DEFAULT_FILTERS };
+      saveModuleDefault("screener", { ...SCREENER_DEFAULT_FILTERS });
       render();
+      return;
+    }
+
+    const screenerPreset = event.target.closest("[data-screener-preset]");
+    if (screenerPreset) {
+      applyScreenerPreset(screenerPreset.dataset.screenerPreset || "all");
       return;
     }
 
@@ -2177,6 +2899,7 @@
     const eventFilter = event.target.closest("[data-event-filter]");
     if (eventFilter) {
       state.eventHub.type = eventFilter.dataset.eventFilter || "all";
+      saveModuleDefault("eventHub", { type: state.eventHub.type });
       render();
       return;
     }
@@ -2184,6 +2907,7 @@
     const eventWindow = event.target.closest("[data-event-window]");
     if (eventWindow) {
       state.eventHub.window = eventWindow.dataset.eventWindow || "week";
+      saveModuleDefault("eventHub", { window: state.eventHub.window });
       render();
       return;
     }
@@ -2191,6 +2915,7 @@
     const eventScope = event.target.closest("[data-event-scope]");
     if (eventScope) {
       state.eventHub.scope = eventScope.dataset.eventScope || "all";
+      saveModuleDefault("eventHub", { scope: state.eventHub.scope });
       render();
       return;
     }
@@ -2198,6 +2923,7 @@
     const eventRelevance = event.target.closest("[data-event-relevance]");
     if (eventRelevance) {
       state.eventHub.relevance = eventRelevance.dataset.eventRelevance || "all";
+      saveModuleDefault("eventHub", { relevance: state.eventHub.relevance });
       render();
       return;
     }
@@ -2252,6 +2978,28 @@
     if (alertInput) {
       updateAlertFilterState(alertInput);
     }
+
+    const journalInput = event.target.closest("[data-journal-control]");
+    if (journalInput) {
+      updateJournalFilterState(journalInput);
+    }
+
+    const prefInput = event.target.closest("[data-pref-control]");
+    if (prefInput) {
+      updatePreferenceControl(prefInput);
+    }
+
+    const commandInput = event.target.closest("[data-command-search]");
+    if (commandInput) {
+      state.commandQuery = commandInput.value;
+      renderCommandResults(commandInput.value);
+    }
+
+    const helpInput = event.target.closest("[data-help-input]");
+    if (helpInput) {
+      state.helpQuery = helpInput.value;
+      renderHelpSuggestions(helpInput.value);
+    }
   }
 
   function handleChange(event) {
@@ -2284,9 +3032,41 @@
     if (alertInput) {
       updateAlertFilterState(alertInput);
     }
+
+    const journalInput = event.target.closest("[data-journal-control]");
+    if (journalInput) {
+      updateJournalFilterState(journalInput);
+    }
+
+    const prefInput = event.target.closest("[data-pref-control]");
+    if (prefInput) {
+      updatePreferenceControl(prefInput);
+    }
+
+    const setupImport = event.target.closest("[data-setup-import-file]");
+    if (setupImport) {
+      previewSetupImport(setupImport.files?.[0]);
+    }
   }
 
   function handleKeydown(event) {
+    const commandInput = event.target.closest("[data-command-search]");
+    if (commandInput && event.key === "Enter") {
+      event.preventDefault();
+      const first = featureSearchResults(commandInput.value)[0];
+      if (first) {
+        runCommandAction(first.id);
+      }
+      return;
+    }
+
+    const helpInput = event.target.closest("[data-help-input]");
+    if (helpInput && event.key === "Enter") {
+      event.preventDefault();
+      askHelpAssistant(helpInput.value);
+      return;
+    }
+
     const input = event.target.closest("[data-search-input]");
     if (!input || event.key !== "Enter") {
       return;
@@ -2338,11 +3118,25 @@
     if (event.target.matches("[data-journal-form]")) {
       event.preventDefault();
       saveJournalEntryFromForm(event.target);
+      return;
+    }
+
+    if (event.target.matches("[data-journal-review-form]")) {
+      event.preventDefault();
+      saveJournalReviewFromForm(event.target);
     }
   }
 
   function navigate(route) {
     const normalizedRoute = route || "home";
+    recordActivity("Modul", routeLabel(normalizedRoute), { route: normalizedRoute });
+    if (normalizedRoute === "etf") {
+      persistOnboarding({ ...state.onboarding, etfViewed: true });
+      awardXp("etf-viewed", 20, "ETF-Vergleich gestartet");
+    }
+    if (normalizedRoute === "portfolio") {
+      awardXp("portfolio-viewed", 25, "Portfolio analysiert");
+    }
     if (normalizedRoute === "asset") {
       window.location.hash = `asset/${state.activeSymbol || "NVDA"}`;
     } else {
@@ -2361,6 +3155,9 @@
     state.assetTab = "overview";
     storageSet(STORAGE_KEYS.activeSymbol, normalized);
     addRecent(normalized);
+    persistOnboarding({ ...state.onboarding, assetAnalyzed: true });
+    recordActivity("Asset", `${normalized} Asset-Analyse`, { route: "asset", symbol: normalized });
+    awardXp("first-asset", 15, "Erstes Asset analysiert");
     window.location.hash = `asset/${normalized}`;
   }
 
@@ -2400,8 +3197,14 @@
       renderPortfolioPage();
     } else if (state.route === "alerts") {
       renderAlertsPage();
+    } else if (state.route === "journal") {
+      renderJournalPage();
+    } else if (state.route === "preferences") {
+      renderPreferencesPage();
     } else if (state.route === "data-health") {
       renderDataHealthPage();
+    } else if (state.route === "legal") {
+      renderLegalPage();
     } else if (state.route === "settings") {
       renderSettingsPage();
     } else {
@@ -2409,6 +3212,7 @@
     }
 
     renderAllSuggestions();
+    renderGuidanceDock();
   }
 
   function setActiveNav() {
@@ -2422,75 +3226,15 @@
     ensureEventData();
 
     app.innerHTML = `
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">MH Analytics</p>
-          <h1>Premium Research für klare Marktentscheidungen.</h1>
-          <p class="hero-text">Ein cleanes Finanz-Cockpit für Makro, Aktien, Krypto, Screener, Ratings, Alerts, Watchlist, Sentiment und transparente Datenquellen.</p>
-          <div class="hero-actions">
-            <button class="primary-button" type="button" data-route="asset">Aktie analysieren</button>
-            <button class="ghost-button" type="button" data-route="screener">Screener öffnen</button>
-            <button class="ghost-button" type="button" data-report="topPicks">Top Picks Report</button>
-            <button class="ghost-button" type="button" data-route="settings">Datenquellen ansehen</button>
-          </div>
-          <div class="hero-meta">
-            <div class="meta-tile">
-              <strong>${state.watchlist.length}</strong>
-              <span>Watchlist-Werte</span>
-            </div>
-            <div class="meta-tile">
-              <strong>${countLiveQuotes()}</strong>
-              <span>Live-Datenpunkte</span>
-            </div>
-            <div class="meta-tile">
-              <strong>0</strong>
-              <span>Server-Zwang</span>
-            </div>
-          </div>
-        </div>
-        <aside class="search-card">
-          <div>
-            <p class="eyebrow">Globale Suche</p>
-            <h2>Asset, ETF, Krypto oder Index</h2>
-            <p>Enter oder Vorschlag anklicken. MH Analytics verbindet Asset-Seiten, Live-Daten, Screener, Ratings, Alerts, ETF, Portfolio und Reports.</p>
-          </div>
-          ${renderSearchBox("home-search", "z. B. NVDA, Apple, BTC, DAX")}
-          <div>
-            <span class="card-label">Zuletzt gesucht</span>
-            <div class="chip-row recent-row">
-              ${state.recents.map((symbol) => renderSymbolChip(symbol)).join("")}
-            </div>
-          </div>
-          <div class="status-note">
-            ${renderStatusBadge(getOverallDataStatus())}
-            <span>${getOverallDataStatusText()}</span>
-          </div>
-        </aside>
-      </section>
-
+      ${renderTodayImportantHero()}
       ${renderTicker()}
-      ${renderDailyBriefingSection()}
-      ${renderDailyRecapSection()}
+      ${renderGuidedStartSection()}
+      ${renderPersonalShortcuts()}
+      ${renderPersonalizedHomeModules()}
+      ${renderTrustStatusBar()}
+      ${renderLearningLightSection()}
+      ${renderActivitySetupSection()}
       ${renderPersonalDashboardPanel()}
-      ${renderPersonalModuleStrip()}
-      ${renderQuickCompareSection()}
-      ${renderMacroSection()}
-      ${renderTopPicksSection()}
-
-      <section class="section">
-        <div class="grid two">
-          ${renderLiquidityImpactCard()}
-          ${renderHeatmapCard()}
-          ${renderWatchlistCard()}
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="grid two">
-          ${renderSentimentCard()}
-          ${renderResearchTeaserCard()}
-        </div>
-      </section>
     `;
   }
 
@@ -2514,6 +3258,1073 @@
         </div>
       </section>
     `;
+  }
+
+  function renderTodayImportantHero() {
+    const briefing = dailyBriefingForView();
+    const recap = dailyRecapForView();
+    const macro = macroCountryComparisonForView();
+    const watchItems = recap.watchlistItems.slice(0, 3);
+    return `
+      <section class="hero guidance-hero today-important-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Heute wichtig</p>
+          <h1>${esc(recap.conclusion.label)}</h1>
+          <p class="hero-text">${esc(recap.conclusion.text)}</p>
+          <div class="today-grid">
+            <div>
+              <span class="card-label">Marktbewegungen</span>
+              ${briefing.marketMoves.slice(0, 3).map((item) => `
+                <button class="guidance-mini-row" type="button" data-symbol="${escAttr(item.symbol)}">
+                  <strong>${esc(item.symbol)}</strong><span class="${toneClass(item.changePct)}">${formatPercent(item.changePct)}</span>
+                </button>
+              `).join("")}
+            </div>
+            <div>
+              <span class="card-label">Events</span>
+              ${briefing.upcomingEvents.slice(0, 3).map((eventItem) => `
+                <button class="guidance-mini-row" type="button" ${assetMap.has(eventItem.symbol) ? `data-symbol="${escAttr(eventItem.symbol)}"` : `data-route="events"`}>
+                  <strong>${esc(eventTypeLabel(eventItem))}</strong><span>${esc(eventTimingLabel(eventItem))}</span>
+                </button>
+              `).join("") || `<div class="guidance-mini-row"><strong>Ruhig</strong><span>Keine Top-Events</span></div>`}
+            </div>
+            <div>
+              <span class="card-label">Watchlist</span>
+              ${watchItems.map((item) => `
+                <button class="guidance-mini-row" type="button" ${item.symbol && assetMap.has(item.symbol) ? `data-symbol="${escAttr(item.symbol)}"` : `data-route="portfolio"`}>
+                  <strong>${esc(item.symbol || item.kind)}</strong><span>${esc(String(item.text || "").slice(0, 38))}</span>
+                </button>
+              `).join("") || `<div class="guidance-mini-row"><strong>Offen</strong><span>Watchlist starten</span></div>`}
+            </div>
+          </div>
+          <div class="hero-actions guidance-actions">
+            <button class="primary-button" type="button" data-report="dailyRecap">Tagesreport erstellen</button>
+            <button class="ghost-button" type="button" data-route="events">Event-Hub oeffnen</button>
+            <button class="ghost-button" type="button" data-route="alerts">Alerts pruefen</button>
+          </div>
+        </div>
+        <aside class="search-card command-card">
+          <div>
+            <p class="eyebrow">Was moechtest du tun?</p>
+            <h2>Feature-Suche</h2>
+            <p>Regelbasierte Suche ueber Module, Aktionen und Begriffe. Keine KI-API, keine Finanzberatung.</p>
+          </div>
+          <label class="field command-field">
+            <span>Aktion oder Begriff</span>
+            <input data-command-search value="${escAttr(state.commandQuery)}" placeholder="z. B. ETF vergleichen, KGV erklaeren, Report erstellen">
+          </label>
+          <div id="commandResults" class="command-results">
+            ${renderCommandResultItems(featureSearchResults(state.commandQuery))}
+          </div>
+          <div class="trust-strip-inline">
+            <span class="pill ${escAttr(macro.control.tone)}">${esc(macro.control.label)}</span>
+            ${renderStatusBadge(getOverallDataStatus())}
+          </div>
+        </aside>
+      </section>
+    `;
+  }
+
+  function renderGuidedStartSection() {
+    const items = guidedStartItemsForView();
+    const done = items.filter((item) => item.done).length;
+    return `
+      <section class="section guidance-section" id="guided-start">
+        <div class="section-head compact-section-head">
+          <div>
+            <p class="eyebrow">Guided Start</p>
+            <h2>Starte in 60 Sekunden</h2>
+            <p>Ein kurzer Produktpfad fuer neue Nutzer: Watchlist, Research, Portfolio, ETF, Alerts und Report.</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-guidance-action="demo-add">Demo-Daten laden</button>
+            <button class="ghost-button" type="button" data-guidance-action="demo-replace">Demo ersetzen</button>
+            <button class="ghost-button" type="button" data-route="preferences">Dashboard anpassen</button>
+          </div>
+        </div>
+        <div class="guided-start-grid">
+          ${items.map(renderGuidedStartCard).join("")}
+        </div>
+        <article class="card setup-check-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Dein Setup</span>
+              <h3>${done}/${items.length} Schritte erledigt</h3>
+              <p>Fortschritt wird lokal aus deinen Daten und Aktionen abgeleitet.</p>
+            </div>
+            ${renderLevelBadge()}
+          </div>
+          <div class="progress-track"><i style="width: ${Math.round(done / Math.max(items.length, 1) * 100)}%"></i></div>
+          <div class="chip-row">
+            ${items.filter((item) => !item.done).slice(0, 3).map((item) => `<button class="chip" type="button" data-route="${escAttr(item.route)}">${esc(item.label)}</button>`).join("") || `<span class="pill bull">Setup stark</span>`}
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderGuidedStartCard(item) {
+    const actionAttrs = item.action ? `data-guidance-action="${escAttr(item.action)}"` : `data-route="${escAttr(item.route)}"`;
+    return `
+      <article class="card guided-start-card ${item.done ? "done" : ""}">
+        <div class="card-topline">
+          <span class="pill ${item.done ? "bull" : ""}">${item.done ? "erledigt" : "offen"}</span>
+          <span class="small">+${item.xp} XP</span>
+        </div>
+        <h3>${esc(item.label)}</h3>
+        <p>${esc(item.text)}</p>
+        <button class="${item.done ? "ghost-button" : "primary-button"}" type="button" ${actionAttrs}>${item.done ? "Nochmals oeffnen" : "Starten"}</button>
+      </article>
+    `;
+  }
+
+  function renderTrustStatusBar() {
+    const items = dataStatusTodayItems();
+    return `
+      <section class="section compact-section">
+        <article class="card trust-status-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Datenstatus heute</span>
+              <h3>Live, Hybrid, Fallback und lokal klar getrennt</h3>
+            </div>
+            <button class="tiny-button" type="button" data-route="data-health">Data Health</button>
+          </div>
+          <div class="trust-status-grid">
+            ${items.map((item) => `
+              <div class="trust-status-item">
+                <span>${esc(item.label)}</span>
+                ${renderStatusBadge(item.status)}
+                <small>${esc(item.text)}</small>
+              </div>
+            `).join("")}
+          </div>
+          <p class="small">Lokale Funktionen speichern Nutzerpraeferenzen im Browser. Keine Betreiber-Secrets, kein Login, kein Cloud-Sync.</p>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderGuidanceControlSection() {
+    return `
+      <section class="section guidance-control-section">
+        <div class="grid two">
+          ${renderOnboardingChecklistCard()}
+          ${renderCommandPaletteCard()}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderOnboardingChecklistCard() {
+    const items = onboardingChecklistItems();
+    const done = items.filter((item) => item.done).length;
+    return `
+      <article class="card onboarding-check-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Onboarding</span>
+            <h3>Dein Setup ${done}/${items.length}</h3>
+            <p>Kleine Schritte, lokal gespeichert oder aus vorhandenen Daten abgeleitet.</p>
+          </div>
+          ${renderLevelBadge()}
+        </div>
+        <div class="progress-track"><i style="width: ${Math.round(done / Math.max(items.length, 1) * 100)}%"></i></div>
+        <div class="onboarding-list">
+          ${items.map((item) => `
+            <button class="onboarding-item ${item.done ? "done" : ""}" type="button" data-route="${escAttr(item.route)}">
+              <span>${item.done ? "✓" : "·"}</span>
+              <strong>${esc(item.label)}</strong>
+              <small>${esc(item.done ? "erledigt" : item.text)}</small>
+            </button>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderCommandPaletteCard() {
+    return `
+      <article class="card command-palette-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Command Palette</span>
+            <h3>Schnell zur richtigen Funktion</h3>
+            <p>Suche nach Aktion, Modul oder Begriff. Alles lokal und regelbasiert.</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>Was moechtest du tun?</span>
+          <input data-command-search value="${escAttr(state.commandQuery)}" placeholder="Portfolio pruefen, Alert setzen, TER erklaeren">
+        </label>
+        <div class="command-results" id="commandResultsSecondary">
+          ${renderCommandResultItems(featureSearchResults(state.commandQuery))}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderLearningLightSection() {
+    return `
+      <section class="section learning-light-section">
+        <div class="section-head compact-section-head">
+          <div>
+            <p class="eyebrow">Learning Light</p>
+            <h2>Begriffe verstehen, ohne Academy-Ballast</h2>
+            <p>Kurze Erklaerungen, 3 Fragen des Tages und lokaler Fortschritt. Keine KI-API.</p>
+          </div>
+        </div>
+        <div class="grid two">
+          ${renderGlossaryCard()}
+          ${renderQuizLightCard()}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderGlossaryCard() {
+    const focus = state.learning.focusTerm || "kgv";
+    const selected = glossaryTermById(focus) || GLOSSARY_TERMS[0];
+    return `
+      <article class="card glossary-card" id="glossary">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Begriffe schnell erklaert</span>
+            <h3>${esc(selected.term)}</h3>
+            <p>${esc(selected.text)}</p>
+          </div>
+          <span class="pill">Glossar</span>
+        </div>
+        <div class="insight-row"><span class="pill">Warum wichtig?</span><p>${esc(selected.why)}</p></div>
+        <div class="insight-row"><span class="pill">Wo relevant?</span><p>${esc(selected.where)}</p></div>
+        <div class="glossary-chip-grid">
+          ${GLOSSARY_TERMS.map((term) => `<button class="chip ${term.id === selected.id ? "active" : ""}" type="button" data-glossary="${escAttr(term.id)}">${esc(term.term)}</button>`).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderQuizLightCard() {
+    const questions = quizQuestionsForToday();
+    const answered = state.learning.quizAnswers || {};
+    const score = questions.filter((question) => answered[question.id]?.correct).length;
+    return `
+      <article class="card quiz-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Quiz Light</span>
+            <h3>3 Fragen des Tages</h3>
+            <p>${score}/${questions.length} richtig. Feedback kommt sofort, XP nur einmal pro Tagesrunde.</p>
+          </div>
+          ${renderLevelBadge()}
+        </div>
+        <div class="quiz-list">
+          ${questions.map((question, index) => renderQuizQuestion(question, index)).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderQuizQuestion(question, index) {
+    const answer = state.learning.quizAnswers?.[question.id];
+    return `
+      <div class="quiz-question">
+        <strong>${index + 1}. ${esc(question.question)}</strong>
+        <div class="quiz-options">
+          ${question.options.map((option, optionIndex) => `
+            <button class="chip ${answer?.selected === optionIndex ? (answer.correct ? "active" : "wrong") : ""}" type="button" data-quiz-answer="${escAttr(question.id)}" data-quiz-index="${optionIndex}">${esc(option)}</button>
+          `).join("")}
+        </div>
+        ${answer ? `<p class="small ${answer.correct ? "bull" : "bear"}">${answer.correct ? "Richtig." : "Nicht ganz."} ${esc(question.explain)}</p>` : ""}
+      </div>
+    `;
+  }
+
+  function renderActivitySetupSection() {
+    return `
+      <section class="section activity-setup-section">
+        <div class="grid two">
+          ${renderRecentActivitiesCard()}
+          ${renderSetupTransferCard()}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderRecentActivitiesCard() {
+    return `
+      <article class="card activity-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Zuletzt benutzt</span>
+            <h3>Lokale Aktivitaeten</h3>
+            <p>Nur in diesem Browser gespeichert, kein Tracking-Backend.</p>
+          </div>
+        </div>
+        <div class="activity-list">
+          ${state.activity.slice(0, 8).map((item) => `
+            <button class="activity-row" type="button" ${item.route ? `data-route="${escAttr(item.route)}"` : item.symbol ? `data-symbol="${escAttr(item.symbol)}"` : ""}>
+              <span class="pill">${esc(item.kind)}</span>
+              <strong>${esc(item.label)}</strong>
+              <small>${esc(formatTimestamp(item.timestamp))}</small>
+            </button>
+          `).join("") || renderGuidedEmptyState("activity")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderSetupTransferCard() {
+    return `
+      <article class="card setup-transfer-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Setup sichern</span>
+            <h3>Export / Import</h3>
+            <p>Exportiert lokale Nutzerpraeferenzen, Watchlist, Portfolios, Alerts, Journal, Aktivitaeten und XP. Keine Betreiber-Secrets.</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="row-actions">
+          <button class="primary-button" type="button" data-guidance-action="export-setup">Setup exportieren</button>
+          <button class="ghost-button" type="button" data-guidance-action="import-setup">Setup importieren</button>
+          <input class="visually-hidden" type="file" accept="application/json" data-setup-import-file>
+        </div>
+        ${state.importPreview ? renderImportPreview() : `<p class="small">Dieser Export enthaelt lokale Nutzerdaten, aber keine Provider-Secrets oder Betreiber-Konfiguration.</p>`}
+      </article>
+    `;
+  }
+
+  function renderImportPreview() {
+    const preview = state.importPreview;
+    return `
+      <div class="import-preview">
+        <span class="card-label">Import-Vorschau</span>
+        <p>${esc(preview.summary)}</p>
+        <div class="row-actions">
+          <button class="primary-button" type="button" data-guidance-action="confirm-import">Import uebernehmen</button>
+          <button class="ghost-button" type="button" data-guidance-action="cancel-import">Abbrechen</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderModuleActionBar(module, context = {}) {
+    const actions = moduleActions(module, context).slice(0, 4);
+    if (!actions.length) return "";
+    return `
+      <section class="section compact-section">
+        <article class="card module-action-bar">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Action Bar</span>
+              <h3>${esc(moduleActionTitle(module))}</h3>
+            </div>
+            ${renderWhyNote("Warum?", moduleActionWhy(module))}
+          </div>
+          <div class="shortcut-row">
+            ${actions.map((action) => `<button class="${action.primary ? "primary-button" : "ghost-button"}" type="button" ${actionAttrs(action)}>${esc(action.label)}</button>`).join("")}
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderNextSteps(module, context = {}) {
+    const steps = nextStepItems(module, context).slice(0, 4);
+    if (!steps.length) return "";
+    return `
+      <section class="section compact-section">
+        <article class="card next-steps-card">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Was du als Naechstes tun kannst</span>
+              <h3>${esc(nextStepTitle(module))}</h3>
+              <p>Maximal vier sinnvolle Schritte, passend zum aktuellen Modul.</p>
+            </div>
+          </div>
+          <div class="next-step-grid">
+            ${steps.map((step) => `
+              <button class="next-step-card" type="button" ${actionAttrs(step)}>
+                <strong>${esc(step.label)}</strong>
+                <span>${esc(step.text)}</span>
+              </button>
+            `).join("")}
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderWhyNote(label, text) {
+    return `<div class="why-note"><span class="pill">Warum?</span><p>${esc(text || label)}</p></div>`;
+  }
+
+  function moduleActions(module, context = {}) {
+    const symbol = context.symbol || state.activeSymbol || "NVDA";
+    const map = {
+      asset: [
+        { label: "Watchlist", dataset: { watchAdd: symbol }, primary: true },
+        { label: "Alert", dataset: { alertQuick: symbol, alertQuickType: "price" } },
+        { label: "Compare", dataset: { compareOpen: symbol } },
+        { label: "Report", report: "asset", symbol }
+      ],
+      portfolio: [
+        { label: "Report", report: "portfolio", primary: true },
+        { label: "What-if", route: "portfolio" },
+        { label: "Risiko pruefen", route: "portfolio" },
+        { label: "Data Health", route: "data-health" }
+      ],
+      etf: [
+        { label: "Compare", route: "compare", primary: true },
+        { label: "Overlap pruefen", route: "etf" },
+        { label: "Portfolio-Fit", dataset: { etfPortfolioFit: state.etf.left || "SPY" } },
+        { label: "Report", report: "etf" }
+      ],
+      macro: [
+        { label: "Report", report: "macro", primary: true },
+        { label: "Data Health", route: "data-health" },
+        { label: "Laendervergleich", route: "macro" }
+      ],
+      screener: [
+        { label: "Asset oeffnen", symbol: topPicksForView().long[0]?.symbol || state.activeSymbol, primary: true },
+        { label: "Compare", route: "compare" },
+        { label: "Alert", dataset: { alertQuick: topPicksForView().long[0]?.symbol || state.activeSymbol, alertQuickType: "price" } },
+        { label: "Report", report: "screener" }
+      ]
+    };
+    return map[module] || [];
+  }
+
+  function moduleActionTitle(module) {
+    const titles = { asset: "Research-Aktionen", portfolio: "Portfolio-Aktionen", etf: "ETF-Aktionen", macro: "Makro-Aktionen", screener: "Screener-Aktionen" };
+    return titles[module] || "Sinnvolle Aktionen";
+  }
+
+  function moduleActionWhy(module) {
+    const text = {
+      asset: "Asset-Seiten fuehren zu Watchlist, Alert, Compare und Report, weil das die naechsten natuerlichen Research-Schritte sind.",
+      portfolio: "Portfolio-Hinweise werden aus lokalen Positionen, Exposure und vorhandenen Kursdaten abgeleitet.",
+      etf: "ETF-Analyse ist besonders nuetzlich, wenn Kosten, Overlap und Portfolio-Fit zusammen betrachtet werden.",
+      macro: "Makro-Ampeln sind heuristische Einordnung aus Inflation, Zinsen, Wachstum, FX und Liquiditaet.",
+      screener: "Top Picks zeigen Score-Treiber und Gegenpunkte, damit das Ranking keine Blackbox bleibt."
+    };
+    return text[module] || "Diese Aktionen passen zum aktuellen Modul.";
+  }
+
+  function nextStepItems(module, context = {}) {
+    const symbol = context.symbol || state.activeSymbol || "NVDA";
+    const similar = similarAssetFor(symbol);
+    const map = {
+      asset: [
+        { label: "Mit aehnlichem Asset vergleichen", text: `${symbol} vs ${similar}`, action: "compare-pair", left: symbol, right: similar },
+        { label: "Alert setzen", text: "Preis- oder Event-Regel fuer dieses Asset anlegen.", dataset: { alertQuick: symbol, alertQuickType: "price" } },
+        { label: "In Watchlist speichern", text: "Asset fuer Recap, Events und Alerts vormerken.", dataset: { watchAdd: symbol } },
+        { label: "Asset-Report erstellen", text: "Research-Snapshot als Druckansicht exportieren.", report: "asset", symbol }
+      ],
+      portfolio: [
+        { label: "Klumpenrisiko pruefen", text: "Groesste Positionen und Sektorlast ansehen.", route: "portfolio" },
+        { label: "ETF-Fit testen", text: "ETF als moeglichen Diversifikationsbaustein pruefen.", route: "etf" },
+        { label: "Portfolio-Report exportieren", text: "Risiko, Exposure und Rebalancing dokumentieren.", report: "portfolio" },
+        { label: "What-if simulieren", text: "Cash, Schock und Zusatzposition lokal testen.", route: "portfolio" }
+      ],
+      etf: [
+        { label: "Overlap pruefen", text: "Sieh, ob zwei ETFs wirklich diversifizieren.", route: "etf" },
+        { label: "Kostenvergleich starten", text: "TER-Effekt langfristig simulieren.", route: "etf" },
+        { label: "Portfolio-Fit pruefen", text: "ETF im Portfolio-Kontext einordnen.", dataset: { etfPortfolioFit: state.etf.left || "SPY" } },
+        { label: "ETF-Report exportieren", text: "Kosten, Holdings und Struktur dokumentieren.", report: "etf" }
+      ],
+      macro: [
+        { label: "Makro-Report exportieren", text: "Ampel, Laendervergleich und Risiken sichern.", report: "macro" },
+        { label: "Asset-Implikationen ansehen", text: "Kontext fuer Aktien, Gold, Anleihen und Krypto.", route: "macro" },
+        { label: "Data Health pruefen", text: "Sehen, welche Makroquellen live/hybrid/fallback sind.", route: "data-health" }
+      ],
+      screener: [
+        { label: "Top Pick oeffnen", text: "Besten Kandidaten mit Erklaerung ansehen.", symbol: topPicksForView().long[0]?.symbol || "NVDA" },
+        { label: "Compare starten", text: "Zwei Kandidaten direkt gegenueberstellen.", route: "compare" },
+        { label: "Alert setzen", text: "Auffaelligen Wert beobachten.", dataset: { alertQuick: topPicksForView().long[0]?.symbol || "NVDA", alertQuickType: "price" } },
+        { label: "Screener-Report exportieren", text: "Ranking und Scoremodell dokumentieren.", report: "screener" }
+      ]
+    };
+    return map[module] || [];
+  }
+
+  function nextStepTitle(module) {
+    const titles = { asset: "Vom Research zur Entscheidungsvorbereitung", portfolio: "Depot besser verstehen", etf: "Diversifikation statt Doppelung", macro: "Makro-Kontext nutzbar machen", screener: "Kandidaten gezielt weiterpruefen" };
+    return titles[module] || "Naechster sinnvoller Schritt";
+  }
+
+  function actionAttrs(action) {
+    if (action.report) return `data-report="${escAttr(action.report)}"${action.symbol ? ` data-symbol="${escAttr(action.symbol)}"` : ""}`;
+    if (action.symbol) return `data-symbol="${escAttr(action.symbol)}"`;
+    if (action.route) return `data-route="${escAttr(action.route)}"`;
+    if (action.action) return `data-guidance-action="${escAttr(action.action)}"${action.left ? ` data-left="${escAttr(action.left)}"` : ""}${action.right ? ` data-right="${escAttr(action.right)}"` : ""}`;
+    if (action.dataset) return Object.entries(action.dataset).map(([key, value]) => `data-${kebabCase(key)}="${escAttr(value)}"`).join(" ");
+    return "";
+  }
+
+  function kebabCase(value) {
+    return String(value || "").replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`).replace(/^-/, "");
+  }
+
+  function guidedStartItemsForView() {
+    const checklist = onboardingChecklistState();
+    return GUIDED_START_ITEMS.map((item) => ({
+      ...item,
+      done: Boolean(checklist[item.id] || (item.id === "alert" && checklist.alerts) || (item.id === "report" && checklist.report))
+    }));
+  }
+
+  function onboardingChecklistItems() {
+    const done = onboardingChecklistState();
+    return [
+      { id: "mode", label: "Dashboard-Modus gewaehlt", text: "Investor, Trader, ETF, Makro oder Portfolio-Fokus waehlen.", route: "preferences", done: done.mode },
+      { id: "watchlist", label: "Watchlist erstellt", text: "Mindestens 3 Werte beobachten.", route: "portfolio", done: done.watchlist },
+      { id: "favorites", label: "Favoriten gewaehlt", text: "Schnellzugriffe fuer wichtige Assets setzen.", route: "preferences", done: done.favorites },
+      { id: "portfolio", label: "Portfolio/Testportfolio erstellt", text: "Portfolio-Modul oeffnen oder Demo laden.", route: "portfolio", done: done.portfolio },
+      { id: "alert", label: "Erster Alert gesetzt", text: "Preis- oder Event-Alert anlegen.", route: "alerts", done: done.alerts },
+      { id: "report", label: "Erster Report exportiert", text: "Report-Center oder Tagesreport nutzen.", route: "research", done: done.report },
+      { id: "asset", label: "Erstes Asset analysiert", text: "Asset-Seite oeffnen.", route: "asset", done: done.asset },
+      { id: "etf", label: "Erster ETF-Vergleich", text: "ETF V2 oeffnen.", route: "etf", done: done.etf },
+      { id: "quiz", label: "Erstes Quiz abgeschlossen", text: "3 Fragen des Tages beantworten.", route: "home", done: done.quiz }
+    ];
+  }
+
+  function onboardingChecklistState() {
+    const prefs = dashboardPrefs();
+    return {
+      mode: Boolean(prefs.mode),
+      watchlist: state.watchlist.length >= 3,
+      favorites: prefs.favorites.length >= 2,
+      portfolio: state.portfolios.some((portfolio) => (portfolio.positions || []).length || portfolio.type === "test"),
+      alerts: state.alerts.length > 0,
+      report: Boolean(state.onboarding.reportExported),
+      asset: Boolean(state.onboarding.assetAnalyzed || state.recents.length > 0),
+      etf: Boolean(state.onboarding.etfViewed || state.etf.left !== "SPY" || state.etf.right !== "QQQ"),
+      quiz: Object.keys(state.learning.quizAnswers || {}).length >= 3
+    };
+  }
+
+  function renderLevelBadge() {
+    const current = currentLevel();
+    const next = nextLevel();
+    const progress = next ? Math.round((state.level.xp - current.xp) / Math.max(next.xp - current.xp, 1) * 100) : 100;
+    return `
+      <div class="level-badge">
+        <span>Level ${current.level}</span>
+        <strong>${esc(current.label)}</strong>
+        <small>${state.level.xp} XP${next ? ` · ${Math.max(next.xp - state.level.xp, 0)} bis ${next.label}` : ""}</small>
+        <div class="progress-track"><i style="width: ${clamp(progress, 0, 100)}%"></i></div>
+      </div>
+    `;
+  }
+
+  function currentLevel() {
+    return LEVELS.slice().reverse().find((level) => state.level.xp >= level.xp) || LEVELS[0];
+  }
+
+  function nextLevel() {
+    return LEVELS.find((level) => level.xp > state.level.xp) || null;
+  }
+
+  function awardXp(key, amount, label) {
+    if (!key || state.level.awarded.includes(key)) return;
+    state.level = normalizeLevelState({
+      ...state.level,
+      xp: Number(state.level.xp || 0) + Number(amount || 0),
+      awarded: [...state.level.awarded, key]
+    });
+    storageSet(STORAGE_KEYS.level, state.level);
+    toast(`+${amount} XP: ${label}`);
+  }
+
+  function persistOnboarding(next = state.onboarding) {
+    state.onboarding = normalizeOnboardingState(next);
+    storageSet(STORAGE_KEYS.onboarding, state.onboarding);
+  }
+
+  function recordActivity(kind, label, data = {}) {
+    const item = {
+      id: `${kind}-${Date.now()}`,
+      kind,
+      label,
+      route: data.route || "",
+      symbol: data.symbol || "",
+      timestamp: Date.now()
+    };
+    state.activity = normalizeActivityState([item, ...state.activity]);
+    storageSet(STORAGE_KEYS.activity, state.activity);
+  }
+
+  function dataStatusTodayItems() {
+    const quoteStatus = getOverallDataStatus();
+    const macroStatus = macroCountryComparisonForView().status || "hybrid";
+    return [
+      { label: "Aktien", status: quoteStatus === "live" ? "hybrid" : quoteStatus, text: "Quotes live/hybrid, Research lokal transparent." },
+      { label: "Makro", status: macroStatus, text: "FRED/OpenData/Fallback je Reihe sichtbar." },
+      { label: "ETF", status: "local", text: "Struktur lokal, Kurse hybrid moeglich." },
+      { label: "Portfolio", status: "local", text: "Positionen lokal, Kurse hybrid." },
+      { label: "Reports", status: "local", text: "Browser-PDF ohne Server-PDF." },
+      { label: "Letzter Check", status: quoteStatus, text: formatTimestamp(Date.now()) }
+    ];
+  }
+
+  function featureSearchResults(query = "") {
+    const term = String(query || "").trim().toLowerCase();
+    const mode = dashboardPrefs().mode;
+    const scored = FEATURE_COMMANDS.map((command) => {
+      const haystack = [command.label, command.text, ...(command.keywords || [])].join(" ").toLowerCase();
+      let score = !term ? 1 : haystack.includes(term) ? 10 : term.split(/\s+/).filter((part) => haystack.includes(part)).length;
+      if (mode === "trader" && ["alert", "screener"].some((word) => haystack.includes(word))) score += 1;
+      if (mode === "etf" && haystack.includes("etf")) score += 2;
+      if (mode === "macro" && haystack.includes("makro")) score += 2;
+      return { ...command, score };
+    }).filter((command) => command.score > 0);
+    return scored.sort((a, b) => b.score - a.score).slice(0, 6);
+  }
+
+  function renderCommandResultItems(items = []) {
+    return items.map((item) => `
+      <button class="command-result" type="button" data-command-action="${escAttr(item.id)}">
+        <strong>${esc(item.label)}</strong>
+        <span>${esc(item.text)}</span>
+      </button>
+    `).join("") || renderGuidedEmptyState("command");
+  }
+
+  function renderCommandResults(query) {
+    const html = renderCommandResultItems(featureSearchResults(query));
+    document.querySelectorAll("#commandResults, #commandResultsSecondary").forEach((target) => {
+      target.innerHTML = html;
+    });
+  }
+
+  function runCommandAction(id) {
+    const command = FEATURE_COMMANDS.find((item) => item.id === id);
+    if (!command) return;
+    state.commandQuery = "";
+    recordActivity("Suche", command.label, { route: command.route || "home", symbol: command.symbol || "" });
+    if (command.glossary) {
+      focusGlossaryTerm(command.glossary);
+      navigate("home");
+      return;
+    }
+    if (command.action) {
+      runGuidanceAction(command.action);
+      return;
+    }
+    if (command.symbol) {
+      selectAsset(command.symbol);
+      return;
+    }
+    if (command.route) {
+      navigate(command.route);
+    }
+  }
+
+  function focusGlossaryTerm(id) {
+    state.learning = normalizeLearningState({ ...state.learning, focusTerm: id });
+    storageSet(STORAGE_KEYS.learning, state.learning);
+    render();
+  }
+
+  function glossaryTermById(id) {
+    return GLOSSARY_TERMS.find((term) => term.id === id) || null;
+  }
+
+  function glossaryTermForQuery(query) {
+    const term = String(query || "").toLowerCase();
+    return GLOSSARY_TERMS.find((item) => [item.term, item.id, ...(item.aliases || [])].some((value) => term.includes(String(value).toLowerCase())));
+  }
+
+  function quizQuestionsForToday() {
+    const day = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    return [0, 1, 2].map((offset) => QUIZ_QUESTIONS[(day + offset) % QUIZ_QUESTIONS.length]);
+  }
+
+  function answerQuizQuestion(questionId, selected) {
+    const question = QUIZ_QUESTIONS.find((item) => item.id === questionId);
+    if (!question) return;
+    const correct = selected === question.answer;
+    state.learning = normalizeLearningState({
+      ...state.learning,
+      quizAnswers: {
+        ...state.learning.quizAnswers,
+        [questionId]: { selected, correct, timestamp: Date.now() }
+      }
+    });
+    storageSet(STORAGE_KEYS.learning, state.learning);
+    if (correct && quizQuestionsForToday().every((item) => state.learning.quizAnswers[item.id]?.correct)) {
+      awardXp("quiz-first-perfect", 15, "Quiz Light abgeschlossen");
+    }
+    recordActivity("Quiz", question.question, { route: "home" });
+    render();
+  }
+
+  function runGuidanceAction(action, dataset = {}) {
+    if (action === "demo-add" || action === "demo-replace") {
+      const replaces = action === "demo-replace";
+      if (typeof window.confirm === "function") {
+        const confirmed = window.confirm(replaces
+          ? "Demo-Daten ersetzen? Bestehende lokale Demo-/Beispieldaten werden ersetzt. Betreiber-Secrets sind nicht betroffen."
+          : "Demo-Daten lokal hinzufuegen? Bestehende eigene Daten bleiben erhalten. Betreiber-Secrets sind nicht enthalten.");
+        if (!confirmed) return;
+      }
+      loadDemoSetup(replaces);
+      return;
+    }
+    if (action === "export-setup") {
+      exportLocalSetup();
+      return;
+    }
+    if (action === "import-setup") {
+      document.querySelector("[data-setup-import-file]")?.click();
+      return;
+    }
+    if (action === "confirm-import") {
+      applySetupImport();
+      return;
+    }
+    if (action === "cancel-import") {
+      state.importPreview = null;
+      render();
+      return;
+    }
+    if (action === "open-help") {
+      state.helpOpen = true;
+      renderGuidanceDock();
+      return;
+    }
+    if (action === "close-help") {
+      state.helpOpen = false;
+      renderGuidanceDock();
+      return;
+    }
+    if (action === "ask-help") {
+      askHelpAssistant(state.helpQuery);
+      return;
+    }
+    if (action === "compare-pair") {
+      openComparePair(dataset.left || state.activeSymbol, dataset.right || similarAssetFor(state.activeSymbol));
+    }
+  }
+
+  function loadDemoSetup(replace = false) {
+    const demoWatchlist = GUIDANCE_DEMO_SYMBOLS.filter((symbol) => assetMap.has(symbol));
+    const demoAlerts = [
+      buildAlertRecord({ symbol: "NVDA", type: "price", condition: "above", target: quoteFor("NVDA").price * 1.05, priority: "high", source: "demo", note: "Demo-Preisalert fuer NVIDIA" }),
+      buildAlertRecord({ symbol: "AAPL", type: "earnings", priority: "medium", source: "demo", note: "Demo-Earnings-Reminder" })
+    ];
+    const demoPortfolio = {
+      id: "demo-guidance",
+      name: "Demo Testportfolio",
+      type: "test",
+      cash: 7500,
+      targetCash: 12,
+      notes: "Demo/Testdaten fuer Onboarding. Nicht als echtes Depot verstehen.",
+      positions: [
+        { symbol: "NVDA", quantity: 2, avgPrice: 620, country: "USA" },
+        { symbol: "MSFT", quantity: 5, avgPrice: 360, country: "USA" },
+        { symbol: "QQQ", quantity: 8, avgPrice: 410, country: "USA" },
+        { symbol: "GLD", quantity: 3, avgPrice: 180, country: "Global" }
+      ]
+    };
+    state.watchlist = replace ? demoWatchlist : unique([...state.watchlist, ...demoWatchlist]);
+    storageSet(STORAGE_KEYS.watchlist, state.watchlist);
+    const prefs = dashboardPrefs();
+    state.userPreferences = normalizeUserPreferences({ ...prefs, favorites: unique([...prefs.favorites, "NVDA", "MSFT", "SPY", "QQQ"]).slice(0, 12) });
+    persistUserPreferences();
+    const withoutOldDemo = state.portfolios.filter((portfolio) => portfolio.id !== demoPortfolio.id);
+    state.portfolios = replace ? [demoPortfolio, ...withoutOldDemo.filter((portfolio) => portfolio.type !== "test")] : [demoPortfolio, ...withoutOldDemo];
+    state.activePortfolioId = demoPortfolio.id;
+    savePortfolios();
+    state.alerts = replace ? demoAlerts : [...demoAlerts, ...state.alerts.filter((alert) => alert.source !== "demo")].slice(0, 60);
+    saveAlerts();
+    state.etf = { ...state.etf, left: "SPY", right: "QQQ", amount: 10000, monthly: 250, years: 12, returnRate: 5 };
+    state.demoState = { loaded: true, updatedAt: Date.now(), mode: replace ? "replace" : "add" };
+    storageSet(STORAGE_KEYS.demoState, state.demoState);
+    persistOnboarding({ ...state.onboarding, demoLoaded: true, etfViewed: true });
+    recordActivity("Demo", replace ? "Demo-Daten ersetzt" : "Demo-Daten geladen", { route: "home" });
+    awardXp("demo-loaded", 10, "Demo-Daten geladen");
+    toast(replace ? "Demo-Daten ersetzt." : "Demo-Daten lokal hinzugefuegt.");
+    render();
+  }
+
+  function exportLocalSetup() {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      notice: "Dieser Export enthaelt lokale Nutzerpraeferenzen und Portfoliodaten, aber keine Provider-Secrets oder Betreiber-Konfiguration.",
+      userPreferences: dashboardPrefs(),
+      watchlist: state.watchlist,
+      portfolios: state.portfolios,
+      activePortfolioId: state.activePortfolioId,
+      alerts: state.alerts.map(normalizeAlertRecord),
+      journal: state.journal,
+      activity: state.activity,
+      onboarding: state.onboarding,
+      learning: state.learning,
+      level: state.level
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `mh-analytics-setup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    persistOnboarding({ ...state.onboarding, reportExported: true, setupExported: true });
+    recordActivity("Export", "Setup exportiert", { route: "home" });
+    awardXp("setup-exported", 15, "Setup gesichert");
+    toast("Setup exportiert. Keine Betreiber-Secrets enthalten.");
+  }
+
+  function previewSetupImport(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const payload = JSON.parse(String(reader.result || "{}"));
+        if (!payload || typeof payload !== "object") throw new Error("ungueltig");
+        const safe = sanitizeSetupImport(payload);
+        state.importPreview = {
+          payload: safe,
+          summary: `${safe.watchlist.length} Watchlist-Werte, ${safe.portfolios.length} Portfolios, ${safe.alerts.length} Alerts, ${safe.journal.length} Journal-Eintraege. Betreiber-Secrets werden nicht importiert.`
+        };
+        render();
+      } catch (error) {
+        logError(error);
+        toast("Import-Datei konnte nicht gelesen werden.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function sanitizeSetupImport(payload) {
+    return {
+      userPreferences: normalizeUserPreferences(payload.userPreferences || {}),
+      watchlist: sanitizeFavoriteSymbols(payload.watchlist || []),
+      portfolios: Array.isArray(payload.portfolios) ? payload.portfolios.filter((portfolio) => portfolio && portfolio.name && Array.isArray(portfolio.positions)).slice(0, 12) : [],
+      activePortfolioId: String(payload.activePortfolioId || ""),
+      alerts: Array.isArray(payload.alerts) ? payload.alerts.map(normalizeAlertRecord).slice(0, 80) : [],
+      journal: Array.isArray(payload.journal) ? payload.journal.slice(0, 500) : [],
+      activity: normalizeActivityState(payload.activity || []),
+      onboarding: normalizeOnboardingState(payload.onboarding || {}),
+      learning: normalizeLearningState(payload.learning || {}),
+      level: normalizeLevelState(payload.level || {})
+    };
+  }
+
+  function applySetupImport() {
+    const payload = state.importPreview?.payload;
+    if (!payload) return;
+    state.userPreferences = payload.userPreferences;
+    state.watchlist = payload.watchlist.length ? payload.watchlist : state.watchlist;
+    state.portfolios = payload.portfolios.length ? payload.portfolios : state.portfolios;
+    state.activePortfolioId = state.portfolios.some((portfolio) => portfolio.id === payload.activePortfolioId) ? payload.activePortfolioId : state.portfolios[0]?.id || "core";
+    state.alerts = payload.alerts;
+    state.journal = payload.journal;
+    state.activity = payload.activity;
+    state.onboarding = payload.onboarding;
+    state.learning = payload.learning;
+    state.level = payload.level;
+    storageSet(STORAGE_KEYS.userPreferences, state.userPreferences);
+    storageSet(STORAGE_KEYS.watchlist, state.watchlist);
+    savePortfolios();
+    saveAlerts();
+    storageSet(STORAGE_KEYS.journal, state.journal);
+    storageSet(STORAGE_KEYS.activity, state.activity);
+    storageSet(STORAGE_KEYS.onboarding, state.onboarding);
+    storageSet(STORAGE_KEYS.learning, state.learning);
+    storageSet(STORAGE_KEYS.level, state.level);
+    state.importPreview = null;
+    applyPreferenceDefaults();
+    toast("Setup importiert. Betreiber-Secrets wurden weder erwartet noch uebernommen.");
+    render();
+  }
+
+  function renderGuidanceDock() {
+    const existing = document.getElementById("helpAssistantDock");
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML("beforeend", renderHelpAssistantDock());
+  }
+
+  function renderHelpAssistantDock() {
+    return `
+      <div class="help-assistant-dock" id="helpAssistantDock">
+        ${state.helpOpen ? `
+          <article class="help-panel">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">MH Help Assistant</span>
+                <h3>Navigation & Begriffe</h3>
+              </div>
+              <button class="tiny-button" type="button" data-guidance-action="close-help">Schliessen</button>
+            </div>
+            <p class="small">Regelbasiert, lokal, keine KI-API und keine Finanzberatung.</p>
+            <label class="field">
+              <span>Frage</span>
+              <input data-help-input value="${escAttr(state.helpQuery)}" placeholder="Wo finde ich ETFs? Was bedeutet KGV?">
+            </label>
+            <div class="row-actions">
+              <button class="primary-button" type="button" data-guidance-action="ask-help">Antwort suchen</button>
+            </div>
+            <div id="helpSuggestions" class="help-suggestions">
+              ${renderHelpSuggestionItems(helpSuggestions(state.helpQuery))}
+            </div>
+            ${state.helpAnswer ? renderHelpAnswer(state.helpAnswer) : ""}
+          </article>
+        ` : `<button class="help-fab" type="button" data-guidance-action="open-help">?</button>`}
+      </div>
+    `;
+  }
+
+  function helpSuggestions(query = "") {
+    const base = [
+      "Ich bin neu, womit soll ich anfangen?",
+      "Wo kann ich ETFs vergleichen?",
+      "Wie erstelle ich einen Report?",
+      "Was bedeutet Hybrid-Daten?",
+      "Wo sehe ich mein Portfolio?",
+      "Wie setze ich einen Alert?",
+      "Wo finde ich den Screener?"
+    ];
+    const term = String(query || "").toLowerCase();
+    return base.filter((item) => !term || item.toLowerCase().includes(term)).slice(0, 5);
+  }
+
+  function renderHelpSuggestionItems(items) {
+    return items.map((item) => `<button class="chip" type="button" data-help-prompt="${escAttr(item)}">${esc(item)}</button>`).join("");
+  }
+
+  function renderHelpSuggestions(query) {
+    const target = document.getElementById("helpSuggestions");
+    if (target) target.innerHTML = renderHelpSuggestionItems(helpSuggestions(query));
+  }
+
+  function askHelpAssistant(query) {
+    state.helpQuery = String(query || "").trim();
+    state.helpAnswer = helpAnswerForQuery(state.helpQuery);
+    recordActivity("Hilfe", state.helpQuery || "Help Assistant", { route: state.helpAnswer.route || "home" });
+    renderGuidanceDock();
+  }
+
+  function helpAnswerForQuery(query) {
+    const term = String(query || "").toLowerCase();
+    const glossary = glossaryTermForQuery(term);
+    if (glossary) {
+      return { category: "Begriff", title: glossary.term, text: `${glossary.text} Wichtig: ${glossary.why}`, route: "home", actionLabel: "Glossar oeffnen", glossary: glossary.id };
+    }
+    const command = featureSearchResults(term)[0];
+    if (command) {
+      return { category: "Navigation", title: command.label, text: command.text, route: command.route || "home", actionLabel: command.route ? "Oeffnen" : "Ausfuehren", commandId: command.id };
+    }
+    return { category: "Start", title: "Starte mit Guided Start", text: "Wenn du neu bist, beginne mit Watchlist, erstem Asset, Testportfolio und Tagesreport.", route: "home", actionLabel: "Start oeffnen" };
+  }
+
+  function renderHelpAnswer(answer) {
+    return `
+      <div class="help-answer">
+        <span class="pill">${esc(answer.category)}</span>
+        <h4>${esc(answer.title)}</h4>
+        <p>${esc(answer.text)}</p>
+        <button class="ghost-button" type="button" ${answer.glossary ? `data-glossary="${escAttr(answer.glossary)}"` : answer.commandId ? `data-command-action="${escAttr(answer.commandId)}"` : `data-route="${escAttr(answer.route || "home")}"`}>${esc(answer.actionLabel || "Oeffnen")}</button>
+      </div>
+    `;
+  }
+
+  function renderGuidedEmptyState(kind) {
+    const states = {
+      watchlist: { text: "Du hast noch keine Watchlist.", actions: `<button class="ghost-button" type="button" data-guidance-action="demo-add">Demo-Daten laden</button><button class="ghost-button" type="button" data-watch-add="NVDA">NVDA hinzufuegen</button>` },
+      alerts: { text: "Noch keine Alerts.", actions: `<button class="ghost-button" type="button" data-alert-quick="NVDA" data-alert-quick-type="price">Ersten Preis-Alert setzen</button>` },
+      portfolio: { text: "Noch kein Portfolio.", actions: `<button class="ghost-button" type="button" data-guidance-action="demo-add">Demoportfolio laden</button>` },
+      reports: { text: "Noch kein Report exportiert.", actions: `<button class="ghost-button" type="button" data-report="dailyRecap">Tagesreport erstellen</button>` },
+      activity: { text: "Noch keine Aktivitaeten. Oeffne ein Asset, exportiere einen Report oder lade Demo-Daten.", actions: `<button class="ghost-button" type="button" data-guidance-action="demo-add">Demo-Daten laden</button>` },
+      command: { text: "Keine passende Aktion gefunden. Probiere 'Portfolio', 'ETF', 'Report' oder 'KGV'.", actions: "" }
+    };
+    const item = states[kind] || states.activity;
+    return `<div class="empty-state guided-empty"><p>${esc(item.text)}</p><div class="row-actions">${item.actions}</div></div>`;
+  }
+
+  function similarAssetFor(symbol) {
+    const asset = getAsset(symbol);
+    const peer = ASSETS.find((item) => item.symbol !== asset.symbol && item.type === asset.type && item.sector === asset.sector)
+      || ASSETS.find((item) => item.symbol !== asset.symbol && item.type === asset.type)
+      || getAsset("MSFT");
+    return peer.symbol;
+  }
+
+  function routeLabel(route) {
+    const labels = {
+      home: "Startseite",
+      asset: "Asset-Seite",
+      screener: "Screener",
+      compare: "Quick Compare",
+      macro: "Makro",
+      liquidity: "Liquiditaet",
+      etf: "ETF",
+      events: "Event-Hub",
+      research: "Research / Reports",
+      portfolio: "Portfolio / Watchlist",
+      alerts: "Alerts",
+      journal: "Journal",
+      preferences: "Personalisierung",
+      "data-health": "Data Health",
+      settings: "Datenquellen"
+    };
+    return labels[route] || route || "Modul";
+  }
+
+  function reportTypeLabel(type) {
+    const labels = {
+      asset: "Asset-Report",
+      portfolio: "Portfolio-Report",
+      etf: "ETF-Report",
+      macro: "Makro-Report",
+      dailyRecap: "Tages-Recap-Report",
+      watchlist: "Watchlist-Report",
+      screener: "Screener-Report",
+      topPicks: "Top-Picks-Report"
+    };
+    return labels[type] || "Report";
+  }
+
+  function normalizeOnboardingState(value = {}) {
+    return {
+      demoLoaded: Boolean(value.demoLoaded),
+      reportExported: Boolean(value.reportExported),
+      assetAnalyzed: Boolean(value.assetAnalyzed),
+      etfViewed: Boolean(value.etfViewed),
+      setupExported: Boolean(value.setupExported)
+    };
+  }
+
+  function normalizeActivityState(value = []) {
+    return (Array.isArray(value) ? value : [])
+      .filter((item) => item && item.label)
+      .map((item) => ({
+        id: String(item.id || `activity-${Date.now()}`),
+        kind: String(item.kind || "Aktivitaet"),
+        label: String(item.label || ""),
+        route: String(item.route || ""),
+        symbol: String(item.symbol || ""),
+        timestamp: Number(item.timestamp || Date.now())
+      }))
+      .slice(0, 40);
+  }
+
+  function normalizeLearningState(value = {}) {
+    return {
+      focusTerm: String(value.focusTerm || "kgv"),
+      quizAnswers: value.quizAnswers && typeof value.quizAnswers === "object" ? value.quizAnswers : {}
+    };
+  }
+
+  function normalizeLevelState(value = {}) {
+    return {
+      xp: Number(value.xp || 0),
+      awarded: Array.isArray(value.awarded) ? value.awarded.map(String) : []
+    };
   }
 
   function renderDailyBriefingSection() {
@@ -2602,6 +4413,7 @@
             <p>Ein kuratierter Blick auf heutige Marktbewegungen, Events, Watchlist-Hinweise, Alerts und News. Live-Daten fließen ein, lokale Priorisierung bleibt sichtbar.</p>
           </div>
           <div class="row-actions">
+            <button class="ghost-button" type="button" data-report="dailyRecap">Recap-Report</button>
             <button class="ghost-button" type="button" data-route="events">Event-Hub öffnen</button>
             <button class="ghost-button" type="button" data-route="alerts">Alerts prüfen</button>
             <button class="ghost-button" type="button" data-route="screener">Screener öffnen</button>
@@ -2751,7 +4563,7 @@
     `;
   }
 
-  function renderPersonalDashboardPanel() {
+  function renderLegacyPersonalDashboardPanel() {
     const prefs = dashboardPrefs();
     return `
       <section class="section">
@@ -2783,7 +4595,7 @@
     `;
   }
 
-  function renderPersonalModuleStrip() {
+  function renderLegacyPersonalModuleStrip() {
     const modules = dashboardPrefs().modules || DASHBOARD_MODES.standard;
     const labels = {
       macro: "Makro",
@@ -2804,6 +4616,296 @@
           ${modules.map((moduleId) => `<span class="pill">${esc(labels[moduleId] || moduleId)}</span>`).join("")}
         </div>
       </section>
+    `;
+  }
+
+  function renderPersonalDashboardPanel() {
+    const prefs = dashboardPrefs();
+    const modeConfig = DASHBOARD_MODES[prefs.mode] || DASHBOARD_MODES.investor;
+    const profileLine = [
+      profileOptionLabel("goal", prefs.profile.goal),
+      profileOptionLabel("horizon", prefs.profile.horizon),
+      `Risiko ${profileOptionLabel("risk", prefs.profile.risk)}`
+    ].join(" · ");
+    return `
+      <section class="section">
+        <article class="card personalization-panel">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Personalization V2 · lokal gespeichert</span>
+              <h3>${esc(modeConfig.label)} Dashboard</h3>
+              <p>${esc(modeConfig.description)} ${esc(profileLine)}.</p>
+            </div>
+            ${renderDataMeta(makeMeta("Lokale User Preferences", "local", Date.now(), "Es werden nur normale Nutzerpraeferenzen gespeichert, keine geheimen Betreiber-Schluessel."), true)}
+          </div>
+          <div class="dashboard-mode-row">
+            ${Object.keys(DASHBOARD_MODES).map((mode) => `
+              <button class="chip ${prefs.mode === mode ? "active" : ""}" type="button" data-dashboard-mode="${escAttr(mode)}">${esc(preferenceModeLabel(mode))}</button>
+            `).join("")}
+          </div>
+          <div class="preference-summary-grid">
+            ${renderMiniMetric("Favoriten", String(prefs.favorites.length))}
+            ${renderMiniMetric("Oben", String(Object.values(prefs.modules).filter((value) => value === "high").length))}
+            ${renderMiniMetric("Shortcuts", String(prefs.shortcuts.length))}
+            ${renderMiniMetric("Detailgrad", profileOptionLabel("experience", prefs.profile.experience))}
+          </div>
+          <div class="continue-row">
+            <button class="ghost-button" type="button" data-symbol="${escAttr(state.activeSymbol)}">Weiter mit ${esc(state.activeSymbol)}</button>
+            ${state.recents.slice(0, 3).map((symbol) => `<button class="chip" type="button" data-symbol="${escAttr(symbol)}">${esc(symbol)}</button>`).join("")}
+            <button class="ghost-button" type="button" data-route="preferences">Personalisierung öffnen</button>
+          </div>
+          <div class="chip-row">
+            ${favoriteAssetCandidates().slice(0, 10).map((asset) => `
+              <button class="chip ${isFavoriteSymbol(asset.symbol) ? "active" : ""}" type="button" data-favorite-symbol="${escAttr(asset.symbol)}">${esc(asset.symbol)}</button>
+            `).join("")}
+          </div>
+          ${prefs.display.beginnerHelp ? `<p class="small preference-help-note">Erklaerungen sind aktiv: wichtige Begriffe und Datenstatus-Hinweise werden etwas sichtbarer gehalten.</p>` : ""}
+        </article>
+      </section>
+    `;
+  }
+
+  function renderPersonalShortcuts() {
+    const shortcuts = selectedShortcuts();
+    if (!shortcuts.length) {
+      return "";
+    }
+    return `
+      <section class="section compact-section">
+        <article class="card shortcut-panel">
+          <div class="card-topline">
+            <div>
+              <span class="card-label">Persönliche Shortcuts</span>
+              <h3>Schneller zu deinen wichtigsten Bereichen</h3>
+            </div>
+            <button class="tiny-button" type="button" data-route="preferences">Anpassen</button>
+          </div>
+          <div class="shortcut-row">
+            ${shortcuts.map((shortcut) => `<button class="ghost-button" type="button" data-route="${escAttr(shortcut.route)}">${esc(shortcut.label)}</button>`).join("")}
+          </div>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderPersonalizedHomeModules() {
+    return visibleHomeModules().map(renderHomeModuleById).join("");
+  }
+
+  function visibleHomeModules() {
+    const prefs = dashboardPrefs();
+    const rank = { high: 0, normal: 1, hidden: 2 };
+    return HOME_MODULE_CATALOG
+      .map((module, index) => ({ ...module, index, priority: prefs.modules[module.id] || "normal" }))
+      .filter((module) => module.priority !== "hidden")
+      .sort((a, b) => rank[a.priority] - rank[b.priority] || a.index - b.index);
+  }
+
+  function renderHomeModuleById(module) {
+    if (module.id === "dailyRecap") {
+      return renderDailyRecapSection();
+    }
+    if (module.id === "dailyBriefing") {
+      return renderDailyBriefingSection();
+    }
+    if (module.id === "quickCompare") {
+      return renderQuickCompareSection();
+    }
+    if (module.id === "macro") {
+      return renderMacroSection();
+    }
+    const renderers = {
+      portfolio: renderHomePortfolioModule,
+      watchlist: () => renderWatchlistCard(),
+      events: renderHomeEventsModule,
+      alerts: renderHomeAlertsModule,
+      etf: renderHomeEtfModule,
+      screener: renderHomeScreenerModule,
+      reports: () => renderReportCenterCard(),
+      assetResearch: renderHomeAssetResearchModule,
+      liquidity: () => renderLiquidityImpactCard(),
+      dataHealth: () => renderProviderHealthPreview()
+    };
+    const content = renderers[module.id] ? renderers[module.id]() : "";
+    if (!content) {
+      return "";
+    }
+    return `
+      <section class="section personalized-home-module module-priority-${escAttr(module.priority)}" data-home-module="${escAttr(module.id)}">
+        <div class="section-head compact-section-head">
+          <div>
+            <p class="eyebrow">${esc(modulePriorityLabel(module.priority))}</p>
+            <h2>${esc(module.label)}</h2>
+            <p>${esc(module.description)}</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="${escAttr(module.route)}">Öffnen</button>
+            <button class="tiny-button" type="button" data-route="preferences">Anpassen</button>
+          </div>
+        </div>
+        ${content}
+      </section>
+    `;
+  }
+
+  function renderHomePortfolioModule() {
+    const portfolio = activePortfolio();
+    const analysis = portfolioAnalysis(portfolio);
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">${esc(portfolio.name)} · ${portfolio.type === "real" ? "Echtgeld" : "Testportfolio"}</span>
+            <h3>${esc(analysis.health.label)}</h3>
+            <p>${esc(analysis.health.summary || analysis.priorityHint)}</p>
+          </div>
+          ${renderDataMeta(analysis.meta, true)}
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("Gesamtwert", formatMoney(analysis.totalValue, "USD"))}
+          ${renderMiniMetric("Performance", `${formatMoney(analysis.performanceAbs, "USD")} · ${formatPercent(analysis.performancePct)}`)}
+          ${renderMiniMetric("Cash", formatPercent(analysis.cashPct))}
+          ${renderMiniMetric("Risiko", analysis.riskLevel.label)}
+        </div>
+        <div class="stack-list">
+          ${analysis.focusItems.slice(0, 3).map(renderPortfolioInsightRow).join("") || renderEmptyState("Keine dringenden Portfolio-Hinweise.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderHomeEventsModule() {
+    const rows = eventsForView().filter((item) => item.date >= startOfToday()).sort(sortEventsForHub).slice(0, 5);
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Event-/Earnings-Hub</span>
+            <h3>Nächste relevante Termine</h3>
+          </div>
+          ${renderStatusBadge(bestDataStatus(rows.map((item) => item.meta?.status)))}
+        </div>
+        <div class="stack-list">
+          ${rows.map(renderEventFocusRow).join("") || renderEmptyState("Keine Termine im aktuellen Fenster.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderHomeAlertsModule() {
+    const summary = alertSummary();
+    const alerts = alertsForView().slice(0, 4);
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Alerts V2</span>
+            <h3>Offen, ausgelöst, erledigt</h3>
+          </div>
+          ${renderDataMeta(makeMeta("Lokale Alerts + Event-/Preisdaten", "local", Date.now()), true)}
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("Offen", String(summary.open))}
+          ${renderMiniMetric("Ausgeloest", String(summary.triggered))}
+          ${renderMiniMetric("Watchlist", String(summary.watchlist))}
+          ${renderMiniMetric("Historie", String(alertHistoryForView().length))}
+        </div>
+        <div class="stack-list">
+          ${alerts.map(renderAlertRow).join("") || renderGuidedEmptyState("alerts")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderHomeEtfModule() {
+    const summary = etfUniverseSummary();
+    const selected = etfBySymbol(state.etf.left) || ETF_DATA[0];
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">ETF-Bereich V2</span>
+            <h3>Kosten, Overlap und Diversifikation</h3>
+            <p>${esc(summary.conclusion || "ETF-Strukturdaten werden lokal/hybrid transparent gekennzeichnet.")}</p>
+          </div>
+          ${renderDataMeta(etfDataMeta(selected), true)}
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("ETF-Universum", String(ETF_DATA.length))}
+          ${renderMiniMetric("Durchschn. TER", `${formatNumber(summary.avgTer)}%`)}
+          ${renderMiniMetric("Guenstigster ETF", summary.cheapest?.symbol || "n/a")}
+          ${renderMiniMetric("Top-Konzentration", `${formatNumber(summary.concentrated?.concentration || 0)}%`)}
+        </div>
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-route="etf">ETF V2 öffnen</button>
+          <button class="ghost-button" type="button" data-route="compare">Quick Compare</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderHomeScreenerModule() {
+    const rows = filteredScreenerRows().slice(0, 5);
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Screener</span>
+            <h3>Top-Treffer mit deinen Standardfiltern</h3>
+          </div>
+          ${renderDataMeta(makeMeta("Screener Defaults + lokale Heuristik", getOverallDataStatus(), Date.now()), true)}
+        </div>
+        <div class="stack-list">
+          ${rows.map((row, index) => `
+            <button class="brief-row" type="button" data-symbol="${escAttr(row.symbol)}">
+              <span><strong>${index + 1}. ${esc(row.symbol)}</strong><small>${esc(row.name)} · ${esc(row.pickReason)}</small></span>
+              <span class="score-pill ${escAttr(row.rating.tone)}">${row.score}%</span>
+            </button>
+          `).join("") || renderEmptyState("Keine Treffer mit den aktuellen Standardfiltern.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderHomeAssetResearchModule() {
+    const symbol = assetMap.has(state.activeSymbol) ? state.activeSymbol : "NVDA";
+    const asset = getAsset(symbol);
+    const quote = quoteFor(symbol);
+    const news = newsFor(symbol);
+    const context = {
+      symbol,
+      asset,
+      quote,
+      profile: profileFor(symbol),
+      fundamentals: fundamentalsFor(symbol),
+      news,
+      sentiment: sentimentFor(symbol, quote, news),
+      technical: technicalFor(symbol, quote),
+      events: eventsForSymbol(symbol)
+    };
+    const research = buildAssetResearchSnapshot(context);
+    return `
+      <article class="card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">5-Minuten-Research · ${esc(symbol)}</span>
+            <h3>${esc(research.headline)}</h3>
+            <p>${esc(research.summary)}</p>
+          </div>
+          <span class="score-pill ${research.score >= 70 ? "bull" : research.score <= 45 ? "bear" : ""}">${research.score}/100</span>
+        </div>
+        <div class="grid two">
+          <div>
+            <span class="card-label">Chancen</span>
+            ${renderResearchBulletList(research.opportunities.slice(0, 2))}
+          </div>
+          <div>
+            <span class="card-label">Risiken</span>
+            ${renderResearchBulletList(research.risks.slice(0, 2))}
+          </div>
+        </div>
+        ${renderDataMeta(makeMeta("Asset-Research: lokale Verdichtung + verfügbare Daten", research.dataStatus, Date.now()), true)}
+      </article>
     `;
   }
 
@@ -2953,6 +5055,7 @@
     const concentration = etfHoldingConcentration(etf);
     const topRegion = etf.region[0] ? `${etf.region[0][0]} ${formatNumber(etf.region[0][1])}%` : "nicht verfügbar";
     const topHolding = etf.holdings[0] ? `${etf.holdings[0][0]} ${formatNumber(etf.holdings[0][1])}%` : "nicht verfügbar";
+    const topSector = etfTopSector(etf);
     return `
       <div class="compare-section">
         <span class="card-label">ETF-Struktur</span>
@@ -2963,8 +5066,10 @@
           ${renderMiniMetric("Top-Holding", topHolding)}
           ${renderMiniMetric("Top-5 Anteil", `${formatNumber(concentration)}%`)}
           ${renderMiniMetric("Währung", etf.currency)}
+          ${renderMiniMetric("Sektor", topSector ? `${topSector[0]} ${formatNumber(topSector[1])}%` : "offen")}
+          ${renderMiniMetric("Rolle", etf.role || "ETF-Baustein")}
         </div>
-        <p>${esc(etf.useCase)} ${esc(etf.fxRisk)}.</p>
+        <p>${esc(etf.useCase)} ${esc(etf.fxRisk)}. Struktur: ${esc(etf.structureType || "lokal")} / ${esc(etf.replication || "nicht verfügbar")}.</p>
       </div>
     `;
   }
@@ -3163,10 +5268,12 @@
       rows.push(
         compareNumericRow("TER", left.etf.ter, right.etf.ter, (value) => `${formatNumber(value)}%`, "niedriger", "Niedrigere laufende Kosten sind ein Pluspunkt."),
         compareNumericRow("Top-5 Konzentration", etfHoldingConcentration(left.etf), etfHoldingConcentration(right.etf), (value) => `${formatNumber(value)}%`, "niedriger", "Geringere Konzentration kann breiter streuen."),
-        compareRow("Ausschüttung", left.etf.distribution, right.etf.distribution, "Cashflow vs. Wiederanlage.", "none")
+        compareRow("Ausschüttung", left.etf.distribution, right.etf.distribution, "Cashflow vs. Wiederanlage.", "none"),
+        compareRow("Top-Region", etfTopRegion(left.etf)?.[0] || "offen", etfTopRegion(right.etf)?.[0] || "offen", "Regionale Konzentration ist Kontext, kein automatischer Gewinner.", "none"),
+        compareRow("ETF-Rolle", left.etf.role || "ETF", right.etf.role || "ETF", "Core/Satellite-Einordnung aus lokaler Struktur.", "none")
       );
       const overlap = etfOverlap(left.etf, right.etf);
-      rows.push(compareRow("ETF-Overlap", `${formatNumber(overlap.score)}% Holdings`, `${formatNumber(overlap.regionScore)}% Regionen`, "Zeigt Dopplung statt Gewinner.", "none"));
+      rows.push(compareRow("ETF-Overlap", `${formatNumber(overlap.score)}% Holdings`, `${formatNumber(overlap.regionScore)}% Regionen / ${formatNumber(overlap.sectorScore)}% Sektoren`, "Zeigt Dopplung statt Gewinner.", "none"));
     } else {
       rows.push(
         compareNumericRow("KGV", valueOr(left.fundamentals.pe, left.asset.fallback.pe), valueOr(right.fundamentals.pe, right.asset.fallback.pe), (value) => formatNumber(value, "x"), "niedriger", "Niedriger kann günstiger sein, ersetzt aber keine Qualitätsprüfung."),
@@ -3217,7 +5324,7 @@
             <h2>Makro-Schnellblick</h2>
             <p>FRED-Daten laufen online über die Vercel Function /api/fred. Lokal per Doppelklick bleibt die Seite stabil mit klar markierten Fallback-Werten.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="settings">FRED Function prüfen</button>
+          <button class="ghost-button" type="button" data-route="data-health">Datenstatus öffnen</button>
         </div>
         <div class="grid five macro-grid">
           ${macro.map((item) => `
@@ -3275,6 +5382,8 @@
   }
 
   function renderTopPicksSection() {
+    return renderTopPicksV2Section(screenerRowsForView());
+
     const picks = topPicksForView();
     return `
       <section class="section">
@@ -3337,6 +5446,65 @@
     `;
   }
 
+  function renderTopPicksV2Section(rows = screenerRowsForView()) {
+    const picks = topPicksForView(rows);
+    return `
+      <section class="section top-picks-v2-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Top Picks V2</p>
+            <h2>Long, Watch, Risk und persönliche Auffälligkeiten</h2>
+            <p>Die Karten erklären die wichtigsten Treiber und zeigen bewusst auch Gegenargumente und Datenstatus.</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-report="topPicks">Top-Picks-Report</button>
+          </div>
+        </div>
+        <div class="grid four top-picks-v2-grid">
+          ${renderPickGroupCard("Long-Kandidaten", "Starkes Setup, aber prüfen", picks.long, "bull")}
+          ${renderPickGroupCard("Watch-Kandidaten", "Interessant, aber gemischt", picks.watch, "neutral")}
+          ${renderPickGroupCard("Risk-/Short-Kandidaten", "Warnlogik, keine Short-Empfehlung", picks.risk, "bear")}
+          ${renderPickGroupCard("Watchlist / Favoriten", "Persönliche Auffälligkeiten", picks.personal, "bull")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderPickGroupCard(title, subtitle, rows, tone) {
+    return `
+      <article class="card pick-group-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">${esc(subtitle)}</span>
+            <h3>${esc(title)}</h3>
+          </div>
+          <span class="pill ${escAttr(tone)}">${rows.length}</span>
+        </div>
+        <div class="stack-list">
+          ${rows.map((row, index) => renderPickV2Row(row, index + 1)).join("") || renderEmptyState("Keine Treffer mit aktueller Datenlage.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderPickV2Row(row, index) {
+    const quote = quoteFor(row.symbol);
+    return `
+      <button class="pick-row pick-engine-row" type="button" data-symbol="${escAttr(row.symbol)}">
+        <span class="rank">${index}</span>
+        <span>
+          <strong>${esc(row.symbol)} - ${esc(row.pickLabel)}</strong>
+          <span class="small">Score ${row.score}% · ${esc(row.scores.momentum.labelText)} · ${esc(row.scores.risk.labelText)}</span>
+          <span class="small">${esc(row.explanation)}</span>
+        </span>
+        <span class="right-cell">
+          <span class="${toneClass(quote.changePct)}">${formatPercent(quote.changePct)}</span>
+          ${renderTinyStatus(row.dataStatus)}
+        </span>
+      </button>
+    `;
+  }
+
   function renderLegacyTopPickCards() {
     return TOP_PICKS.map((pick) => {
             const asset = getAsset(pick.symbol);
@@ -3386,6 +5554,7 @@
 
   function renderWatchlistCard() {
     const watchNews = watchlistNewsForView();
+    const favoriteRows = dashboardPrefs().favorites.filter((symbol) => !state.watchlist.includes(symbol)).slice(0, 6);
     const rows = state.watchlist.map((symbol) => {
       const asset = getAsset(symbol);
       const quote = quoteFor(symbol);
@@ -3413,13 +5582,22 @@
             <h3>Lokal gespeichert</h3>
           </div>
           <div class="row-actions">
+            <button class="ghost-button" type="button" data-report="watchlist">Watchlist-Report</button>
             <button class="ghost-button" type="button" data-route="alerts">Alerts</button>
             <button class="ghost-button" type="button" data-route="portfolio">Verwalten</button>
           </div>
         </div>
         <div class="stack-list">
-          ${rows || renderEmptyState("Noch keine Watchlist. Füge ein Asset hinzu.")}
+          ${rows || renderGuidedEmptyState("watchlist")}
         </div>
+        ${favoriteRows.length ? `
+          <div class="watchlist-news-box">
+            <span class="card-label">Favoriten als Schnellzugriff</span>
+            <div class="chip-row">
+              ${favoriteRows.map((symbol) => `<button class="chip active" type="button" data-symbol="${escAttr(symbol)}">${esc(symbol)}</button>`).join("")}
+            </div>
+          </div>
+        ` : ""}
         <div class="watchlist-news-box">
           <span class="card-label">Watchlist-News & Events</span>
           <p class="small">Bewegungen, Termine und Reminder für deine gespeicherten Assets. Live-Quotes werden bevorzugt, sonst bleibt der lokale Fallback aktiv.</p>
@@ -3490,45 +5668,119 @@
   function renderScreenerPage() {
     ensureHomeData();
     ensureScreenerData();
+    ensureEventData();
+    const rows = screenerRowsForView();
+    const filtered = filteredScreenerRows(rows);
+    const summary = screenerSummary(rows, filtered);
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Screener V1</p>
+            <p class="eyebrow">Screener / Ratings / Top Picks V2</p>
             <h1>Rankings statt Bauchgefühl.</h1>
             <p>Filtere ein erweitertes Universum mit ${ASSETS.length} Assets nach Momentum, Value, Growth, Market Cap, Sektor und Performance. Der Screener nutzt Finnhub-Quotes/Profile/Fundamentals und Alpha-Vantage-Zeitreihen über serverseitige Vercel Functions, sofern sie im Deployment verfügbar sind; die Heuristik bleibt stabil hybrid.</p>
           </div>
           <div class="row-actions">
+            <button class="ghost-button" type="button" data-report="screener">Screener-Report</button>
+            <button class="ghost-button" type="button" data-report="topPicks">Top-Picks-Report</button>
             <button class="ghost-button" type="button" data-route="compare">Quick Compare</button>
             <button class="ghost-button" type="button" data-screener-reset>Filter zurücksetzen</button>
           </div>
         </div>
-        <article class="card screener-controls">
-          ${renderScreenerControl("search", "Suche", "input")}
-          ${renderScreenerControl("momentum", "Momentum", "select", [["all", "Alle"], ["60", ">= 60"], ["70", ">= 70"]])}
-          ${renderScreenerControl("value", "Value", "select", [["all", "Alle"], ["50", ">= 50"], ["60", ">= 60"]])}
-          ${renderScreenerControl("growth", "Growth", "select", [["all", "Alle"], ["60", ">= 60"], ["75", ">= 75"]])}
-          ${renderScreenerControl("marketCap", "Market Cap", "select", [["all", "Alle"], ["mega", "Mega Cap"], ["large", "Large Cap"], ["nonEquity", "ETF/Krypto/Rohstoff"]])}
-          ${renderScreenerControl("sector", "Sektor", "select", screenerSectorOptions())}
-          ${renderScreenerControl("performance", "Performance", "select", [["all", "Alle"], ["positive", "1M positiv"], ["strong", "1M > 5%"], ["weak", "1M < 0%"]])}
-          ${renderScreenerControl("sort", "Sortierung", "select", [["score", "Score"], ["name", "Name"], ["performance", "Performance"], ["marketCap", "Market Cap"]])}
-        </article>
+        ${renderScreenerControlCenter(summary)}
+        ${renderScreenerPresetBar()}
+        ${renderScreenerFilters()}
       </section>
+      ${renderModuleActionBar("screener")}
+      ${renderNextSteps("screener")}
+      ${renderTopPicksV2Section(rows)}
       <section class="section">
         <article class="card">
           <div class="card-topline">
             <div>
-              <span class="card-label">Ranking-Liste</span>
-              <h3>Gefilterte Assets</h3>
-              <p>Jede Zeile zeigt, ob Quote, Profil, Fundamentals oder Zeitreihe live/cache-basiert sind oder lokal abgesichert bleiben.</p>
+              <span class="card-label">Ranking-Liste V2</span>
+              <h3><span id="screenerResultCount">${filtered.length}</span> gefilterte Assets</h3>
+              <p>Jede Zeile zeigt Score-Komponenten, wichtigste Treiber, naechsten Event-Kontext und Datenstatus.</p>
             </div>
             ${renderDataMeta(makeMeta("Lokale Screener Engine + verfügbare Quotes", getOverallDataStatus(), Date.now()), true)}
           </div>
           <div id="screenerResults">
-            ${renderScreenerResults()}
+            ${renderScreenerResults(filtered)}
           </div>
         </article>
       </section>
+    `;
+  }
+
+  function renderScreenerControlCenter(summary) {
+    return `
+      <article class="card screener-control-center">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Kontrollzentrum</span>
+            <h3>${esc(summary.comment.title)}</h3>
+            <p>${esc(summary.comment.text)}</p>
+          </div>
+          ${renderDataMeta(makeMeta("Screener V2: lokale Scores + Live/Hybrid/Fallback Inputs", summary.status, Date.now()), true)}
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("Analysiert", String(summary.total))}
+          ${renderMiniMetric("Long", String(summary.longCount))}
+          ${renderMiniMetric("Watch", String(summary.watchCount))}
+          ${renderMiniMetric("Risk", String(summary.riskCount))}
+          ${renderMiniMetric("Momentum", summary.momentum ? `${summary.momentum.symbol} ${summary.momentum.scores.momentum.score}` : "--")}
+          ${renderMiniMetric("Value", summary.value ? `${summary.value.symbol} ${summary.value.scores.value.score}` : "--")}
+          ${renderMiniMetric("Growth", summary.growth ? `${summary.growth.symbol} ${summary.growth.scores.growth.score}` : "--")}
+          ${renderMiniMetric("Risiko-Warnung", summary.risk ? `${summary.risk.symbol} ${summary.risk.scores.risk.score}` : "--")}
+        </div>
+        <div class="insight-row">
+          <span class="pill">Keine Blackbox</span>
+          <p>Der Gesamtscore zeigt die gewichtete Mischung aus Momentum, Value, Growth, Quality, Risiko-Schutz, Event, Makro und Datenqualitaet. Der Dashboard-Modus passt die Gewichte leicht an.</p>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderScreenerPresetBar() {
+    return `
+      <article class="card screener-preset-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Presets</span>
+            <h3>Schnelle Scans</h3>
+          </div>
+        </div>
+        <div class="screener-preset-grid">
+          ${SCREENER_PRESETS.map((preset) => `
+            <button class="mode-option ${state.screener.preset === preset.id ? "active" : ""}" type="button" data-screener-preset="${escAttr(preset.id)}">
+              <strong>${esc(preset.label)}</strong>
+              <span>${esc(preset.text)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderScreenerFilters() {
+    return `
+      <article class="card screener-controls screener-controls-v2">
+        ${renderScreenerControl("search", "Suche", "input")}
+        ${renderScreenerControl("assetType", "Asset-Typ", "select", screenerAssetTypeOptions())}
+        ${renderScreenerControl("region", "Region", "select", screenerRegionOptions())}
+        ${renderScreenerControl("sector", "Sektor", "select", screenerSectorOptions())}
+        ${renderScreenerControl("style", "Stil", "select", screenerStyleOptions())}
+        ${renderScreenerControl("marketCap", "Market Cap", "select", screenerMarketCapOptions())}
+        ${renderScreenerControl("dataStatus", "Datenstatus", "select", screenerDataStatusOptions())}
+        ${renderScreenerControl("personal", "Watchlist / Favoriten", "select", [["all", "ohne persönlichen Filter"], ["watchlist", "nur Watchlist"], ["favorites", "nur Favoriten"]])}
+        ${renderScreenerControl("eventContext", "Event-Kontext", "select", screenerEventOptions())}
+        ${renderScreenerControl("rating", "Rating", "select", [["all", "Alle"], ["long", "Long-Kandidat"], ["watch", "Watch"], ["neutral", "Neutral"], ["risk", "Risk / Short"]])}
+        ${renderScreenerControl("momentum", "Momentum", "select", [["all", "Alle"], ["60", ">= 60"], ["70", ">= 70"], ["80", ">= 80"]])}
+        ${renderScreenerControl("value", "Value", "select", [["all", "Alle"], ["50", ">= 50"], ["60", ">= 60"], ["70", ">= 70"]])}
+        ${renderScreenerControl("growth", "Growth", "select", [["all", "Alle"], ["60", ">= 60"], ["70", ">= 70"], ["80", ">= 80"]])}
+        ${renderScreenerControl("performance", "Performance", "select", [["all", "Alle"], ["positive", "1M positiv"], ["strong", "1M > 5%"], ["weak", "1M < 0%"]])}
+        ${renderScreenerControl("sort", "Sortierung", "select", screenerSortOptions())}
+      </article>
     `;
   }
 
@@ -3552,26 +5804,59 @@
     `;
   }
 
-  function renderScreenerResults() {
-    const rows = filteredScreenerRows();
+  function renderScreenerResults(rows = filteredScreenerRows()) {
     if (!rows.length) {
       return renderEmptyState("Keine Treffer. Filter etwas weiter stellen.");
     }
     return `
-      <div class="screener-table">
-        ${rows.map((row, index) => `
-          <button class="screener-row" type="button" data-symbol="${escAttr(row.symbol)}">
-            <span class="rank">${index + 1}</span>
-            <span>
-              <strong>${esc(row.symbol)} - ${esc(row.name)}</strong>
-              <span class="small">${esc(row.sector)} | ${esc(row.rating.rating)} | ${esc(row.pickReason)}</span>
-            </span>
-            <span class="score-pill ${row.rating.tone}">${row.score}%</span>
-            <span class="${toneClass(row.performance1m)}">${formatPercent(row.performance1m)} 1M</span>
-            <span>${formatCompactMoney(row.marketCap, row.currency)}</span>
-            <span class="screener-source">${renderTinyStatus(row.dataStatus)} ${esc(statusLabel(row.dataStatus))}</span>
+      <div class="screener-v2-list">
+        ${rows.map((row, index) => renderScreenerV2Row(row, index + 1)).join("")}
+      </div>
+    `;
+  }
+
+  function renderScreenerV2Row(row, index) {
+    const personal = row.isWatchlist ? "Watchlist" : row.isFavorite ? "Favorit" : "";
+    return `
+      <article class="screener-v2-row">
+        <div class="screener-rank-cell">
+          <span class="rank">${index}</span>
+          <span class="score-pill ${escAttr(row.pickTone)}">${row.score}%</span>
+        </div>
+        <div class="screener-main-cell">
+          <button class="symbol-button" type="button" data-symbol="${escAttr(row.symbol)}">
+            <strong>${esc(row.symbol)} - ${esc(row.name)}</strong>
+            <span>${esc(row.type)} · ${esc(row.region)} · ${esc(row.sector)}${personal ? ` · ${esc(personal)}` : ""}</span>
           </button>
-        `).join("")}
+          <p>${esc(row.explanation)}</p>
+          <div class="screener-driver-row">
+            ${row.drivers.slice(0, 4).map((driver) => `<span class="pill ${escAttr(driver.tone || "")}">${esc(driver.label)}</span>`).join("")}
+            ${renderStatusBadge(row.dataStatus)}
+          </div>
+        </div>
+        <div class="screener-score-grid">
+          ${Object.values(row.scores).map(renderScreenerScoreChip).join("")}
+        </div>
+        <div class="screener-context-cell">
+          <span class="pill ${escAttr(row.pickTone)}">${esc(row.pickLabel)}</span>
+          <span class="small">${esc(row.eventContext.text)}</span>
+          <span class="small">${esc(row.macroContext.label)}: ${esc(row.macroContext.text)}</span>
+          <div class="row-actions">
+            <button class="tiny-button" type="button" data-compare-open="${escAttr(row.symbol)}">Compare</button>
+            <button class="tiny-button" type="button" data-alert-quick="${escAttr(row.symbol)}" data-alert-quick-type="price">Alert</button>
+            <button class="tiny-button" type="button" data-report="asset" data-symbol="${escAttr(row.symbol)}">Report</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderScreenerScoreChip(component) {
+    return `
+      <div class="screener-score-chip ${escAttr(component.tone || "")}">
+        <span>${esc(component.shortLabel || component.label)}</span>
+        <strong>${component.score}</strong>
+        <small>${esc(component.labelText)}</small>
       </div>
     `;
   }
@@ -3768,42 +6053,271 @@
 
   function renderMacroPage() {
     ensureHomeData();
+    const snapshot = macroCountryComparisonForView();
     const macro = macroEnhancedForView();
-    const liquidity = liquidityNarrativeForView();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Makro Dashboard</p>
-            <h1>Liquidität, Zinsen und Risiko in einem Blick.</h1>
-            <p>FRED-Daten werden online serverseitig über /api/fred genutzt. ECB, BLS, Treasury und lokale Fallbacks ergänzen das Bild für Zinsen, Geldmengen, Realzins und Yield Curve.</p>
+            <p class="eyebrow">Makro- / Ländervergleich V2</p>
+            <h1>USA, Eurozone, Deutschland und China im Makrovergleich.</h1>
+            <p>Inflation, Arbeitsmarkt, Zinsen, Realzins, Yield Curve, Wachstum, Verschuldung, FX und Liquidität werden in eine nachvollziehbare Makroampel übersetzt. Live-/Hybrid-/Fallback-Status bleibt sichtbar.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="settings">Provider prüfen</button>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="data-health">Data Health</button>
+            <button class="ghost-button" type="button" data-report="macro">Makro-Report</button>
+          </div>
         </div>
-        <article class="card macro-context-card">
-          <div class="card-topline">
-            <div>
-              <span class="card-label">Kernaussage</span>
-              <h3>${esc(liquidity.label)}</h3>
-              <p>${esc(liquidity.summary)}</p>
-            </div>
-            <span class="score-pill ${liquidity.tone}">${formatNumber(liquidity.score)} / 100</span>
-          </div>
-          <div class="grid four">
-            ${liquidityImpactForView().map((item) => `
-              <div class="snapshot-tile">
-                <span>${esc(item.asset)}</span>
-                <strong>${esc(item.signal)}</strong>
-                <p>${esc(item.text)}</p>
-              </div>
-            `).join("")}
-          </div>
-        </article>
-        ${renderGlobalMacroCard()}
+        ${renderMacroControlCenter(snapshot)}
+        ${renderModuleActionBar("macro")}
+        ${renderNextSteps("macro")}
+        ${renderMacroCountryComparison(snapshot)}
+        <div class="grid two macro-v2-grid">
+          ${renderMacroIndicatorPanel("Inflationsvergleich", "Wo Preisauftrieb entspannter oder kritischer wirkt.", snapshot.countries, "inflation")}
+          ${renderMacroIndicatorPanel("Arbeitsmarktvergleich", "Arbeitslosigkeit als Konjunktur- und Zentralbank-Kontext.", snapshot.countries, "unemployment")}
+        </div>
+        <div class="grid two macro-v2-grid">
+          ${renderMacroRatesPanel(snapshot)}
+          ${renderMacroGrowthDebtPanel(snapshot)}
+        </div>
+        <div class="grid two macro-v2-grid">
+          ${renderMacroFxLiquidityPanel(snapshot)}
+          ${renderMacroAssetImplications(snapshot)}
+        </div>
+        ${renderMacroDataHealthPanel(snapshot)}
         <div class="grid four macro-deep-grid">
           ${macro.map((item) => renderMacroDeepCard(item)).join("")}
         </div>
       </section>
+    `;
+  }
+
+  function renderMacroControlCenter(snapshot) {
+    const control = snapshot.control;
+    return `
+      <article class="card macro-control-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Makro-Kontrollzentrum</span>
+            <h3>${esc(control.label)}</h3>
+            <p>${esc(control.summary)}</p>
+          </div>
+          <span class="score-pill ${control.tone}">${formatNumber(control.score)} / 100</span>
+        </div>
+        <div class="grid six macro-health-strip">
+          ${control.tiles.map((tile) => `
+            <div class="snapshot-tile macro-health-tile">
+              <span>${esc(tile.label)}</span>
+              <strong>${esc(tile.value)}</strong>
+              <p>${esc(tile.text)}</p>
+            </div>
+          `).join("")}
+        </div>
+        <div class="macro-driver-row">
+          ${control.drivers.map((driver) => `
+            <div class="insight-row">
+              <span class="pill ${escAttr(driver.tone)}">${esc(driver.label)}</span>
+              <p>${esc(driver.text)}</p>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMacroCountryComparison(snapshot) {
+    return `
+      <article class="card macro-country-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Ländervergleich</span>
+            <h3>USA vs. Eurozone vs. Deutschland vs. China</h3>
+            <p>Jede Karte zeigt dieselben Kernindikatoren. Wo keine gleichwertige Live-Reihe aktiv ist, bleibt der Wert klar als Hybrid/Fallback eingeordnet.</p>
+          </div>
+          ${renderStatusBadge(snapshot.status)}
+        </div>
+        <div class="macro-country-grid">
+          ${snapshot.countries.map((country) => `
+            <div class="macro-country-tile">
+              <div class="card-topline">
+                <div>
+                  <span class="card-label">${esc(country.region)} · ${esc(country.currency)}</span>
+                  <h3>${esc(country.name)}</h3>
+                </div>
+                <span class="score-pill ${escAttr(country.risk.tone)}">${esc(country.risk.label)}</span>
+              </div>
+              <div class="macro-country-metrics">
+                ${renderMacroCountryMetric("BIP", country.gdp)}
+                ${renderMacroCountryMetric("Inflation", country.inflation)}
+                ${renderMacroCountryMetric("Arbeitsmarkt", country.unemployment)}
+                ${renderMacroCountryMetric("Leitzins", country.policyRate)}
+                ${renderMacroCountryMetric("10Y", country.yield10)}
+                ${renderMacroCountryMetric("Realzins", country.realRate)}
+                ${renderMacroCountryMetric("Schulden", country.debt)}
+                ${renderMacroCountryMetric("FX", country.fx)}
+              </div>
+              <p class="small">${esc(country.risk.summary)}</p>
+              ${renderDataMeta(country.meta, true)}
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMacroCountryMetric(label, field) {
+    return `
+      <div class="macro-country-metric">
+        <span>${esc(label)}</span>
+        <strong>${esc(field.display)}</strong>
+        ${renderTinyStatus(field.meta?.status)}
+      </div>
+    `;
+  }
+
+  function renderMacroIndicatorPanel(title, intro, countries, fieldName) {
+    return `
+      <article class="card macro-signal-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Vergleich</span>
+            <h3>${esc(title)}</h3>
+            <p>${esc(intro)}</p>
+          </div>
+        </div>
+        <div class="macro-signal-list">
+          ${countries.map((country) => {
+            const field = country[fieldName];
+            return `
+              <div class="macro-signal-row">
+                <span><strong>${esc(country.name)}</strong><small>${esc(field.label)}</small></span>
+                <div><i style="width:${clamp(Math.abs(Number(field.value || 0)) * (fieldName === "inflation" ? 12 : 9), 4, 100)}%"></i></div>
+                <span class="right-cell"><strong>${esc(field.display)}</strong>${renderTinyStatus(field.meta?.status)}</span>
+              </div>
+              <p class="small macro-signal-note">${esc(field.comment)}</p>
+            `;
+          }).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMacroRatesPanel(snapshot) {
+    return `
+      <article class="card macro-signal-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Zinsen / Yield Curve / Realzins</span>
+            <h3>${esc(snapshot.rates.label)}</h3>
+            <p>${esc(snapshot.rates.text)}</p>
+          </div>
+          <span class="score-pill ${escAttr(snapshot.rates.tone)}">${esc(snapshot.rates.value)}</span>
+        </div>
+        <div class="macro-rate-grid">
+          ${snapshot.countries.map((country) => `
+            <div class="snapshot-tile">
+              <span>${esc(country.name)}</span>
+              <strong>${esc(country.policyRate.display)} · Real ${esc(country.realRate.display)}</strong>
+              <p>10Y ${esc(country.yield10.display)} · 2Y-10Y ${esc(country.yieldCurve.display)} · ${esc(country.yieldCurve.comment)}</p>
+            </div>
+          `).join("")}
+        </div>
+        <p class="small">Realzins ist eine vereinfachte Näherung: 10-jährige Rendite minus Inflation. Für die USA kann FRED/Treasury diese Sicht ergänzen.</p>
+      </article>
+    `;
+  }
+
+  function renderMacroGrowthDebtPanel(snapshot) {
+    return `
+      <article class="card macro-signal-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Wachstum / Fiskalrisiko</span>
+            <h3>${esc(snapshot.growth.label)}</h3>
+            <p>${esc(snapshot.growth.text)}</p>
+          </div>
+          <span class="score-pill ${escAttr(snapshot.growth.tone)}">${esc(snapshot.growth.value)}</span>
+        </div>
+        <div class="macro-signal-list">
+          ${snapshot.countries.map((country) => `
+            <div class="macro-signal-row">
+              <span><strong>${esc(country.name)}</strong><small>BIP ${esc(country.gdp.comment)} · Schulden ${esc(country.debt.comment)}</small></span>
+              <div><i style="width:${clamp(Number(country.debt.value || 0), 4, 100)}%"></i></div>
+              <span class="right-cell"><strong>${esc(country.gdp.display)}</strong><small>${esc(country.debt.display)}</small></span>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMacroFxLiquidityPanel(snapshot) {
+    return `
+      <article class="card macro-signal-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Währungen / Liquidität</span>
+            <h3>${esc(snapshot.liquidity.label)}</h3>
+            <p>${esc(snapshot.liquidity.text)}</p>
+          </div>
+          <span class="score-pill ${escAttr(snapshot.liquidity.tone)}">${esc(snapshot.liquidity.value)}</span>
+        </div>
+        <div class="grid two">
+          ${snapshot.countries.map((country) => `
+            <div class="snapshot-tile">
+              <span>${esc(country.name)}</span>
+              <strong>${esc(country.fx.display)}</strong>
+              <p>Liquidität ${esc(country.liquidity.display)} · ${esc(country.liquidity.comment)}</p>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMacroAssetImplications(snapshot) {
+    return `
+      <article class="card macro-signal-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Was bedeutet das für Märkte?</span>
+            <h3>Asset-Implikationen als Kontextlogik</h3>
+            <p>Keine Prognose und keine Anlageberatung: nur eine vorsichtige Übersetzung der aktuellen Makrobausteine in Markt-Kontext.</p>
+          </div>
+        </div>
+        <div class="macro-implication-list">
+          ${snapshot.assetImplications.map((item) => `
+            <div class="insight-row">
+              <span class="pill ${escAttr(item.tone)}">${esc(item.asset)}</span>
+              <p><strong>${esc(item.signal)}:</strong> ${esc(item.text)}</p>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMacroDataHealthPanel(snapshot) {
+    return `
+      <article class="card macro-source-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Datenstatus / Quellen</span>
+            <h3>Live, Hybrid und Fallback klar getrennt</h3>
+            <p>Der Makrovergleich nutzt offizielle serverseitige und Open-Data-Pfade, bleibt aber ehrlich hybrid, solange nicht jede Länderreihe live gleichwertig verfügbar ist.</p>
+          </div>
+          <button class="ghost-button" type="button" data-route="data-health">Quellenstatus öffnen</button>
+        </div>
+        <div class="grid four">
+          ${snapshot.sourceRows.map((row) => `
+            <div class="snapshot-tile">
+              <span>${esc(row.label)}</span>
+              <strong>${esc(statusLabel(row.meta.status))}</strong>
+              <p>${esc(row.meta.source)} · ${esc(formatTimestamp(row.meta.timestamp))}</p>
+            </div>
+          `).join("")}
+        </div>
+      </article>
     `;
   }
 
@@ -3845,7 +6359,7 @@
             <h1>Liquidität, Realzins und Zinskurve klar einordnen.</h1>
             <p>Dieser Bereich trennt Geldmengen und Liquidität vom allgemeinen Makro-Dashboard. M1, M2, M3, M4, Realzins, Yield Curve und Zentralbank-Bilanzen sind mit Quelle, Zeitstempel und Status sichtbar gekennzeichnet.</p>
           </div>
-          <button class="ghost-button" type="button" data-route="settings">Makro-Provider prüfen</button>
+          <button class="ghost-button" type="button" data-route="data-health">Quellenstatus öffnen</button>
         </div>
         <article class="card macro-context-card">
           <div class="card-topline">
@@ -3936,41 +6450,43 @@
   }
 
   function renderEtfPage() {
+    const selected = etfBySymbol(state.etf.left) || ETF_DATA[0];
+    const summary = etfUniverseSummary();
     app.innerHTML = `
       <section class="section">
         <div class="section-head">
           <div>
-            <p class="eyebrow">ETF System</p>
-            <h1>ETF-Kosten, Holdings, Regionen und Überschneidung.</h1>
-            <p>Lokale strukturierte ETF-Datenbasis mit TER, Regionen, Top Holdings, Ausschüttungstyp, Basisrisiko und Währungsrisiko. Wo Live-Holdings fehlen, bleibt der Status klar als Fallback markiert.</p>
+            <p class="eyebrow">ETF Bereich V2</p>
+            <h1>ETF-Kosten, Overlap, Holdings und Portfolio-Fit.</h1>
+            <p>Strukturierte ETF-Analyse für langfristige Anleger: Kostenwirkung, Überschneidung, Regionen, Sektoren, Ausschüttung, Währung, Konzentration und Einsatz im Portfolio. ETF-Strukturdaten bleiben bewusst lokal/hybrid gekennzeichnet.</p>
           </div>
-          ${renderDataMeta(makeMeta("Lokale ETF-Datenbasis", "fallback", BOOT_TIME), true)}
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-report="etf">ETF-Report</button>
+            ${renderDataMeta(makeMeta("Strukturierte ETF-Datenbasis", "local", BOOT_TIME, "TER, Holdings, Regionen und Struktur sind lokal gepflegt; Kurse können über bestehende Quote-Pfade live/hybrid kommen."), true)}
+          </div>
         </div>
-        <div class="grid three etf-guide-grid">
-          <article class="card">
-            <span class="card-label">Worauf achten?</span>
-            <h3>Kosten, Konzentration, Währung</h3>
-            <p>TER ist nur ein Teil der Kosten. Wichtig sind außerdem Klumpen in Top-Holdings, USD-Exposure und ob ein ETF als Kern oder Satellit gedacht ist.</p>
-          </article>
-          <article class="card">
-            <span class="card-label">Ausschüttend vs. thesaurierend</span>
-            <h3>Cashflow oder Wiederanlage</h3>
-            <p>Ausschüttende ETFs liefern laufende Zahlungen. Thesaurierende ETFs reinvestieren Erträge automatisch und sind oft bequemer für langfristigen Vermögensaufbau.</p>
-          </article>
-          <article class="card">
-            <span class="card-label">Datenstatus</span>
-            <h3>Fallback statt leerer Tabelle</h3>
-            <p>TER, Regionen und Holdings sind lokal modelliert. Live-ETF-Holdings werden später über geeignete Provider ergänzt, ohne das Modul zu blockieren.</p>
-          </article>
-        </div>
-        <div class="grid two">
-          ${ETF_DATA.map(renderEtfCard).join("")}
-        </div>
+        ${renderEtfControlCenter(summary)}
       </section>
+      ${renderModuleActionBar("etf")}
+      ${renderNextSteps("etf")}
       <section class="section">
         <div class="grid two">
           ${renderEtfCostCalculator()}
           ${renderEtfOverlapChecker()}
+        </div>
+      </section>
+      <section class="section">
+        ${renderEtfDeepDive(selected)}
+      </section>
+      <section class="section">
+        <div class="section-head compact-section-head">
+          <div>
+            <h2>ETF-Universum</h2>
+            <p>Lokale strukturierte ETF-Karten mit Kosten, Rolle, Regionen, Holdings, Währungs-/Strukturhinweisen und Datenstatus.</p>
+          </div>
+        </div>
+        <div class="grid two">
+          ${ETF_DATA.map(renderEtfCard).join("")}
         </div>
       </section>
     `;
@@ -3978,24 +6494,37 @@
 
   function renderEtfCard(etf) {
     const concentration = etfHoldingConcentration(etf);
+    const top10 = etfTop10Concentration(etf);
+    const topRegion = etfTopRegion(etf);
+    const topHolding = etf.holdings[0] || ["nicht verfügbar", 0];
+    const riskHints = etfRiskHints(etf).slice(0, 3);
+    const assetAvailable = assetMap.has(etf.symbol);
     return `
       <article class="card etf-card">
         <div class="card-topline">
           <div>
-            <span class="card-label">${esc(etf.symbol)}</span>
+            <span class="card-label">${esc(etf.symbol)}${etf.isin ? ` · ${esc(etf.isin)}` : ""}</span>
             <h3>${esc(etf.name)}</h3>
+            <p>${esc(etf.role || etf.useCase)}</p>
           </div>
-          ${renderStatusBadge("fallback")}
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="module-chip-row etf-tag-row">
+          ${etfCategoryTags(etf).map((tag) => `<span class="module-chip">${esc(tag)}</span>`).join("")}
         </div>
         <div class="metric-grid">
           ${renderMiniMetric("TER", `${formatNumber(etf.ter)}%`)}
-          ${renderMiniMetric("Typ", etf.distribution)}
+          ${renderMiniMetric("Ausschüttung", etf.distribution)}
+          ${renderMiniMetric("Top-Region", topRegion ? `${topRegion[0]} ${formatNumber(topRegion[1])}%` : "nicht verfügbar")}
+          ${renderMiniMetric("Top-5", `${formatNumber(concentration)}%`)}
+          ${renderMiniMetric("Top-10", `${formatNumber(top10)}%`)}
           ${renderMiniMetric("Währung", etf.currency)}
-          ${renderMiniMetric("Top-5 Anteil", `${formatNumber(concentration)}%`)}
         </div>
         <div class="grid two">
           <div class="insight-row"><span class="pill">Einsatz</span><p>${esc(etf.useCase || "ETF-Baustein für Portfolio-Exposure.")}</p></div>
           <div class="insight-row"><span class="pill">Ausschüttung</span><p>${esc(distributionExplanation(etf))}</p></div>
+          <div class="insight-row"><span class="pill">Top-Holding</span><p>${esc(topHolding[0])} mit ${formatNumber(topHolding[1])}% Gewicht.</p></div>
+          <div class="insight-row"><span class="pill">Währung</span><p>${esc(etfCurrencyHint(etf))}</p></div>
         </div>
         <h4>Top Holdings</h4>
         <div class="mini-bars">
@@ -4005,68 +6534,98 @@
         <div class="mini-bars">
           ${etf.region.map(([name, weight]) => renderMiniBar(name, weight)).join("")}
         </div>
-        <p><strong>Basis-Risiko:</strong> ${esc(etf.risk)}</p>
-        <p><strong>Währungsrisiko:</strong> ${esc(etf.fxRisk)}</p>
-        <p><strong>Struktur:</strong> ${esc(etf.structure || etf.dataNote || "Lokales ETF-Modell.")}</p>
-        ${renderDataMeta(makeMeta("Lokale ETF-Datenbasis", "fallback", BOOT_TIME))}
+        <h4>Hinweise</h4>
+        <div class="etf-risk-list">
+          ${riskHints.map((item) => `<div class="research-bullet"><span class="pill ${escAttr(item.tone)}">${esc(item.label)}</span><p>${esc(item.text)}</p></div>`).join("")}
+        </div>
+        <div class="row-actions">
+          ${assetAvailable ? `<button class="ghost-button" type="button" data-symbol="${escAttr(etf.symbol)}">Asset-Seite</button>` : ""}
+          ${assetAvailable ? `<button class="ghost-button" type="button" data-compare-open="${escAttr(etf.symbol)}">Quick Compare</button>` : ""}
+          ${assetAvailable ? `<button class="ghost-button" type="button" data-etf-portfolio-fit="${escAttr(etf.symbol)}">Portfolio-Fit prüfen</button>` : ""}
+        </div>
+        ${renderDataMeta(etfDataMeta(etf))}
       </article>
     `;
   }
 
   function renderEtfCostCalculator() {
     const amount = Number(state.etf.amount || 0);
+    const monthly = Number(state.etf.monthly || 0);
     const years = Number(state.etf.years || 0);
-    const selected = ETF_DATA.find((etf) => etf.symbol === state.etf.left) || ETF_DATA[0];
-    const cost = amount * (selected.ter / 100) * years;
-    const yearlyCost = amount * (selected.ter / 100);
+    const returnRate = Number(state.etf.returnRate || 0);
+    const selected = etfBySymbol(state.etf.left) || ETF_DATA[0];
+    const compare = etfBySymbol(state.etf.right) || ETF_DATA[1];
+    const selectedCost = etfCostProjection(amount, monthly, years, selected.ter, returnRate);
+    const compareCost = etfCostProjection(amount, monthly, years, compare.ter, returnRate);
+    const yearlyCost = etfAnnualCostEstimate(amount, monthly, selected.ter);
     const monthlyCost = yearlyCost / 12;
+    const feeDiff = selectedCost.feeDrag - compareCost.feeDrag;
+    const endDiff = selectedCost.endValue - compareCost.endValue;
     return `
-      <article class="card">
+      <article class="card etf-tool-card">
         <div class="card-topline">
           <div>
-            <span class="card-label">ETF Kosten Rechner</span>
-            <h3>Was kostet der ETF grob?</h3>
+            <span class="card-label">ETF Kosten Rechner V2</span>
+            <h3>Was kostet TER langfristig?</h3>
+            <p>Simulation mit Anlagebetrag, Sparplan, Laufzeit, ETF A/B und Renditeannahme. Keine Steuer- oder Anlageberatung.</p>
           </div>
-          ${renderStatusBadge("fallback")}
+          ${renderStatusBadge("local")}
         </div>
         <div class="form-grid">
           <label class="field">
-            <span>ETF</span>
+            <span>ETF A</span>
             <select data-etf-control name="left">${ETF_DATA.map((etf) => `<option value="${escAttr(etf.symbol)}" ${state.etf.left === etf.symbol ? "selected" : ""}>${esc(etf.symbol)}</option>`).join("")}</select>
+          </label>
+          <label class="field">
+            <span>ETF B</span>
+            <select data-etf-control name="right">${ETF_DATA.map((etf) => `<option value="${escAttr(etf.symbol)}" ${state.etf.right === etf.symbol ? "selected" : ""}>${esc(etf.symbol)}</option>`).join("")}</select>
           </label>
           <label class="field">
             <span>Anlagebetrag</span>
             <input data-etf-control name="amount" type="number" value="${escAttr(amount)}">
           </label>
           <label class="field">
+            <span>Monatlicher Sparplan</span>
+            <input data-etf-control name="monthly" type="number" value="${escAttr(monthly)}">
+          </label>
+          <label class="field">
             <span>Jahre</span>
             <input data-etf-control name="years" type="number" value="${escAttr(years)}">
+          </label>
+          <label class="field">
+            <span>Renditeannahme % p.a.</span>
+            <input data-etf-control name="returnRate" type="number" step="0.1" value="${escAttr(returnRate)}">
           </label>
         </div>
         <div class="metric-grid">
           ${renderMiniMetric("pro Jahr", formatMoney(yearlyCost, selected.currency))}
           ${renderMiniMetric("pro Monat", formatMoney(monthlyCost, selected.currency))}
-          ${renderMiniMetric(`${years} Jahre`, formatMoney(cost, selected.currency))}
+          ${renderMiniMetric(`${selected.symbol} TER-Effekt`, formatMoney(selectedCost.feeDrag, selected.currency))}
+          ${renderMiniMetric(`${compare.symbol} TER-Effekt`, formatMoney(compareCost.feeDrag, compare.currency))}
+          ${renderMiniMetric("Kostendifferenz", `${feeDiff >= 0 ? "+" : ""}${formatMoney(feeDiff, selected.currency)}`)}
+          ${renderMiniMetric("Endwert-Differenz", `${endDiff >= 0 ? "+" : ""}${formatMoney(endDiff, selected.currency)}`)}
         </div>
-        <p>Grobe TER-Näherung ohne Rendite, Tracking Difference, Spreads und Steuereffekte. Für die erste Einschätzung reicht das, für echte Entscheidungen später Live-/Emittentendaten prüfen.</p>
-        ${renderDataMeta(makeMeta("Lokaler ETF-Kostenrechner", "fallback", BOOT_TIME))}
+        <div class="insight-row"><span class="pill">Warum wichtig?</span><p>TER wirkt jedes Jahr auf das investierte Vermögen. Kleine Unterschiede sehen kurz unspektakulär aus, können über lange Sparpläne aber spürbare Endwertunterschiede erzeugen.</p></div>
+        ${renderDataMeta(makeMeta("Lokaler ETF-Kostenrechner V2", "local", BOOT_TIME, "Simulation aus TER und Renditeannahme; Tracking Difference, Spreads und Steuern sind nicht enthalten."))}
       </article>
     `;
   }
 
   function renderEtfOverlapChecker() {
-    const left = ETF_DATA.find((etf) => etf.symbol === state.etf.left) || ETF_DATA[0];
-    const right = ETF_DATA.find((etf) => etf.symbol === state.etf.right) || ETF_DATA[1];
+    const left = etfBySymbol(state.etf.left) || ETF_DATA[0];
+    const right = etfBySymbol(state.etf.right) || ETF_DATA[1];
     const overlap = etfOverlap(left, right);
     const overlapText = etfOverlapText(overlap);
+    const level = etfOverlapLevel(overlap);
     return `
-      <article class="card">
+      <article class="card etf-tool-card">
         <div class="card-topline">
           <div>
-            <span class="card-label">ETF Overlap Checker V1</span>
+            <span class="card-label">ETF Overlap Checker V2</span>
             <h3>${esc(left.symbol)} vs ${esc(right.symbol)}</h3>
+            <p>Prüft Dopplungen in Top-Holdings, Regionen, Sektoren, TER und Konzentration auf Basis der lokalen ETF-Strukturdaten.</p>
           </div>
-          ${renderStatusBadge("fallback")}
+          ${renderStatusBadge("local")}
         </div>
         <div class="form-grid">
           <label class="field">
@@ -4081,16 +6640,415 @@
         <div class="metric-grid">
           ${renderMiniMetric("Holdings", `${formatNumber(overlap.score)}%`)}
           ${renderMiniMetric("Regionen", `${formatNumber(overlap.regionScore)}%`)}
+          ${renderMiniMetric("Sektoren", `${formatNumber(overlap.sectorScore)}%`)}
           ${renderMiniMetric("TER-Differenz", `${formatNumber(Math.abs(left.ter - right.ter))}%`)}
+          ${renderMiniMetric("Top-5 Abstand", `${formatNumber(Math.abs(etfHoldingConcentration(left) - etfHoldingConcentration(right)))}%`)}
+          ${renderMiniMetric("Einordnung", level.label)}
         </div>
-        <p>Top-Holdings-Überschneidung: ${esc(overlap.names.join(", ") || "keine Top-Overlap-Holdings")}. Regionale Überschneidung: ${esc(overlap.regionNames.join(", ") || "keine erkennbare regionale Dopplung")}.</p>
         <div class="insight-row"><span class="pill">Einordnung</span><p>${esc(overlapText)}</p></div>
+        <div class="grid two etf-overlap-detail-grid">
+          ${renderEtfCommonRows("Gemeinsame Top-Holdings", overlap.holdingRows, "Keine Überschneidung in den lokal gepflegten Top-Holdings.")}
+          ${renderEtfCommonRows("Regionen-Overlap", overlap.regionRows, "Keine erkennbare regionale Dopplung.")}
+        </div>
+        <div class="etf-overlap-bars">
+          <span class="card-label">Sektor-/Themen-Overlap</span>
+          ${overlap.sectorRows.map((row) => renderMiniBar(row.name, row.weight)).join("") || renderEmptyState("Keine sektorale Überschneidung in der lokalen Struktur.")}
+        </div>
         <div class="row-actions">
           <button class="ghost-button" type="button" data-compare-pair-left="${escAttr(left.symbol)}" data-compare-pair-right="${escAttr(right.symbol)}">Im Quick Compare öffnen</button>
+          <button class="ghost-button" type="button" data-etf-portfolio-fit="${escAttr(left.symbol)}">ETF A im Portfolio prüfen</button>
         </div>
-        ${renderDataMeta(makeMeta("Lokaler ETF-Overlap-Fallback", "fallback", BOOT_TIME))}
+        ${renderDataMeta(makeMeta("Lokaler ETF-Overlap V2", "local", BOOT_TIME, "Overlap ist eine strukturierte Schätzung aus lokalen Top-Holdings, Regionen und Sektoren."))}
       </article>
     `;
+  }
+
+  function renderEtfControlCenter(summary) {
+    return `
+      <article class="card etf-control-center">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">ETF-Kontrollzentrum</span>
+            <h3>${esc(summary.title)}</h3>
+            <p>${esc(summary.text)}</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("ETF-Universum", String(summary.count))}
+          ${renderMiniMetric("Ø TER", `${formatNumber(summary.avgTer)}%`)}
+          ${renderMiniMetric("Günstigster ETF", `${summary.cheapest.symbol} · ${formatNumber(summary.cheapest.ter)}%`)}
+          ${renderMiniMetric("Höchste Top-5", `${summary.concentrated.symbol} · ${formatNumber(summary.concentrated.concentration)}%`)}
+          ${renderMiniMetric("Größte Regionenlast", `${summary.regionHeavy.symbol} · ${summary.regionHeavy.region}`)}
+          ${renderMiniMetric("Stärkster Overlap", summary.overlapPair)}
+        </div>
+        <div class="grid three etf-guide-grid">
+          <div class="insight-row"><span class="pill">Kosten</span><p>TER ist laufend und wirkt über viele Jahre auf das Endvermögen. Der Rechner zeigt ETF A gegen ETF B.</p></div>
+          <div class="insight-row"><span class="pill">Overlap</span><p>Hohe Top-Holdings- oder Regionen-Dopplung kann weniger Diversifikation bringen als erwartet.</p></div>
+          <div class="insight-row"><span class="pill">Portfolio-Fit</span><p>Core-ETFs senken oft Einzelwertrisiko; Satelliten können Themen-, Länder- oder Währungsrisiken erhöhen.</p></div>
+        </div>
+        <div class="insight-row"><span class="pill">Fazit</span><p>${esc(summary.conclusion)}</p></div>
+      </article>
+    `;
+  }
+
+  function renderEtfDeepDive(etf) {
+    return `
+      <article class="card etf-deep-dive-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">ETF-Analyse</span>
+            <h3>${esc(etf.symbol)}: Holdings, Regionen, Struktur und Fit</h3>
+            <p>${esc(etf.useCase)} Datenstatus: lokal/strukturiert, nicht als Live-Holdings verkauft.</p>
+          </div>
+          <label class="field compact-field">
+            <span>ETF auswählen</span>
+            <select data-etf-control name="left">${ETF_DATA.map((item) => `<option value="${escAttr(item.symbol)}" ${etf.symbol === item.symbol ? "selected" : ""}>${esc(item.symbol)}</option>`).join("")}</select>
+          </label>
+        </div>
+        <div class="grid two etf-analysis-grid">
+          ${renderEtfHoldingsPanel(etf)}
+          ${renderEtfRegionPanel(etf)}
+          ${renderEtfSectorPanel(etf)}
+          ${renderEtfStructurePanel(etf)}
+          ${renderEtfDistributionPanel(etf)}
+          ${renderEtfPortfolioFitPanel(etf)}
+        </div>
+        ${renderDataMeta(etfDataMeta(etf))}
+      </article>
+    `;
+  }
+
+  function renderEtfHoldingsPanel(etf) {
+    const top5 = etfHoldingConcentration(etf);
+    const top10 = etfTop10Concentration(etf);
+    const hint = top5 >= 45 ? "Stark konzentriert" : top5 >= 25 ? "Spürbare Mega-Cap-Last" : "Breiter verteilt";
+    return `
+      <div class="etf-analysis-panel">
+        <span class="card-label">Holdings</span>
+        <h4>${esc(hint)}</h4>
+        <div class="metric-grid compact-metric-grid">
+          ${renderMiniMetric("Top-5", `${formatNumber(top5)}%`)}
+          ${renderMiniMetric("Top-10", `${formatNumber(top10)}%`)}
+        </div>
+        <div class="mini-bars">${etf.holdings.map(([name, weight]) => renderMiniBar(name, weight)).join("")}</div>
+        <p>${esc(etfConcentrationLabel(etf))}</p>
+      </div>
+    `;
+  }
+
+  function renderEtfRegionPanel(etf) {
+    const topRegion = etfTopRegion(etf);
+    return `
+      <div class="etf-analysis-panel">
+        <span class="card-label">Regionen / Länder</span>
+        <h4>${esc(topRegion ? `${topRegion[0]} dominiert` : "Region offen")}</h4>
+        <div class="mini-bars">${etf.region.map(([name, weight]) => renderMiniBar(name, weight)).join("")}</div>
+        <p>${esc(etfRegionLabel(etf))}</p>
+      </div>
+    `;
+  }
+
+  function renderEtfSectorPanel(etf) {
+    return `
+      <div class="etf-analysis-panel">
+        <span class="card-label">Sektoren / Themen</span>
+        <h4>${esc(etfSectorHeadline(etf))}</h4>
+        <div class="mini-bars">${(etf.sectors || []).map(([name, weight]) => renderMiniBar(name, weight)).join("") || renderEmptyState("Keine sektorale Detailstruktur verfügbar.")}</div>
+        <p>${esc(etfSectorHint(etf))}</p>
+      </div>
+    `;
+  }
+
+  function renderEtfStructurePanel(etf) {
+    return `
+      <div class="etf-analysis-panel">
+        <span class="card-label">Währung / Struktur</span>
+        <h4>${esc(etf.structureType || "Struktur offen")}</h4>
+        <div class="research-metric-list">
+          ${renderResearchMetricList([
+            { label: "Fondswährung", value: etf.fundCurrency || etf.currency || "nicht verfügbar" },
+            { label: "Handelswährung", value: etf.currency || "nicht verfügbar" },
+            { label: "Domizil", value: etf.domicile || "nicht verfügbar" },
+            { label: "Replikation", value: etf.replication || "nicht verfügbar" }
+          ])}
+        </div>
+        <p>${esc(etf.fxRisk || "Währungsrisiko nicht ausreichend verfügbar.")}</p>
+      </div>
+    `;
+  }
+
+  function renderEtfDistributionPanel(etf) {
+    return `
+      <div class="etf-analysis-panel">
+        <span class="card-label">Ausschüttend vs. thesaurierend</span>
+        <h4>${esc(etf.distribution)}</h4>
+        <p>${esc(distributionExplanation(etf))}</p>
+        <p class="small">Steuerliche Behandlung hängt vom Land und persönlichen Fall ab. Diese Einordnung ist keine Steuerberatung.</p>
+      </div>
+    `;
+  }
+
+  function renderEtfPortfolioFitPanel(etf) {
+    const hints = etfPortfolioFitHints(etf);
+    return `
+      <div class="etf-analysis-panel">
+        <span class="card-label">Portfolio-Fit</span>
+        <h4>${esc(etfPortfolioFitLabel(etf))}</h4>
+        <div class="etf-risk-list">
+          ${hints.map((item) => `<div class="research-bullet"><span class="pill ${escAttr(item.tone)}">${esc(item.label)}</span><p>${esc(item.text)}</p></div>`).join("")}
+        </div>
+        <div class="row-actions">
+          ${assetMap.has(etf.symbol) ? `<button class="ghost-button" type="button" data-etf-portfolio-fit="${escAttr(etf.symbol)}">In Portfolio-Simulation prüfen</button>` : ""}
+          ${assetMap.has(etf.symbol) ? `<button class="ghost-button" type="button" data-compare-open="${escAttr(etf.symbol)}">Mit ETF vergleichen</button>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderEtfCommonRows(title, rows, emptyText) {
+    return `
+      <div class="etf-common-card">
+        <span class="card-label">${esc(title)}</span>
+        <div class="stack-list">
+          ${rows.map((row) => `
+            <div class="compact-row">
+              <span>${esc(row.name)}</span>
+              <strong>${formatNumber(row.weight)}%</strong>
+              <small>${formatNumber(row.left)}% / ${formatNumber(row.right)}%</small>
+            </div>
+          `).join("") || renderEmptyState(emptyText)}
+        </div>
+      </div>
+    `;
+  }
+
+  function etfBySymbol(symbol) {
+    return ETF_DATA.find((item) => item.symbol === normalizeSymbol(symbol)) || null;
+  }
+
+  function etfUniverseSummary() {
+    const avgTer = average(ETF_DATA.map((etf) => etf.ter));
+    const cheapest = ETF_DATA.reduce((best, etf) => etf.ter < best.ter ? etf : best, ETF_DATA[0]);
+    const concentrated = ETF_DATA
+      .map((etf) => ({ symbol: etf.symbol, concentration: etfHoldingConcentration(etf) }))
+      .sort((a, b) => b.concentration - a.concentration)[0];
+    const regionHeavy = ETF_DATA
+      .map((etf) => {
+        const top = etfTopRegion(etf) || ["offen", 0];
+        return { symbol: etf.symbol, weight: top[1], region: `${top[0]} ${formatNumber(top[1])}%` };
+      })
+      .sort((a, b) => b.weight - a.weight)[0];
+    let strongest = { label: "nicht verfügbar", score: 0 };
+    ETF_DATA.forEach((left, leftIndex) => {
+      ETF_DATA.slice(leftIndex + 1).forEach((right) => {
+        const overlap = etfOverlap(left, right);
+        const score = overlap.score * 0.7 + overlap.regionScore * 0.2 + overlap.sectorScore * 0.1;
+        if (score > strongest.score) {
+          strongest = { label: `${left.symbol}/${right.symbol} · ${formatNumber(score)}%`, score };
+        }
+      });
+    });
+    const conclusion = `${cheapest.symbol} ist im lokalen Universum am günstigsten. ${concentrated.symbol} hat die höchste Top-5-Konzentration; ${regionHeavy.symbol} zeigt die stärkste Regionenlast. Overlap sollte vor ETF-Kombinationen geprüft werden.`;
+    return {
+      count: ETF_DATA.length,
+      avgTer,
+      cheapest,
+      concentrated,
+      regionHeavy,
+      overlapPair: strongest.label,
+      title: `${ETF_DATA.length} strukturierte ETF-Bausteine`,
+      text: "Kosten, Konzentration, Länder-/Sektorlast und Portfolio-Rolle werden zentral sichtbar.",
+      conclusion
+    };
+  }
+
+  function etfDataMeta(etf) {
+    return makeMeta(etf.dataNote || "Lokale ETF-Strukturdaten", "local", BOOT_TIME, "ETF-Struktur ist lokal gepflegt; Marktpreise können je nach Asset live/hybrid oder fallback sein.");
+  }
+
+  function etfCategoryTags(etf) {
+    return unique([
+      etf.role,
+      etf.category,
+      etf.structureType,
+      etf.distribution,
+      etfTopRegion(etf)?.[0],
+      etfSectorHeadline(etf)
+    ]).filter(Boolean).slice(0, 6);
+  }
+
+  function etfTopRegion(etf) {
+    return (etf.region || []).slice().sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))[0] || null;
+  }
+
+  function etfTopSector(etf) {
+    return (etf.sectors || []).slice().sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))[0] || null;
+  }
+
+  function etfTop10Concentration(etf) {
+    if (Number.isFinite(Number(etf.top10))) {
+      return Number(etf.top10);
+    }
+    return etfHoldingConcentration(etf);
+  }
+
+  function etfConcentrationLabel(etf) {
+    const top5 = etfHoldingConcentration(etf);
+    if (top5 >= 80) {
+      return "Kein klassischer Aktienkorb: die Struktur konzentriert sich bewusst auf einen Rohstoff- oder Anleihebaustein.";
+    }
+    if (top5 >= 45) {
+      return "Hohe Top-5-Konzentration. Prüfe, ob der ETF wirklich als Core taugt oder eher Satellit ist.";
+    }
+    if (top5 >= 25) {
+      return "Spürbare Konzentration in großen Einzeltiteln, aber noch breiter als viele Themen-ETFs.";
+    }
+    return "Top-Holdings sind vergleichsweise moderat gewichtet; Diversifikation kommt eher über Breite und Regionen.";
+  }
+
+  function etfRegionLabel(etf) {
+    const top = etfTopRegion(etf);
+    if (!top) {
+      return "Regionenstruktur nicht verfügbar.";
+    }
+    if (top[1] >= 95) {
+      return `${top[0]} dominiert fast vollständig. Das ist kein global neutraler ETF.`;
+    }
+    if (top[1] >= 70) {
+      return `${top[0]} ist stark übergewichtet. Als Satellit plausibel, als Weltportfolio begrenzt.`;
+    }
+    if (top[1] >= 55) {
+      return `${top[0]} ist größte Region, aber weitere Regionen tragen sichtbar bei.`;
+    }
+    return "Regionen wirken breiter verteilt; genaue Ländergewichte bleiben lokale Strukturwerte.";
+  }
+
+  function etfSectorHeadline(etf) {
+    const top = etfTopSector(etf);
+    if (!top) {
+      return "Sektorstruktur offen";
+    }
+    if (top[0] === "Edelmetalle" || top[0] === "Staatsanleihen") {
+      return top[0];
+    }
+    return top[1] >= 40 ? `${top[0]}-lastig` : `${top[0]} größter Sektor`;
+  }
+
+  function etfSectorHint(etf) {
+    const top = etfTopSector(etf);
+    if (!top) {
+      return "Keine belastbare Sektorstruktur verfügbar; deshalb keine harte Sektorbehauptung.";
+    }
+    if (top[1] >= 45) {
+      return `${top[0]} prägt den ETF stark. Das kann Themenchance sein, erhöht aber Klumpenrisiko.`;
+    }
+    if ((etf.sectors || []).length >= 5) {
+      return "Mehrere Sektoren sind sichtbar vertreten; die Einordnung bleibt eine strukturierte lokale Näherung.";
+    }
+    return "Sektorbild ist bewusst grob gehalten und nicht als Live-Holdings-Feed zu verstehen.";
+  }
+
+  function etfCurrencyHint(etf) {
+    if (etf.currency === "EUR" && etf.fundCurrency && etf.fundCurrency !== "EUR") {
+      return `Handel in EUR, Fonds-/Basiswährung ${etf.fundCurrency}; Währungsrisiko steckt weiterhin in den Basiswerten.`;
+    }
+    return etf.fxRisk || `${etf.currency || "Währung"}-Exposure prüfen.`;
+  }
+
+  function etfRiskHints(etf) {
+    const hints = [];
+    const top5 = etfHoldingConcentration(etf);
+    const topRegion = etfTopRegion(etf);
+    const topSector = etfTopSector(etf);
+    if (etf.ter >= 0.5) {
+      hints.push({ label: "Kosten", tone: "bear", text: `TER ${formatNumber(etf.ter)}% ist im lokalen Vergleich hoch. Prüfe, ob der Nutzen diese Kosten rechtfertigt.` });
+    } else if (etf.ter <= 0.1) {
+      hints.push({ label: "Kosten", tone: "bull", text: `TER ${formatNumber(etf.ter)}% ist sehr niedrig und langfristig ein Pluspunkt.` });
+    }
+    if (top5 >= 45) {
+      hints.push({ label: "Konzentration", tone: "bear", text: `Top-5-Holdings bei ${formatNumber(top5)}%. Einzelwert- oder Faktorlast ist deutlich.` });
+    } else {
+      hints.push({ label: "Konzentration", tone: "neutral", text: `Top-5-Holdings bei ${formatNumber(top5)}%. Konzentration bleibt sichtbar, aber einordnungsabhängig.` });
+    }
+    if (topRegion && topRegion[1] >= 75) {
+      hints.push({ label: "Region", tone: "neutral", text: `${topRegion[0]}-Anteil von ${formatNumber(topRegion[1])}% kann Länder-/Währungsrisiko bündeln.` });
+    }
+    if (topSector && topSector[1] >= 40) {
+      hints.push({ label: "Thema", tone: "neutral", text: `${topSector[0]} ist dominant. Das spricht eher für Satellit als für neutralen Core.` });
+    }
+    if (etf.structureType && !String(etf.structureType).includes("UCITS")) {
+      hints.push({ label: "Struktur", tone: "neutral", text: `${etf.structureType}: für europäische Anleger Struktur, Handelbarkeit und Steuerkontext separat prüfen.` });
+    }
+    return hints.length ? hints : [{ label: "Datenlage", tone: "neutral", text: "Strukturdaten lokal gepflegt; vor einer Entscheidung Emittentendaten prüfen." }];
+  }
+
+  function etfPortfolioFitLabel(etf) {
+    const top5 = etfHoldingConcentration(etf);
+    const topRegion = etfTopRegion(etf);
+    if (String(etf.role || "").toLowerCase().includes("core") && top5 < 35 && (!topRegion || topRegion[1] < 75)) {
+      return "eher Core-tauglich";
+    }
+    if (top5 >= 45 || (topRegion && topRegion[1] >= 90)) {
+      return "eher Satellit / Konzentrationsbaustein";
+    }
+    if (String(etf.category || "").includes("Gold") || String(etf.category || "").includes("Staatsanleihen")) {
+      return "eher Diversifikations-/Hedge-Baustein";
+    }
+    return "Core/Satellite abhängig von Gewichtung";
+  }
+
+  function etfPortfolioFitHints(etf) {
+    const hints = [];
+    const topRegion = etfTopRegion(etf);
+    const topSector = etfTopSector(etf);
+    hints.push({ label: "Rolle", tone: "neutral", text: etf.useCase || etf.role || "ETF-Baustein für Portfolio-Exposure." });
+    if (topRegion) {
+      hints.push({ label: "Exposure", tone: topRegion[1] >= 75 ? "bear" : "neutral", text: `${topRegion[0]} wäre der wichtigste regionale Einfluss.` });
+    }
+    if (topSector) {
+      hints.push({ label: "Sektor", tone: topSector[1] >= 40 ? "bear" : "neutral", text: `${topSector[0]} prägt den ETF am stärksten.` });
+    }
+    if (etf.ter <= 0.15) {
+      hints.push({ label: "Kosten", tone: "bull", text: "Kostenprofil wirkt für langfristige Nutzung günstig." });
+    }
+    return hints.slice(0, 4);
+  }
+
+  function etfCostProjection(amount, monthly, years, ter, annualReturnPct) {
+    const months = Math.max(0, Math.round(Number(years || 0) * 12));
+    const grossRate = Number(annualReturnPct || 0) / 100 / 12;
+    const netRate = (Number(annualReturnPct || 0) - Number(ter || 0)) / 100 / 12;
+    let gross = Math.max(0, Number(amount || 0));
+    let net = gross;
+    const contribution = Math.max(0, Number(monthly || 0));
+    for (let index = 0; index < months; index += 1) {
+      gross *= 1 + grossRate;
+      net *= 1 + netRate;
+      gross += contribution;
+      net += contribution;
+    }
+    return {
+      contributed: Math.max(0, Number(amount || 0)) + contribution * months,
+      grossEndValue: gross,
+      endValue: net,
+      feeDrag: Math.max(0, gross - net)
+    };
+  }
+
+  function etfAnnualCostEstimate(amount, monthly, ter) {
+    const averageCapital = Math.max(0, Number(amount || 0)) + Math.max(0, Number(monthly || 0)) * 6;
+    return averageCapital * Number(ter || 0) / 100;
+  }
+
+  function etfOverlapLevel(overlap) {
+    if (overlap.score >= 20 || overlap.regionScore >= 90 || overlap.sectorScore >= 70) {
+      return { label: "hoch", tone: "bear" };
+    }
+    if (overlap.score >= 8 || overlap.regionScore >= 60 || overlap.sectorScore >= 40) {
+      return { label: "mittel", tone: "neutral" };
+    }
+    return { label: "gering", tone: "bull" };
   }
 
   function renderAlertsPage() {
@@ -4324,6 +7282,7 @@
     const activeTab = ["overview", "technical", "fundamental", "news", "events", "insider", "journal"].includes(state.assetTab) ? state.assetTab : "overview";
     const assetContext = { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events };
     const research = buildAssetResearchSnapshot(assetContext);
+    const assetEtf = research.etf;
 
     ensureAssetData(symbol);
     ensureEventData();
@@ -4331,7 +7290,7 @@
     app.innerHTML = `
       <section class="asset-hero">
         <div class="asset-main">
-          <p class="eyebrow">Einzelaktien-Seite</p>
+          <p class="eyebrow">${asset.type === "ETF" ? "ETF-Asset-Seite" : "Einzelaktien-Seite"}</p>
           <h1>${esc(symbol)} <span>${esc(profile.name || asset.name)}</span></h1>
           <p>${esc(asset.thesis)}</p>
           <div class="module-chip-row asset-identity-row">
@@ -4343,6 +7302,7 @@
           <div class="asset-actions">
             <button class="primary-button" type="button" data-watch-add="${escAttr(symbol)}">Zur Watchlist</button>
             <button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>
+            <button class="ghost-button" type="button" data-journal-open="${escAttr(symbol)}" data-journal-context="asset">Journal-Eintrag</button>
             <button class="ghost-button" type="button" data-favorite-symbol="${escAttr(symbol)}">${isFavoriteSymbol(symbol) ? "Favorit entfernen" : "Favorit"}</button>
             <button class="ghost-button" type="button" data-compare-open="${escAttr(symbol)}">Vergleichen</button>
             <button class="ghost-button" type="button" data-report="asset" data-symbol="${escAttr(symbol)}">Report exportieren</button>
@@ -4357,12 +7317,18 @@
         </div>
       </section>
 
+      ${renderModuleActionBar("asset", { symbol })}
+      ${renderNextSteps("asset", { symbol })}
       <section class="section">
         <div class="kpi-strip">
-          ${renderKpi("Market Cap", formatCompactMoney(valueOr(profile.marketCap, fundamentals.marketCap), asset.currency), profile.meta || fundamentals.meta)}
-          ${renderKpi("KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x"), fundamentals.meta)}
-          ${renderKpi("EPS", formatMoney(valueOr(fundamentals.eps, asset.fallback.eps), asset.currency), fundamentals.meta)}
-          ${renderKpi("Umsatz", formatCompactMoney(valueOr(fundamentals.revenue, asset.fallback.revenue), asset.currency), fundamentals.meta)}
+          ${assetEtf
+            ? renderEtfAssetKpis(assetEtf)
+            : `
+              ${renderKpi("Market Cap", formatCompactMoney(valueOr(profile.marketCap, fundamentals.marketCap), asset.currency), profile.meta || fundamentals.meta)}
+              ${renderKpi("KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x"), fundamentals.meta)}
+              ${renderKpi("EPS", formatMoney(valueOr(fundamentals.eps, asset.fallback.eps), asset.currency), fundamentals.meta)}
+              ${renderKpi("Umsatz", formatCompactMoney(valueOr(fundamentals.revenue, asset.fallback.revenue), asset.currency), fundamentals.meta)}
+            `}
         </div>
         ${renderAssetDataStatusStrip({ quote, profile, fundamentals, news, events })}
         ${renderAssetAlertStrip(symbol)}
@@ -4370,6 +7336,7 @@
 
       <section class="section asset-research-section">
         ${renderAssetResearchSnapshot(assetContext, research)}
+        ${assetEtf ? renderEtfAssetSnapshot(assetEtf) : ""}
       </section>
 
       <section class="section">
@@ -4645,9 +7612,46 @@
         <div class="row-actions asset-next-actions">
           <button class="ghost-button" type="button" data-compare-open="${escAttr(symbol)}">Vergleichen</button>
           <button class="ghost-button" type="button" data-alert-quick="${escAttr(symbol)}" data-alert-quick-type="price">Alert setzen</button>
+          <button class="ghost-button" type="button" data-journal-open="${escAttr(symbol)}" data-journal-context="research">These festhalten</button>
           <button class="ghost-button" type="button" data-route="events">Events prüfen</button>
           <button class="ghost-button" type="button" data-route="data-health">Datenqualität ansehen</button>
         </div>
+      </article>
+    `;
+  }
+
+  function renderEtfAssetKpis(etf) {
+    const topRegion = etfTopRegion(etf);
+    return `
+      ${renderKpi("TER", `${formatNumber(etf.ter)}%`, etfDataMeta(etf))}
+      ${renderKpi("Ausschüttung", etf.distribution, etfDataMeta(etf))}
+      ${renderKpi("Top-Region", topRegion ? `${topRegion[0]} ${formatNumber(topRegion[1])}%` : "nicht verfügbar", etfDataMeta(etf))}
+      ${renderKpi("Top-5", `${formatNumber(etfHoldingConcentration(etf))}%`, etfDataMeta(etf))}
+    `;
+  }
+
+  function renderEtfAssetSnapshot(etf) {
+    return `
+      <article class="card asset-etf-snapshot">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">ETF-Research-Snapshot</span>
+            <h3>${esc(etf.symbol)} als Portfolio-Baustein</h3>
+            <p>${esc(etf.useCase)} Die Struktur stammt aus der lokalen ETF-V2-Datenbasis.</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="grid three">
+          ${renderEtfHoldingsPanel(etf)}
+          ${renderEtfRegionPanel(etf)}
+          ${renderEtfPortfolioFitPanel(etf)}
+        </div>
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-route="etf">ETF-Bereich öffnen</button>
+          <button class="ghost-button" type="button" data-compare-open="${escAttr(etf.symbol)}">Quick Compare</button>
+          <button class="ghost-button" type="button" data-etf-portfolio-fit="${escAttr(etf.symbol)}">Portfolio-Fit prüfen</button>
+        </div>
+        ${renderDataMeta(etfDataMeta(etf))}
       </article>
     `;
   }
@@ -4697,7 +7701,8 @@
       headline,
       summary,
       conclusion,
-      dataStatus
+      dataStatus,
+      etf
     };
   }
 
@@ -5045,7 +8050,7 @@
             <h3>Warum beobachtest du ${esc(symbol)}?</h3>
             <p>Speichere These, Trigger, Regel-Check und ob die Idee emotional getrieben war. Alles bleibt lokal im Browser.</p>
           </div>
-          ${renderDataMeta(makeMeta("Lokales Journal", "live", Date.now()), true)}
+          ${renderDataMeta(makeMeta("Lokales Journal", "local", Date.now(), "Journal-Einträge bleiben lokal im Browser; Auswertungen sind Produktlogik."), true)}
         </div>
         <div class="grid three">
           <div class="snapshot-tile">
@@ -5072,13 +8077,16 @@
             <label class="field"><span>Emotion</span><select name="emotion"><option value="rational">Rational</option><option value="unsicher">Unsicher</option><option value="fomo">FOMO</option><option value="stress">Stress</option></select></label>
             <label class="field"><span>Regel-Check</span><select name="ruleCheck"><option value="ok">Plan passt</option><option value="risk">Risiko zu hoch</option><option value="wait">Abwarten</option></select></label>
           </div>
-          <button class="primary-button" type="submit">Journal-Eintrag speichern</button>
+          <div class="row-actions">
+            <button class="primary-button" type="submit">Journal-Eintrag speichern</button>
+            <button class="ghost-button" type="button" data-journal-open="${escAttr(symbol)}" data-journal-context="asset-tab">Journal V2 öffnen</button>
+          </div>
         </form>
         <div class="stack-list journal-list">
           ${entries.map((entry) => `
             <div class="journal-row">
               <strong>${esc(entry.thesis)}</strong>
-              <span class="small">${formatTimestamp(entry.timestamp)} | ${esc(entry.emotion)} | ${esc(entry.ruleCheck)}</span>
+              <span class="small">${formatTimestamp(entry.timestamp)} | ${esc(journalEmotionLabel(entry.emotion))} | ${esc(entry.ruleCheck)}</span>
               <p>${esc(entry.trigger)}</p>
             </div>
           `).join("") || renderEmptyState("Noch keine These gespeichert.")}
@@ -5301,6 +8309,9 @@
         </div>
       </section>
       <section class="section">
+        ${renderReportCenterCard()}
+      </section>
+      <section class="section">
         ${renderResearchWorkflowCard()}
       </section>
       <section class="section">
@@ -5320,6 +8331,31 @@
           ${renderDataMeta(makeMeta("Brevo Fallback", "fallback", BOOT_TIME, "Newsletter-Backend ist in der statischen Version nicht aktiv."))}
         </article>
       </section>
+    `;
+  }
+
+  function renderReportCenterCard() {
+    return `
+      <article class="card report-center-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Report-Center V2</span>
+            <h3>Druckbare Research-Dokumente</h3>
+            <p>Erstellt strukturierte Browser-PDF-Reports aus bestehenden Modulen. Keine Server-PDFs, keine neue Bibliothek, keine externen Datenpfade.</p>
+          </div>
+          ${renderDataMeta(makeMeta("HTML/CSS Print Export", "local", Date.now(), "Reports nutzen vorhandene Live-, Hybrid-, Fallback- und lokale Datenstatus."), true)}
+        </div>
+        <div class="module-chip-row report-type-row">
+          <button class="ghost-button" type="button" data-report="asset" data-symbol="${escAttr(state.activeSymbol)}">Asset-Report</button>
+          <button class="ghost-button" type="button" data-report="portfolio">Portfolio-Report</button>
+          <button class="ghost-button" type="button" data-report="etf">ETF-Report</button>
+          <button class="ghost-button" type="button" data-report="macro">Makro-Report</button>
+          <button class="ghost-button" type="button" data-report="screener">Screener-Report</button>
+          <button class="ghost-button" type="button" data-report="dailyRecap">Tages-Recap</button>
+          <button class="ghost-button" type="button" data-report="watchlist">Watchlist-Report</button>
+        </div>
+        <p class="small">Die Vorschau öffnet eine print-optimierte Report-Ansicht. Über den Browser-Dialog kann sie als PDF gespeichert werden.</p>
+      </article>
     `;
   }
 
@@ -5375,6 +8411,8 @@
           `).join("")}
         </div>
       </section>
+      ${renderModuleActionBar("portfolio")}
+      ${renderNextSteps("portfolio")}
 
       <section class="section">
         <article class="card portfolio-control-card">
@@ -5468,7 +8506,7 @@
             ${renderStatusBadge(analysis.dataStatus)}
           </div>
           <div class="portfolio-position-list">
-            ${analysis.positions.map((row) => renderPortfolioPosition(row, analysis)).join("") || renderEmptyState("Noch kein Portfolio angelegt oder keine Positionen vorhanden.")}
+            ${analysis.positions.map((row) => renderPortfolioPosition(row, analysis)).join("") || renderGuidedEmptyState("portfolio")}
           </div>
         </article>
       </section>
@@ -5651,6 +8689,367 @@
     `;
   }
 
+  function renderPreferencesPage() {
+    const prefs = dashboardPrefs();
+    app.innerHTML = `
+      <section class="section preferences-page">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Personalization V2</p>
+            <h1>Dein MH-Analytics-Cockpit.</h1>
+            <p>Ordne Startseite, Favoriten, Standardansichten und Hinweise nach deinem Arbeitsstil. Alles bleibt lokal im Browser, ohne Login, Cloud-Sync oder Betreiber-Konfiguration.</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-route="home">Zur Startseite</button>
+            <button class="ghost-button danger-button" type="button" data-preferences-reset>Zurücksetzen</button>
+          </div>
+        </div>
+
+        <div class="grid two preferences-overview-grid">
+          <article class="card personalization-panel">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Dashboard-Modus</span>
+                <h3>${esc(preferenceModeLabel(prefs.mode))}</h3>
+                <p>${esc(DASHBOARD_MODES[prefs.mode]?.description || DASHBOARD_MODES.investor.description)}</p>
+              </div>
+              ${renderDataMeta(makeMeta("Lokale User Preferences", "local", Date.now(), "Nur Nutzerpraeferenzen, keine geheimen Betreiber-Schluessel."), true)}
+            </div>
+            <div class="mode-card-grid">
+              ${Object.entries(DASHBOARD_MODES).map(([mode, config]) => `
+                <button class="mode-option ${prefs.mode === mode ? "active" : ""}" type="button" data-dashboard-mode="${escAttr(mode)}">
+                  <strong>${esc(config.label)}</strong>
+                  <span>${esc(config.description)}</span>
+                </button>
+              `).join("")}
+            </div>
+          </article>
+
+          <article class="card preference-storage-card">
+            <span class="card-label">Lokale Speicherung</span>
+            <h3>Privat im aktuellen Browser</h3>
+            <p>Einstellungen, Favoriten, Modulreihenfolge und Standardansichten werden lokal gespeichert. Auf einem anderen Gerät oder in einem anderen Browser starten sie wieder mit Standardwerten.</p>
+            <div class="metric-grid">
+              ${renderMiniMetric("Speicher-Key", STORAGE_KEYS.userPreferences)}
+              ${renderMiniMetric("Login", "nicht nötig")}
+              ${renderMiniMetric("Cloud-Sync", "aus")}
+              ${renderMiniMetric("Provider-Schlüssel", "nicht gespeichert")}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="grid two">
+          <article class="card preference-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Startseitenmodule</span>
+                <h3>Oben, normal oder ausblenden</h3>
+                <p>Keine Drag-and-drop-Spielerei: einfache Prioritäten sortieren die Startseite stabil.</p>
+              </div>
+            </div>
+            <div class="module-preference-list">
+              ${HOME_MODULE_CATALOG.map((module) => renderModulePreferenceRow(module, prefs.modules[module.id])).join("")}
+            </div>
+          </article>
+
+          <article class="card preference-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Favoriten & Shortcuts</span>
+                <h3>Schneller Zugriff auf das Wichtige</h3>
+                <p>Favoriten priorisieren Suche, Recap, Watchlist-Kontext und Startseite. Shortcuts beschleunigen die Navigation.</p>
+              </div>
+            </div>
+            <div class="preference-subblock">
+              <span class="card-label">Favoriten</span>
+              <div class="chip-row">
+                ${favoriteAssetCandidates().map((asset) => `<button class="chip ${isFavoriteSymbol(asset.symbol) ? "active" : ""}" type="button" data-favorite-symbol="${escAttr(asset.symbol)}">${esc(asset.symbol)}</button>`).join("")}
+              </div>
+            </div>
+            <div class="preference-subblock">
+              <span class="card-label">Shortcuts (${prefs.shortcuts.length}/6)</span>
+              <div class="shortcut-grid">
+                ${SHORTCUT_CATALOG.map((shortcut) => `
+                  <button class="mode-option shortcut-option ${prefs.shortcuts.includes(shortcut.id) ? "active" : ""}" type="button" data-shortcut-toggle="${escAttr(shortcut.id)}">
+                    <strong>${esc(shortcut.label)}</strong>
+                    <span>${esc(routeLabel(shortcut.route))}</span>
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head compact-section-head">
+          <div>
+            <h2>Standardansichten</h2>
+            <p>Wichtige Modul-Defaults werden lokal gespeichert und beim nächsten Laden angewendet.</p>
+          </div>
+        </div>
+        <div class="grid three preferences-default-grid">
+          ${renderScreenerPreferences(prefs)}
+          ${renderEventPreferences(prefs)}
+          ${renderEtfPreferences(prefs)}
+          ${renderPortfolioPreferences(prefs)}
+          ${renderComparePreferences(prefs)}
+          ${renderReportPreferences(prefs)}
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="grid two">
+          <article class="card preference-card">
+            <span class="card-label">Anlegerprofil</span>
+            <h3>Darstellung nach deinem Stil gewichten</h3>
+            <p>Das Profil steuert Priorisierung und Hinweis-Tiefe. Es ist keine Empfehlung und kein Risikomodell.</p>
+            <div class="form-grid">
+              ${renderPreferenceSelect("profile.goal", "Ziel", prefs.profile.goal, Object.entries(PROFILE_OPTION_LABELS.goal))}
+              ${renderPreferenceSelect("profile.horizon", "Zeithorizont", prefs.profile.horizon, Object.entries(PROFILE_OPTION_LABELS.horizon))}
+              ${renderPreferenceSelect("profile.risk", "Risikotoleranz", prefs.profile.risk, Object.entries(PROFILE_OPTION_LABELS.risk))}
+              ${renderPreferenceSelect("profile.experience", "Erfahrung", prefs.profile.experience, Object.entries(PROFILE_OPTION_LABELS.experience))}
+            </div>
+            <div class="preference-subblock">
+              <span class="card-label">Fokusbereiche</span>
+              <div class="chip-row">
+                ${Object.entries(PROFILE_OPTION_LABELS.focus).map(([value, label]) => `<button class="chip ${prefs.profile.focus.includes(value) ? "active" : ""}" type="button" data-profile-focus="${escAttr(value)}">${esc(label)}</button>`).join("")}
+              </div>
+            </div>
+          </article>
+
+          <article class="card preference-card">
+            <span class="card-label">Anzeigeeinstellungen</span>
+            <h3>Kompakter oder erklärender arbeiten</h3>
+            <p>Dark/Light Mode bleibt oben im Header. Diese Optionen steuern Detailgrad, Formate und Datenstatus-Hinweise.</p>
+            <div class="form-grid">
+              ${renderPreferenceSelect("display.detail", "Detailgrad", prefs.display.detail, [["compact", "kompakt"], ["normal", "normal"], ["detailed", "detailliert"]])}
+              ${renderPreferenceSelect("display.numberFormat", "Zahlenformat", prefs.display.numberFormat, [["de", "Deutsch"], ["en", "Englisch"]])}
+              ${renderPreferenceSelect("display.currency", "Hauptwährung", prefs.display.currency, [["EUR", "EUR"], ["USD", "USD"]])}
+              ${renderPreferenceSelect("display.performanceView", "Darstellung", prefs.display.performanceView, [["percentFirst", "Prozent zuerst"], ["amountFirst", "Betrag zuerst"]])}
+              ${renderPreferenceSelect("display.dataStatus", "Datenstatus-Hinweise", prefs.display.dataStatus, [["compact", "kompakt"], ["normal", "normal"], ["detailed", "ausführlich"]])}
+              ${renderPreferenceCheckbox("display.beginnerHelp", "Anfänger-Erklärungen anzeigen", prefs.display.beginnerHelp)}
+            </div>
+            ${prefs.display.beginnerHelp ? renderBeginnerExplanationPreview() : `<p class="small preference-help-note">Anfänger-Erklärungen sind aus. Die Oberfläche bleibt kompakter.</p>`}
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderModulePreferenceRow(module, priority) {
+    return `
+      <div class="module-preference-row">
+        <div>
+          <strong>${esc(module.label)}</strong>
+          <small>${esc(module.description)}</small>
+        </div>
+        <div class="segmented-actions">
+          ${["high", "normal", "hidden"].map((value) => `
+            <button class="chip ${priority === value ? "active" : ""}" type="button" data-module-pref="${escAttr(module.id)}" data-module-priority="${escAttr(value)}">${esc(modulePriorityLabel(value))}</button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPreferenceSelect(name, label, value, options) {
+    return `
+      <label class="field">
+        <span>${esc(label)}</span>
+        <select data-pref-control name="${escAttr(name)}">
+          ${options.map(([optionValue, optionLabel]) => `<option value="${escAttr(optionValue)}" ${String(value) === String(optionValue) ? "selected" : ""}>${esc(optionLabel)}</option>`).join("")}
+        </select>
+      </label>
+    `;
+  }
+
+  function renderPreferenceNumber(name, label, value, attrs = "") {
+    return `
+      <label class="field">
+        <span>${esc(label)}</span>
+        <input data-pref-control name="${escAttr(name)}" type="number" value="${escAttr(value)}" ${attrs}>
+      </label>
+    `;
+  }
+
+  function renderPreferenceCheckbox(name, label, checked) {
+    return `
+      <label class="field checkbox-field">
+        <span>${esc(label)}</span>
+        <input data-pref-control name="${escAttr(name)}" type="checkbox" ${checked ? "checked" : ""}>
+      </label>
+    `;
+  }
+
+  function renderScreenerPreferences(prefs) {
+    return `
+      <article class="card preference-card">
+        <span class="card-label">Screener</span>
+        <h3>Filter & Sortierung</h3>
+        <div class="form-grid one-column">
+          ${renderPreferenceSelect("defaults.screener.sort", "Sortierung", prefs.defaults.screener.sort, screenerSortOptions())}
+          ${renderPreferenceSelect("defaults.screener.assetType", "Asset-Typ", prefs.defaults.screener.assetType, screenerAssetTypeOptions())}
+          ${renderPreferenceSelect("defaults.screener.region", "Region", prefs.defaults.screener.region, screenerRegionOptions())}
+          ${renderPreferenceSelect("defaults.screener.sector", "Sektor", prefs.defaults.screener.sector, screenerSectorOptions())}
+          ${renderPreferenceSelect("defaults.screener.style", "Stil", prefs.defaults.screener.style, screenerStyleOptions())}
+          ${renderPreferenceSelect("defaults.screener.marketCap", "Asset-Klasse", prefs.defaults.screener.marketCap, screenerMarketCapOptions())}
+          ${renderPreferenceSelect("defaults.screener.dataStatus", "Datenstatus", prefs.defaults.screener.dataStatus, screenerDataStatusOptions())}
+          ${renderPreferenceSelect("defaults.screener.personal", "Watchlist / Favoriten", prefs.defaults.screener.personal, [["all", "ohne persoenlichen Filter"], ["watchlist", "nur Watchlist"], ["favorites", "nur Favoriten"]])}
+          ${renderPreferenceSelect("defaults.screener.eventContext", "Event-Kontext", prefs.defaults.screener.eventContext, screenerEventOptions())}
+          ${renderPreferenceSelect("defaults.screener.performance", "Performance", prefs.defaults.screener.performance, [["all", "Alle"], ["positive", "1M positiv"], ["strong", "1M > 5%"], ["weak", "1M < 0%"]])}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderEventPreferences(prefs) {
+    return `
+      <article class="card preference-card">
+        <span class="card-label">Event-Hub</span>
+        <h3>Zeitraum & Filter</h3>
+        <div class="form-grid one-column">
+          ${renderPreferenceSelect("defaults.eventHub.window", "Zeitraum", prefs.defaults.eventHub.window, [["today", "heute"], ["week", "diese Woche"], ["next", "nächste Woche"]])}
+          ${renderPreferenceSelect("defaults.eventHub.type", "Typ", prefs.defaults.eventHub.type, [["all", "alle"], ["earnings", "Earnings"], ["dividend", "Dividenden"], ["macro", "Makro"], ["ipo", "IPO"]])}
+          ${renderPreferenceSelect("defaults.eventHub.scope", "Bereich", prefs.defaults.eventHub.scope, [["all", "alle"], ["watchlist", "nur Watchlist"], ["stock", "nur Aktie"], ["macro", "nur Makro"]])}
+          ${renderPreferenceSelect("defaults.eventHub.relevance", "Relevanz", prefs.defaults.eventHub.relevance, [["all", "alle"], ["high", "hoch"], ["medium", "mindestens mittel"]])}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderEtfPreferences(prefs) {
+    return `
+      <article class="card preference-card">
+        <span class="card-label">ETF</span>
+        <h3>Vergleich & Kostenannahmen</h3>
+        <div class="form-grid one-column">
+          ${renderPreferenceSelect("defaults.etf.left", "ETF A", prefs.defaults.etf.left, ETF_DATA.map((etf) => [etf.symbol, `${etf.symbol} - ${etf.name}`]))}
+          ${renderPreferenceSelect("defaults.etf.right", "ETF B", prefs.defaults.etf.right, ETF_DATA.map((etf) => [etf.symbol, `${etf.symbol} - ${etf.name}`]))}
+          ${renderPreferenceNumber("defaults.etf.amount", "Anlagebetrag", prefs.defaults.etf.amount)}
+          ${renderPreferenceNumber("defaults.etf.monthly", "Sparplan monatlich", prefs.defaults.etf.monthly)}
+          ${renderPreferenceNumber("defaults.etf.years", "Laufzeit Jahre", prefs.defaults.etf.years)}
+          ${renderPreferenceNumber("defaults.etf.returnRate", "Renditeannahme %", prefs.defaults.etf.returnRate, `step="0.1"`)}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderPortfolioPreferences(prefs) {
+    return `
+      <article class="card preference-card">
+        <span class="card-label">Portfolio</span>
+        <h3>Standardportfolio</h3>
+        <div class="form-grid one-column">
+          ${renderPreferenceSelect("defaults.portfolio.activePortfolioId", "Portfolio", prefs.defaults.portfolio.activePortfolioId, state.portfolios.map((portfolio) => [portfolio.id, `${portfolio.name} (${portfolio.type === "real" ? "Echtgeld" : "Test"})`]))}
+          ${renderPreferenceSelect("defaults.portfolio.view", "Ansicht", prefs.defaults.portfolio.view, [["overview", "Übersicht"], ["risk", "Risiko"], ["exposure", "Exposure"], ["positions", "Positionen"]])}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderComparePreferences(prefs) {
+    return `
+      <article class="card preference-card">
+        <span class="card-label">Quick Compare</span>
+        <h3>Bevorzugtes Paar</h3>
+        <div class="form-grid one-column">
+          <label class="field"><span>Asset A</span><select data-pref-control name="defaults.compare.left">${compareOptions(prefs.defaults.compare.left)}</select></label>
+          <label class="field"><span>Asset B</span><select data-pref-control name="defaults.compare.right">${compareOptions(prefs.defaults.compare.right)}</select></label>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderReportPreferences(prefs) {
+    return `
+      <article class="card preference-card">
+        <span class="card-label">Reports</span>
+        <h3>Export-Standard</h3>
+        <div class="form-grid one-column">
+          ${renderPreferenceSelect("defaults.reports.type", "Report-Typ", prefs.defaults.reports.type, [["asset", "Asset"], ["portfolio", "Portfolio"], ["etf", "ETF"], ["macro", "Makro"], ["dailyRecap", "Tages-Recap"], ["watchlist", "Watchlist"]])}
+          ${renderPreferenceCheckbox("defaults.reports.showDataStatus", "Datenstatus standardmäßig zeigen", prefs.defaults.reports.showDataStatus)}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderBeginnerExplanationPreview() {
+    const terms = [
+      ["KGV", "Bewertung im Verhältnis zum Gewinn."],
+      ["TER", "laufende ETF-Kosten pro Jahr."],
+      ["Yield Curve", "Vergleich kurzer und langer Zinsen."],
+      ["Realzins", "Zins minus Inflation als grobe Näherung."],
+      ["Hybrid", "Mischung aus echten Daten und lokaler Logik."]
+    ];
+    return `
+      <div class="preference-help-list">
+        ${terms.map(([term, text]) => `<div class="insight-row"><span class="pill">${esc(term)}</span><p>${esc(text)}</p></div>`).join("")}
+      </div>
+    `;
+  }
+
+  function routeLabel(route) {
+    const module = HOME_MODULE_CATALOG.find((item) => item.route === route);
+    if (module) return module.label;
+    if (route === "legal") return "Rechtliches";
+    if (route === "settings") return "Datenquellen";
+    if (route === "data-health") return "Data Health";
+    return capitalize(route);
+  }
+
+  function renderLegalPage() {
+    app.innerHTML = `
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Launch-Readiness</p>
+            <h1>Rechtliches vorbereiten.</h1>
+            <p>Platzhalter fuer Impressum, Datenschutz und Disclaimer. Der Betreiber muss diese Inhalte vor oeffentlicher Nutzung rechtlich pruefen und final ausfuellen.</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="legal-grid">
+          <article class="card legal-card">
+            <span class="card-label">Impressum</span>
+            <h3>Betreiberangaben fehlen noch</h3>
+            <p>Bitte vor dem Launch final ausfuellen und rechtlich pruefen lassen.</p>
+            <ul class="clean-list">
+              <li>Betreibername: [bitte eintragen]</li>
+              <li>Adresse: [bitte eintragen]</li>
+              <li>Kontakt: [bitte eintragen]</li>
+              <li>Vertretungsberechtigte Person / Unternehmensangaben: [falls relevant eintragen]</li>
+            </ul>
+          </article>
+          <article class="card legal-card">
+            <span class="card-label">Datenschutz</span>
+            <h3>Lokale Nutzung transparent erklaert</h3>
+            <p>MH Analytics speichert normale Nutzerpraeferenzen, Watchlist, Portfolio, Alerts, Learning-Fortschritt und Exportdaten lokal im Browser. Es gibt aktuell kein Login, keinen Cloud-Sync und keine Konten.</p>
+            <ul class="clean-list">
+              <li>Geheime Betreiber-Konfiguration wird nicht im Browser gespeichert.</li>
+              <li>Setup-Export enthaelt lokale Nutzerdaten, keine Provider-Secrets.</li>
+              <li>Vercel oder ein anderer Hoster kann technisch notwendige Serverlogs fuehren.</li>
+              <li>Tracking/Cookies nur ergaenzen, falls sie spaeter wirklich genutzt werden.</li>
+            </ul>
+          </article>
+          <article class="card legal-card">
+            <span class="card-label">Disclaimer</span>
+            <h3>Keine Anlageberatung</h3>
+            <p>Daten, Scores, Reports, Top Picks, Alerts und Einordnungen dienen nur der Information. Sie sind keine persoenliche Empfehlung und keine Aufforderung zum Kaufen, Verkaufen oder Halten.</p>
+            <ul class="clean-list">
+              <li>Daten koennen verzoegert, unvollstaendig oder fehlerhaft sein.</li>
+              <li>Fallback-, Hybrid- und lokale Produktlogik sind im Datenstatus sichtbar.</li>
+              <li>Entscheidungen liegen immer beim Nutzer.</li>
+              <li>Quellen- und Datenstatus vor Entscheidungen beachten.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
   function renderSettingsPage() {
     const publicProviders = visibleProviders();
     const serverSideCount = publicProviders.filter((provider) => provider.keyMode === "serverEnv").length;
@@ -5661,27 +9060,26 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">Datenquellen</p>
-            <h1>Quellenstatus statt öffentlicher API-Key-Verwaltung.</h1>
-            <p>Normale Nutzer sehen hier keine editierbaren Schlüssel mehr. MH Analytics zeigt nur noch, welche Quellen welche Module bedienen, ob sie serverseitig, als Open Data oder hybrid eingeordnet sind und ob gerade Live-, Fallback- oder Teilstatus aktiv ist.</p>
+            <h1>Datenquellen und Quellenstatus.</h1>
+            <p>Normale Nutzer sehen hier ausschließlich lesbare Informationen: welche Quellen welche Module bedienen, ob sie serverseitig, als Open Data oder hybrid eingeordnet sind und ob gerade Live-, Fallback- oder Teilstatus aktiv ist.</p>
           </div>
           <div class="row-actions">
-            <button class="ghost-button" type="button" data-clear-cache>Daten-Cache leeren</button>
             <button class="ghost-button" type="button" data-route="data-health">Datenstatus öffnen</button>
           </div>
         </div>
         <div class="provider-summary-grid">
-          ${renderProviderSummary("Kernquellen", publicProviders.length, "Öffentliche Quellenübersicht ohne Key-Felder")}
-          ${renderProviderSummary("Serverseitig", serverSideCount, "FRED, Finnhub, Alpha Vantage und EIA laufen mit Environment Variables")}
-          ${renderProviderSummary("Open Data", openDataCount, "Kein Key-Feld nötig")}
-          ${renderProviderSummary("Hybrid / später", hybridCount, "Eingeordnet, aber nicht als öffentliche Key-Konfiguration")}
+          ${renderProviderSummary("Kernquellen", publicProviders.length, "Öffentliche Quellenübersicht ohne Eingabefelder")}
+          ${renderProviderSummary("Serverseitig", serverSideCount, "FRED, Finnhub, Alpha Vantage und EIA laufen über eigene /api/... Routen")}
+          ${renderProviderSummary("Open Data", openDataCount, "Offizielle Datenquellen ohne Nutzerkonfiguration")}
+          ${renderProviderSummary("Hybrid / später", hybridCount, "Eingeordnet, aber nicht vollständig live in allen Modulen")}
         </div>
         ${renderProviderHealthPreview()}
         <article class="card provider-warning-card">
           <div>
-            <h3>Warum keine öffentlichen Key-Felder mehr?</h3>
-            <p>API-Keys gehören nicht in eine öffentliche Oberfläche. Sensible Quellen laufen deshalb serverseitig über Vercel Functions; Open-Data-Quellen werden zentral normalisiert. Das Frontend erhält nur Daten und Statushinweise.</p>
+            <h3>Reine Transparenzseite</h3>
+            <p>Diese öffentliche Ansicht ist bewusst nicht editierbar. Sensible Betreiber-Einstellungen bleiben außerhalb der Nutzeroberfläche; Open-Data-Quellen werden zentral normalisiert. Das Frontend erhält nur Daten und Statushinweise.</p>
           </div>
-          ${renderDataMeta(makeMeta("Vercel Environment Variables", "fallback", BOOT_TIME), true)}
+          ${renderDataMeta(makeMeta("Serverseitige Datenebene", "fallback", BOOT_TIME), true)}
         </article>
       </section>
       <section class="section">
@@ -5700,7 +9098,7 @@
           <div>
             <p class="eyebrow">Data Health</p>
             <h1>Quellen, Frische und Modulstatus transparent.</h1>
-            <p>Diese Seite zeigt f\u00fcr normale Nutzer, woher Daten kommen, wie belastbar sie gerade sind und welche Module live, hybrid oder fallback-gest\u00fctzt arbeiten. Keine Keys, keine Testbuttons, keine \u00f6ffentliche Konfiguration.</p>
+            <p>Diese Seite zeigt f\u00fcr normale Nutzer, woher Daten kommen, wie belastbar sie gerade sind und welche Module live, hybrid oder fallback-gest\u00fctzt arbeiten. Sie ist eine reine Transparenzansicht ohne Betreiber-Konfiguration.</p>
           </div>
           <div class="row-actions">
             <button class="ghost-button" type="button" data-route="settings">Datenquellen ansehen</button>
@@ -5747,7 +9145,7 @@
         <div class="data-health-meta health-summary-meta">
           <span><strong>Letzter Statuscheck:</strong> ${esc(formatTimestamp(snapshot.lastGlobalUpdate))}</span>
           <span><strong>Einordnung:</strong> heuristisch aus echten Provider-Statuswerten, Cache-Zeiten und Modulzuordnungen abgeleitet.</span>
-          <span><strong>Sicherheit:</strong> API-Keys bleiben serverseitig; normale Nutzer sehen nur Transparenzinformationen.</span>
+          <span><strong>Sicherheit:</strong> Sensible Betreiber-Konfiguration bleibt serverseitig; normale Nutzer sehen nur Transparenzinformationen.</span>
         </div>
       </article>
     `;
@@ -6029,7 +9427,7 @@
     const provider = entry.provider || entry;
     const health = entry.health || providerHealthFor(provider.id);
     const source = entry.source || sourceRegistryFor(provider.id);
-    const keyState = providerKeyState(provider);
+    const accessState = providerAccessState(provider);
     const modules = PROVIDER_MODULE_USAGE[provider.id] || provider.categories;
     const freshness = freshnessForHealth(health);
     const healthState = healthStateForStatus(health.status);
@@ -6044,7 +9442,7 @@
         <div class="provider-readiness">
           <span class="status-badge status-hybrid">${esc(source.type || providerSourceType(provider))}</span>
           <span class="status-badge status-${escAttr(healthState.status)}">${esc(healthState.label)}</span>
-          ${renderProviderKeyBadge(keyState)}
+          ${renderProviderAccessBadge(accessState)}
           ${renderProviderLiveBadge(health)}
         </div>
         <div class="module-chip-row">
@@ -6114,9 +9512,8 @@
   }
 
   function renderProviderCard(provider) {
-    const test = providerTestFor(provider.id);
     const security = providerSecurityLabel(provider.security);
-    const keyState = providerKeyState(provider);
+    const accessState = providerAccessState(provider);
     const health = providerHealthFor(provider.id);
     const sourceType = providerSourceType(provider);
     return `
@@ -6135,67 +9532,17 @@
         <p class="small"><strong>Nutzung:</strong> ${esc(provider.usage)}</p>
         <div class="provider-readiness">
           <span class="status-badge status-fallback">${esc(sourceType)}</span>
-          ${renderProviderKeyBadge(keyState)}
+          ${renderProviderAccessBadge(accessState)}
           ${renderProviderLiveBadge(health)}
         </div>
         <div class="provider-module-row">
           ${(PROVIDER_MODULE_USAGE[provider.id] || provider.categories).map((moduleName) => `<span class="module-chip">${esc(moduleName)}</span>`).join("")}
         </div>
-        ${renderProviderDebugDetails(provider, test)}
         <div class="provider-security-note">
           <strong>${esc(security.label)}</strong>
           <span>${esc(security.text)}</span>
         </div>
       </article>
-    `;
-  }
-
-  function renderProviderDebugDetails(provider, test) {
-    if (!provider || provider.id !== "fred" || !test.details) {
-      return "";
-    }
-    const details = test.details;
-    if (details.kind === "fred-vercel-function") {
-      return renderFredProxyDebugDetails(details);
-    }
-    return "";
-  }
-
-  function renderFredProxyDebugDetails(details) {
-    const rows = [
-      ["Codepfad", details.codePath],
-      ["Frontend-Endpoint", details.frontendEndpoint],
-      ["Browser-Origin", details.pageOrigin],
-      ["Server-Key im Frontend", details.frontendKeyExposure],
-      ["Stage", details.stage],
-      ["HTTP-Status", details.httpStatus],
-      ["Content-Type", details.contentType],
-      ["Response-Format", details.responseFormat],
-      ["Parsing", details.parseStatus],
-      ["Function-Fehler", details.functionError || "kein Function-Fehler"],
-      ["FRED-Fehler", details.fredError || "kein FRED-error_message Feld"],
-      ["Hinweis", details.note]
-    ];
-    return `
-      <details class="provider-debug">
-        <summary>FRED Vercel-Function-Diagnose anzeigen</summary>
-        <div class="provider-debug-grid">
-          ${rows.map(([label, value]) => `
-            <span>${esc(label)}</span>
-            <strong>${esc(value ?? "nicht verfügbar")}</strong>
-          `).join("")}
-        </div>
-        ${details.responseBody ? `<pre>${esc(details.responseBody)}</pre>` : ""}
-      </details>
-    `;
-  }
-
-  function renderProviderKeyField(provider, keyValue) {
-    return `
-      <div class="keyless-provider">
-        <span class="pill">${esc(keyModeLabel(provider.keyMode))}</span>
-        <span class="small">Keine öffentliche Key-Konfiguration. Sensible Schlüssel liegen serverseitig oder sind für diese Quelle nicht nötig.</span>
-      </div>
     `;
   }
 
@@ -6217,41 +9564,7 @@
     return PROVIDERS.find((provider) => provider.id === id);
   }
 
-  function providerTestFor(providerId) {
-    const test = state.providerTests[providerId];
-    if (!test) {
-      return {
-        label: "Nicht getestet",
-        className: "test-untested",
-        message: "Noch kein Test ausgeführt.",
-        details: null
-      };
-    }
-    if (test.status === "ok") {
-      return {
-        label: "Test OK",
-        className: "test-ok",
-        message: test.message || "Provider hat geantwortet.",
-        details: test.details || null
-      };
-    }
-    if (test.status === "warn") {
-      return {
-        label: "Hinweis",
-        className: "test-warn",
-        message: test.message || "Provider ist vorbereitet, aber nicht live getestet.",
-        details: test.details || null
-      };
-    }
-    return {
-      label: "Fehler",
-      className: "test-error",
-      message: test.message || "Provider-Test fehlgeschlagen.",
-      details: test.details || null
-    };
-  }
-
-  function providerKeyState(provider) {
+  function providerAccessState(provider) {
     if (!provider) {
       return "missing";
     }
@@ -6280,35 +9593,30 @@
     return "Open Data";
   }
 
-  function renderProviderKeyBadge(stateName) {
+  function renderProviderAccessBadge(stateName) {
     const labels = {
-      none: "Kein Key nötig",
-      serverEnv: "Server-Env",
-      notPublic: "Kein öffentliches Key-Feld",
+      none: "Open Data",
+      serverEnv: "Serverseitig",
+      notPublic: "Nicht öffentlich konfigurierbar",
       present: "Konfiguriert",
-      missing: "Quelle fehlt"
+      missing: "Unbekannt"
     };
     const status = ["present", "none", "serverEnv", "notPublic"].includes(stateName) ? "fallback" : "missing";
-    return `<span class="status-badge status-${status}">${esc(labels[stateName] || "Key unklar")}</span>`;
-  }
-
-  function renderProviderTestBadge(test) {
-    const status = test.className === "test-ok" ? "live" : test.className === "test-error" ? "missing" : "fallback";
-    return `<span class="status-badge status-${status}">${esc(test.label)}</span>`;
+    return `<span class="status-badge status-${status}">${esc(labels[stateName] || "Konfiguration unklar")}</span>`;
   }
 
   function renderProviderLiveBadge(health) {
     const status = health.status || "notUsed";
     const labels = {
       live: "Live",
-      stale: "Teilweise / Cache",
-      fallback: "Fallback aktiv",
-      prepared: "Zugeordnet",
-      mapped: "Zugeordnet",
-      notUsed: "Teilweise / nicht aktiv",
-      missing: "Offline / nicht konfiguriert",
-      error: "Offline / Fehler",
-      disabled: "Nicht öffentlich aktiv"
+      stale: "Hybrid",
+      fallback: "Fallback",
+      prepared: "Unbekannt",
+      mapped: "Unbekannt",
+      notUsed: "Unbekannt",
+      missing: "Offline",
+      error: "Offline",
+      disabled: "Offline"
     };
     const badgeStatus = status === "live" ? "live" : status === "stale" || status === "fallback" || status === "prepared" || status === "mapped" || status === "notUsed" ? "fallback" : "missing";
     return `<span class="status-badge status-${badgeStatus}">${esc(labels[status] || status)}</span>`;
@@ -6385,7 +9693,7 @@
 
   function renderProviderSecurityBadge(security) {
     const labels = {
-      "browser-ok-private": "Browser privat OK",
+      "browser-ok-private": "Privat nicht öffentlich",
       "browser-ok-public": "Public",
       "browser-critical": "Browserkritisch",
       "backend-recommended": "Backend empfohlen",
@@ -6401,12 +9709,12 @@
   function providerSecurityLabel(security) {
     const labels = {
       "browser-ok-private": {
-        label: "Browser-sicher für lokale private Nutzung",
-        text: "Der Key kann lokal gespeichert werden, sollte aber für ein echtes Produkt trotzdem kontrolliert werden."
+        label: "Nicht öffentlich genutzt",
+        text: "Private Betreiber-Konfiguration ist nicht Teil der öffentlichen Website."
       },
       "browser-ok-public": {
-        label: "Public / kein geheimer Key",
-        text: "Dieser Slot ist für öffentliche Daten oder keylose Anbindung vorbereitet."
+        label: "Open Data",
+        text: "Dieser Slot ist für öffentliche Daten oder offene Anbindung vorbereitet."
       },
       "browser-critical": {
         label: "Browserkritisch",
@@ -6414,19 +9722,19 @@
       },
       "backend-recommended": {
         label: "Backend empfohlen",
-        text: "Für Produktion besser per Backend, Proxy oder Edge Function nutzen, damit Keys nicht sichtbar werden."
+        text: "Für Produktion besser per Backend, Proxy oder Edge Function nutzen."
       },
       "backend-only": {
         label: "Backend-only",
-        text: "Nicht direkt aus dem Browser aufrufen. Key/OAuth gehört später serverseitig geschützt."
+        text: "Nicht direkt aus dem Browser aufrufen. Betreiber-Konfiguration bleibt serverseitig geschützt."
       },
       "server-normalized": {
         label: "Serverseitig normalisiert",
-        text: "Die Quelle braucht kein öffentliches Key-Feld. Das Frontend nutzt eine eigene /api/... Route mit einheitlicher Fehlerbehandlung."
+        text: "Das Frontend nutzt eine eigene /api/... Route mit einheitlicher Fehlerbehandlung."
       },
       "proxy-recommended": {
         label: "Proxy empfohlen",
-        text: "Public/Demo kann lokal funktionieren; produktionsnah besser per Key und Proxy/Backend."
+        text: "Public/Demo kann lokal funktionieren; produktionsnah besser per Proxy/Backend."
       },
       "backend-ready": {
         label: "Backend-ready",
@@ -6434,25 +9742,6 @@
       }
     };
     return labels[security] || { label: "Sicherheitsstatus", text: security };
-  }
-
-  function keyModeLabel(mode) {
-    if (mode === "none") {
-      return "Kein Key nötig";
-    }
-    if (mode === "optional") {
-      return "Optionaler Key";
-    }
-    if (mode === "oauth") {
-      return "OAuth / Token Slot";
-    }
-    if (mode === "anon") {
-      return "Anon/Public Key Slot";
-    }
-    if (mode === "serverEnv") {
-      return "Vercel Environment Variable";
-    }
-    return "Kein öffentliches Key-Feld";
   }
 
   async function ensureHomeData(force = false) {
@@ -6478,7 +9767,7 @@
       logError(error);
     } finally {
       state.loadingHome = false;
-      if (["home", "portfolio", "data-health"].includes(state.route)) {
+      if (["home", "portfolio", "data-health", "macro", "liquidity"].includes(state.route)) {
         render();
       }
     }
@@ -6949,7 +10238,7 @@
           recordProviderHealth("fred", "fallback", error.message || "FRED Live-Abruf fehlgeschlagen.");
         }
       } else {
-        recordProviderHealth("fred", "fallback", "FRED Vercel Function ist im lokalen Datei-Modus nicht verfügbar. Makro nutzt BLS/Treasury/Open-Data und Fallbacks.");
+        recordProviderHealth("fred", "fallback", "FRED läuft serverseitig und ist im lokalen Datei-Modus nicht verfügbar. Makro nutzt BLS/Treasury/Open-Data und Fallbacks.");
       }
 
       const openDataRows = await Promise.allSettled([
@@ -6972,6 +10261,8 @@
       const rows = [];
       const wb = await fetchWorldBankGrowthRows();
       rows.push(...wb);
+      const debt = await fetchWorldBankDebtRows();
+      rows.push(...debt);
       const imf = await fetchImfGrowthRows();
       rows.push(...imf);
       return rows.length ? rows : fallbackGlobalMacro("Globale Open-Data-Quellen nicht erreichbar. Lokaler Vergleich aktiv.");
@@ -7110,6 +10401,16 @@
       const y2 = firstNumber(row?.y2);
       const y10 = firstNumber(row?.y10);
       const rows = [];
+      if (y2 !== null) {
+        rows.push({
+          id: "DGS2",
+          label: "US 2Y Yield",
+          value: y2,
+          display: `${formatNumber(y2)}%`,
+          trend: "Serverseitig aus Treasury Daily Rates",
+          meta: makeMeta(result.data?.meta?.source || "U.S. Treasury via Vercel Open-Data-Normalisierung", result.status, result.timestamp)
+        });
+      }
       if (y10 !== null) {
         rows.push({
           id: "DGS10",
@@ -7141,7 +10442,7 @@
 
   async function fetchFxMacroRows() {
     try {
-      const result = await cachedJson("fx:usd:core", fxProxyUrl({ base: "USD", quotes: "EUR,JPY,GBP" }), CACHE_TTL.openData, "frankfurter");
+      const result = await cachedJson("fx:usd:core", fxProxyUrl({ base: "USD", quotes: "EUR,JPY,GBP,CNY" }), CACHE_TTL.openData, "frankfurter");
       const rates = result.data?.rates || {};
       const rows = [];
       if (Number.isFinite(Number(rates.EUR)) && Number(rates.EUR) !== 0) {
@@ -7165,6 +10466,16 @@
           meta: makeMeta(result.data?.meta?.source || "Frankfurter FX via Vercel Function", result.status, result.timestamp)
         });
       }
+      if (Number.isFinite(Number(rates.CNY))) {
+        rows.push({
+          id: "USDCNY",
+          label: "USD/CNY",
+          value: Number(rates.CNY),
+          display: formatNumber(Number(rates.CNY)),
+          trend: "Serverseitig aus Frankfurter FX",
+          meta: makeMeta(result.data?.meta?.source || "Frankfurter FX via Vercel Function", result.status, result.timestamp)
+        });
+      }
       return rows;
     } catch (error) {
       logError(error);
@@ -7181,9 +10492,9 @@
       rows
         .filter((row) => row.value !== null && row.country?.value)
         .forEach((row) => {
-          const name = row.country.value;
+          const name = normalizeMacroCountryName(row.country.value);
           if (!latestByCountry[name] || Number(row.date) > Number(latestByCountry[name].date)) {
-            latestByCountry[name] = row;
+            latestByCountry[name] = { ...row, country: { value: name } };
           }
         });
       return Object.values(latestByCountry).map((row) => ({
@@ -7198,6 +10509,35 @@
     } catch (error) {
       logError(error);
       recordProviderHealth("worldBank", "fallback", "World Bank API nicht erreichbar, globaler Fallback aktiv.");
+      return [];
+    }
+  }
+
+  async function fetchWorldBankDebtRows() {
+    try {
+      const result = await cachedJson("opendata:worldbank:debt", openDataProxyUrl({ source: "worldbank-debt" }), CACHE_TTL.openData, "worldBank");
+      const rows = Array.isArray(result.data?.data) ? result.data.data : [];
+      const latestByCountry = {};
+      rows
+        .filter((row) => row.value !== null && row.country?.value)
+        .forEach((row) => {
+          const name = normalizeMacroCountryName(row.country.value);
+          if (!latestByCountry[name] || Number(row.date) > Number(latestByCountry[name].date)) {
+            latestByCountry[name] = { ...row, country: { value: name } };
+          }
+        });
+      return Object.values(latestByCountry).map((row) => ({
+        country: row.country.value,
+        indicator: "Staatsverschuldung",
+        value: Number(row.value),
+        display: `${formatNumber(Number(row.value))}%`,
+        source: result.data?.meta?.source || "World Bank via Vercel Open-Data-Normalisierung",
+        status: result.status,
+        meta: makeMeta(result.data?.meta?.source || "World Bank via Vercel Open-Data-Normalisierung", result.status, result.timestamp)
+      }));
+    } catch (error) {
+      logError(error);
+      recordProviderHealth("worldBank", "fallback", "World Bank Debt-to-GDP nicht erreichbar, Fallback bleibt aktiv.");
       return [];
     }
   }
@@ -7654,12 +10994,400 @@
     return LIQUIDITY_IMPACT_MAP;
   }
 
+  function macroCountryComparisonForView() {
+    const macroRows = new Map(macroEnhancedForView().map((item) => [item.id, item]));
+    const globalRows = state.globalMacro.length ? state.globalMacro : fallbackGlobalMacro("Globale Open-Data-Fallbacks aktiv.");
+    const countries = MACRO_COUNTRY_BASELINES.map((baseline) => macroCountryForView(baseline, macroRows, globalRows));
+    const control = macroControlForView(countries);
+    const status = combinedDataStatus(countries.map((country) => country.meta.status));
+    const sourceRows = macroSourceRowsForView(countries, macroRows, globalRows);
+    return {
+      countries,
+      control,
+      status,
+      sourceRows,
+      rates: macroRatesSummary(countries),
+      growth: macroGrowthSummary(countries),
+      liquidity: macroLiquiditySummary(countries, macroRows),
+      assetImplications: macroAssetImplicationsForView(countries, control)
+    };
+  }
+
+  function macroCountryForView(baseline, macroRows, globalRows) {
+    const fallbackMeta = makeMeta(baseline.source, baseline.status, BOOT_TIME, "Strukturierter Länderfallback; Live/OpenData überschreibt einzelne Felder.");
+    const gdpRow = globalMacroRowFor(globalRows, baseline.name, "BIP");
+    const debtRow = globalMacroRowFor(globalRows, baseline.name, "Staats");
+    const country = {
+      ...baseline,
+      gdp: macroField("BIP-Wachstum", gdpRow?.value ?? baseline.gdp, "%", gdpRow?.meta || fallbackMeta, gdpRow?.source || baseline.source),
+      inflation: macroField("Inflation", baseline.inflation, "%", fallbackMeta, baseline.source),
+      unemployment: macroField("Arbeitslosenquote", baseline.unemployment, "%", fallbackMeta, baseline.source),
+      policyRate: macroField("Leitzins / Zinsniveau", baseline.policyRate, "%", fallbackMeta, baseline.source),
+      yield2: macroField("2-jährige Rendite", baseline.yield2, "%", fallbackMeta, baseline.source),
+      yield10: macroField("10-jährige Rendite", baseline.yield10, "%", fallbackMeta, baseline.source),
+      debt: macroField("Staatsverschuldung / BIP", debtRow?.value ?? baseline.debt, "%", debtRow?.meta || fallbackMeta, debtRow?.source || baseline.source),
+      liquidity: macroField("Geldmenge / Liquidität", baseline.liquidity, "%", fallbackMeta, baseline.source),
+      fx: macroField(baseline.fxLabel, baseline.fxValue, "", fallbackMeta, baseline.source, baseline.fxDisplay)
+    };
+
+    if (baseline.id === "usa") {
+      country.inflation = macroFieldFromRow(macroRows.get("CPIAUCSL"), country.inflation);
+      country.unemployment = macroFieldFromRow(macroRows.get("UNRATE"), country.unemployment);
+      country.policyRate = macroFieldFromRow(macroRows.get("FEDFUNDS"), country.policyRate);
+      country.yield2 = macroFieldFromRow(macroRows.get("DGS2"), country.yield2);
+      country.yield10 = macroFieldFromRow(macroRows.get("DGS10"), country.yield10);
+      country.liquidity = macroFieldFromRow(macroRows.get("M2"), country.liquidity);
+      country.fx = macroFieldFromRow(macroRows.get("DXY"), country.fx);
+    }
+
+    if (baseline.id === "eurozone" || baseline.id === "germany") {
+      country.policyRate = macroFieldFromRow(macroRows.get("ECB"), country.policyRate);
+      country.liquidity = macroFieldFromRow(macroRows.get("M3"), country.liquidity);
+      country.fx = macroFieldFromRow(macroRows.get("EURUSD"), country.fx);
+    }
+
+    if (baseline.id === "china") {
+      country.fx = macroFieldFromRow(macroRows.get("USDCNY"), country.fx);
+    }
+
+    country.realRate = computedMacroField("Realzins-Näherung", country.yield10.value - country.inflation.value, "%", [country.yield10.meta, country.inflation.meta], "10Y-Rendite minus Inflation; vereinfachte Näherung.");
+    country.yieldCurve = computedMacroField("Yield Curve 2Y-10Y", country.yield10.value - country.yield2.value, "%", [country.yield10.meta, country.yield2.meta], "10Y minus 2Y; negative Werte zeigen Inversion/Anspannung.");
+    addMacroFieldComments(country);
+    country.risk = macroCountryRisk(country);
+    country.meta = makeMeta(country.dataRole, combinedDataStatus([
+      country.gdp.meta.status,
+      country.inflation.meta.status,
+      country.unemployment.meta.status,
+      country.policyRate.meta.status,
+      country.yield10.meta.status,
+      country.debt.meta.status,
+      country.fx.meta.status
+    ]), latestMetaTimestamp([country.gdp.meta, country.inflation.meta, country.unemployment.meta, country.policyRate.meta, country.yield10.meta, country.debt.meta, country.fx.meta]), `${country.name}: ${country.risk.summary}`);
+    return country;
+  }
+
+  function macroField(label, value, suffix, meta, source, display = "") {
+    const number = Number(value);
+    return {
+      label,
+      value: Number.isFinite(number) ? number : 0,
+      display: display || `${formatNumber(number)}${suffix}`,
+      meta: meta || makeMeta(source || "Lokaler Makro-Fallback", "fallback", BOOT_TIME),
+      source: source || meta?.source || "Lokaler Makro-Fallback",
+      comment: "Datenlage eingeschränkt"
+    };
+  }
+
+  function macroFieldFromRow(row, fallback) {
+    if (!row || !Number.isFinite(Number(row.value))) {
+      return fallback;
+    }
+    return {
+      ...fallback,
+      value: Number(row.value),
+      display: row.display || fallback.display,
+      meta: row.meta || fallback.meta,
+      source: row.meta?.source || row.source || fallback.source,
+      trend: row.trend || fallback.trend
+    };
+  }
+
+  function computedMacroField(label, value, suffix, metas, message) {
+    const status = combinedDataStatus((metas || []).map((meta) => meta?.status));
+    return {
+      label,
+      value: Number.isFinite(Number(value)) ? Number(value) : 0,
+      display: `${formatNumber(value)}${suffix}`,
+      meta: makeMeta(message, status === "live" ? "hybrid" : status, latestMetaTimestamp(metas), message),
+      source: message,
+      comment: ""
+    };
+  }
+
+  function addMacroFieldComments(country) {
+    country.inflation.comment = inflationMacroComment(country.inflation.value);
+    country.unemployment.comment = laborMacroComment(country.unemployment.value);
+    country.policyRate.comment = rateMacroComment(country.policyRate.value);
+    country.yield10.comment = rateMacroComment(country.yield10.value);
+    country.realRate.comment = realRateMacroComment(country.realRate.value);
+    country.yieldCurve.comment = yieldCurveMacroComment(country.yieldCurve.value);
+    country.gdp.comment = growthMacroComment(country.gdp.value);
+    country.debt.comment = debtMacroComment(country.debt.value);
+    country.fx.comment = fxMacroComment(country);
+    country.liquidity.comment = liquidityMacroComment(country.liquidity.value);
+  }
+
+  function macroControlForView(countries) {
+    const avgRisk = average(countries.map((country) => country.risk.score));
+    const avgInflation = average(countries.map((country) => country.inflation.value));
+    const avgPolicy = average(countries.map((country) => country.policyRate.value));
+    const avgGrowth = average(countries.map((country) => country.gdp.value));
+    const avgLiquidity = average(countries.map((country) => country.liquidity.value));
+    const score = clamp(100 - avgRisk, 0, 100);
+    const riskTone = avgRisk >= 58 ? "bear" : avgRisk >= 38 ? "neutral" : "bull";
+    const label = avgInflation >= 3.5 ? "inflationskritisch / restriktiv"
+      : avgPolicy >= 4 && avgGrowth < 1.5 ? "restriktiv und wachstumssensibel"
+        : avgLiquidity > 2.5 && avgRisk < 45 ? "risikofreundlicher"
+          : avgGrowth < 1 ? "wachstumsschwach"
+            : "neutral bis restriktiv";
+    const drivers = macroRiskDrivers(countries).slice(0, 4);
+    return {
+      score,
+      tone: riskTone,
+      label,
+      summary: `Makrobild heuristisch: durchschnittliches Risiko ${formatNumber(avgRisk)}/100. Die Einordnung kombiniert Inflation, Zinsen, Realzins, Wachstum, Arbeitsmarkt, Liquidität, FX und Verschuldung.`,
+      drivers,
+      tiles: [
+        { label: "Inflation", value: inflationMacroComment(avgInflation), text: `Schnitt ${formatNumber(avgInflation)}%` },
+        { label: "Zinsen", value: avgPolicy >= 4 ? "restriktiv" : avgPolicy >= 2 ? "neutral/restriktiv" : "locker", text: `Leitzins-Schnitt ${formatNumber(avgPolicy)}%` },
+        { label: "Wachstum", value: growthMacroComment(avgGrowth), text: `BIP-Schnitt ${formatNumber(avgGrowth)}%` },
+        { label: "Arbeitsmarkt", value: laborMacroComment(average(countries.map((country) => country.unemployment.value))), text: "Arbeitslosigkeit als Stabilitätsproxy" },
+        { label: "Liquidität", value: liquidityMacroComment(avgLiquidity), text: `Geldmengen-/Liquiditätsproxy ${formatNumber(avgLiquidity)}%` },
+        { label: "Risikoampel", value: macroRiskLabel(avgRisk).label, text: drivers.map((item) => item.label).join(", ") || "keine dominanten Treiber" }
+      ]
+    };
+  }
+
+  function macroRiskDrivers(countries) {
+    const drivers = [];
+    const usa = countries.find((country) => country.id === "usa");
+    const weakestGrowth = countries.slice().sort((a, b) => a.gdp.value - b.gdp.value)[0];
+    const highestInflation = countries.slice().sort((a, b) => b.inflation.value - a.inflation.value)[0];
+    const highestDebt = countries.slice().sort((a, b) => b.debt.value - a.debt.value)[0];
+    if (highestInflation) {
+      drivers.push({ label: "Inflation", tone: highestInflation.inflation.value >= 3 ? "bear" : "neutral", text: `${highestInflation.name} mit ${highestInflation.inflation.display}: ${highestInflation.inflation.comment}.` });
+    }
+    if (usa && usa.yieldCurve.value < 0) {
+      drivers.push({ label: "Yield Curve", tone: "bear", text: `US-Kurve liegt bei ${usa.yieldCurve.display}; das ist ein Wachstums-/Stresssignal, keine Prognose.` });
+    }
+    if (weakestGrowth) {
+      drivers.push({ label: "Wachstum", tone: weakestGrowth.gdp.value < 1 ? "bear" : "neutral", text: `${weakestGrowth.name} wirkt beim Wachstum am schwächsten: ${weakestGrowth.gdp.display}.` });
+    }
+    if (highestDebt) {
+      drivers.push({ label: "Fiskal", tone: highestDebt.debt.value >= 100 ? "bear" : "neutral", text: `${highestDebt.name} hat den höchsten Schuldenwert im Vergleich: ${highestDebt.debt.display}.` });
+    }
+    return drivers;
+  }
+
+  function macroRatesSummary(countries) {
+    const usa = countries.find((country) => country.id === "usa") || countries[0];
+    const avgReal = average(countries.map((country) => country.realRate.value));
+    const label = usa.yieldCurve.value < -0.25 ? "US-Kurve invers / angespannt" : avgReal > 1 ? "Realzinsen positiv" : "Zinslage gemischt";
+    return {
+      label,
+      value: usa ? `US 2Y-10Y ${usa.yieldCurve.display}` : "--",
+      tone: usa && usa.yieldCurve.value < 0 ? "bear" : avgReal > 1 ? "neutral" : "bull",
+      text: "Zinsniveau, Yield Curve und Realzins bestimmen Bewertungsdruck, Duration-Risiko und Gold-/Krypto-Kontext."
+    };
+  }
+
+  function macroGrowthSummary(countries) {
+    const avgGrowth = average(countries.map((country) => country.gdp.value));
+    const avgDebt = average(countries.map((country) => country.debt.value));
+    return {
+      label: avgGrowth >= 3 ? "Wachstum solide" : avgGrowth >= 1 ? "Wachstum gemischt" : "Wachstum schwach",
+      value: `BIP ${formatNumber(avgGrowth)}%`,
+      tone: avgGrowth >= 3 ? "bull" : avgGrowth >= 1 ? "neutral" : "bear",
+      text: `Wachstum wird mit Debt-to-GDP kombiniert. Durchschnittliche Verschuldung im Vergleich: ${formatNumber(avgDebt)}%.`
+    };
+  }
+
+  function macroLiquiditySummary(countries, macroRows) {
+    const liquidity = liquidityNarrativeForView();
+    const dxy = macroRows.get("DXY");
+    const eurusd = macroRows.get("EURUSD");
+    return {
+      label: liquidity.label,
+      value: `${formatNumber(liquidity.score)} / 100`,
+      tone: liquidity.tone,
+      text: `${liquidity.summary} FX-Kontext: ${dxy?.display ? `DXY ${dxy.display}` : ""}${eurusd?.display ? `, EUR/USD ${eurusd.display}` : ""}`.replace(/^, /, "")
+    };
+  }
+
+  function macroAssetImplicationsForView(countries, control) {
+    const usa = countries.find((country) => country.id === "usa") || countries[0];
+    const avgLiquidity = average(countries.map((country) => country.liquidity.value));
+    const avgGrowth = average(countries.map((country) => country.gdp.value));
+    const dollarStrong = usa.fx.value >= 104 || usa.fx.display.includes("DXY");
+    return [
+      {
+        asset: "Aktien",
+        signal: control.score >= 60 ? "Selektiv konstruktiv" : "Bewertungsdruck beachten",
+        tone: control.score >= 60 ? "bull" : "neutral",
+        text: "Hohe Zinsen und positive Realzinsen können Multiples bremsen; besseres Wachstum und Liquidität können Risikoassets stützen."
+      },
+      {
+        asset: "Gold",
+        signal: usa.realRate.value > 1 ? "Realzins-Gegenwind" : "Stress-/Inflationsschutz im Fokus",
+        tone: usa.realRate.value > 1 ? "neutral" : "bull",
+        text: "Hohe Realzinsen können Gold belasten; Inflations- oder Stressphasen können die Schutzfunktion wieder wichtiger machen."
+      },
+      {
+        asset: "Anleihen",
+        signal: usa.yieldCurve.value < 0 ? "Kurvenstress sichtbar" : "Zinsniveau beobachten",
+        tone: usa.yieldCurve.value < 0 ? "neutral" : "bull",
+        text: "Fallende Renditen können Duration stützen; inverse Kurven zeigen aber oft Wachstumsrisiko oder späten Zyklus."
+      },
+      {
+        asset: "Krypto",
+        signal: avgLiquidity > 2 ? "Liquidität hilft eher" : "Liquidität bleibt wichtiges Risiko",
+        tone: avgLiquidity > 2 ? "bull" : "neutral",
+        text: "Krypto reagiert häufig stark auf globale Liquidität und Risk-on. Hohe Realzinsen und Risk-off können belasten."
+      },
+      {
+        asset: "Rohstoffe",
+        signal: dollarStrong ? "Dollar-Gegenwind möglich" : "FX-Gegenwind moderater",
+        tone: "neutral",
+        text: "Ein starker Dollar kann Rohstoffe belasten; Wachstum und Energie-Nachfrage bleiben der zweite große Treiber."
+      },
+      {
+        asset: "Währungen",
+        signal: "Zinsdifferenzen dominieren",
+        tone: "neutral",
+        text: "EUR/USD, USD/JPY und USD/CNY helfen, internationale Aktien, ETFs, Gold und Rohstoffe im Währungskontext zu lesen."
+      }
+    ];
+  }
+
+  function macroSourceRowsForView(countries, macroRows, globalRows) {
+    const globalStatus = combinedDataStatus(globalRows.map((row) => row.meta?.status || row.status));
+    return [
+      { label: "US-Makro", meta: macroRows.get("FEDFUNDS")?.meta || macroRows.get("CPIAUCSL")?.meta || makeMeta("FRED/BLS Fallback", "fallback", BOOT_TIME) },
+      { label: "Treasury / Yield Curve", meta: macroRows.get("YCURVE")?.meta || macroRows.get("DGS10")?.meta || makeMeta("Treasury/FRED Fallback", "fallback", BOOT_TIME) },
+      { label: "Globale Länder", meta: makeMeta("World Bank / IMF / lokale Länderbasis", globalStatus, latestMetaTimestamp(globalRows.map((row) => row.meta)), "Wachstum und Verschuldung nutzen OpenData, wo vorhanden.") },
+      { label: "FX / Liquidität", meta: macroRows.get("EURUSD")?.meta || macroRows.get("DXY")?.meta || makeMeta("Frankfurter/FRED/ECB Fallback", "fallback", BOOT_TIME) }
+    ];
+  }
+
+  function globalMacroRowFor(rows, country, indicator) {
+    const normalizedCountry = normalizeMacroCountryName(country);
+    const normalizedIndicator = String(indicator || "").toLowerCase();
+    return rows
+      .filter((row) => normalizeMacroCountryName(row.country) === normalizedCountry)
+      .filter((row) => String(row.indicator || "").toLowerCase().includes(normalizedIndicator.toLowerCase()))
+      .sort((a, b) => statusRank(b.meta?.status || b.status) - statusRank(a.meta?.status || a.status))[0] || null;
+  }
+
+  function normalizeMacroCountryName(value) {
+    const name = String(value || "").toLowerCase();
+    if (name.includes("united states") || name === "usa" || name === "us") return "USA";
+    if (name.includes("euro") || name === "emu") return "Eurozone";
+    if (name.includes("germany") || name.includes("deutschland") || name === "de") return "Deutschland";
+    if (name.includes("china") || name === "cn") return "China";
+    return String(value || "");
+  }
+
+  function macroCountryRisk(country) {
+    let score = 18;
+    if (country.inflation.value > 4) score += 18;
+    else if (country.inflation.value > 3) score += 10;
+    else if (country.inflation.value < 0.5) score += 7;
+    if (country.policyRate.value > 4) score += 10;
+    if (country.realRate.value > 1.5) score += 10;
+    if (country.yieldCurve.value < -0.25) score += 12;
+    if (country.gdp.value < 0) score += 16;
+    else if (country.gdp.value < 1) score += 9;
+    if (country.unemployment.value > 7) score += 10;
+    else if (country.unemployment.value > 5.5) score += 5;
+    if (country.debt.value > 110) score += 12;
+    else if (country.debt.value > 80) score += 7;
+    if (country.liquidity.value < 0) score += 8;
+    else if (country.liquidity.value < 1) score += 4;
+    const label = macroRiskLabel(score);
+    return {
+      score: clamp(score, 0, 100),
+      ...label,
+      summary: `${country.name}: ${label.label}, getrieben durch ${country.inflation.comment.toLowerCase()}, ${country.gdp.comment.toLowerCase()} und ${country.debt.comment.toLowerCase()}.`
+    };
+  }
+
+  function macroRiskLabel(score) {
+    if (score >= 70) return { label: "hoch", tone: "bear" };
+    if (score >= 50) return { label: "erhöht", tone: "bear" };
+    if (score >= 32) return { label: "moderat", tone: "neutral" };
+    return { label: "niedrig", tone: "bull" };
+  }
+
+  function inflationMacroComment(value) {
+    if (value >= 4) return "Inflationsdruck hoch";
+    if (value >= 2.2) return "Inflation moderat bis erhöht";
+    if (value < 0.5) return "Deflations-/Schwäche-Risiko";
+    return "Inflation moderat";
+  }
+
+  function laborMacroComment(value) {
+    if (value >= 7) return "Arbeitsmarkt schwächer";
+    if (value >= 5.5) return "Arbeitsmarkt leicht angespannt";
+    if (value <= 3.5) return "Arbeitsmarkt robust";
+    return "Arbeitsmarkt solide";
+  }
+
+  function rateMacroComment(value) {
+    if (value >= 4) return "restriktiv";
+    if (value >= 2) return "neutral bis restriktiv";
+    return "locker";
+  }
+
+  function realRateMacroComment(value) {
+    if (value >= 1.5) return "positive Realzinsen bremsen";
+    if (value >= 0) return "Realzins leicht positiv";
+    return "Realzins eher locker";
+  }
+
+  function yieldCurveMacroComment(value) {
+    if (value < -0.25) return "invers / angespannt";
+    if (value < 0) return "leicht invers";
+    if (value > 0.75) return "normal / steil";
+    return "flach";
+  }
+
+  function growthMacroComment(value) {
+    if (value >= 4) return "Wachstum stark";
+    if (value >= 2) return "Wachstum solide";
+    if (value >= 0.5) return "Wachstum schwach";
+    return "Rezessionsnähe / Stagnation";
+  }
+
+  function debtMacroComment(value) {
+    if (value >= 110) return "Fiskalrisiko hoch";
+    if (value >= 80) return "Fiskalrisiko erhöht";
+    if (value >= 60) return "Fiskalrisiko moderat";
+    return "Fiskalrisiko niedriger";
+  }
+
+  function fxMacroComment(country) {
+    if (country.id === "usa") return "Dollar-Stärke beeinflusst Rohstoffe und EM";
+    if (country.id === "china") return "CNY-Bezug wichtig für EM und Rohstoffe";
+    return "EUR/USD beeinflusst Exportwerte und globale ETFs";
+  }
+
+  function liquidityMacroComment(value) {
+    if (value >= 3) return "liquiditätsfreundlich";
+    if (value >= 0.5) return "neutral";
+    return "liquiditätsbelastend";
+  }
+
+  function latestMetaTimestamp(metas = []) {
+    return Math.max(...metas.map((meta) => Number(meta?.timestamp || 0)), BOOT_TIME);
+  }
+
+  function average(values = []) {
+    const numbers = values.map(Number).filter(Number.isFinite);
+    return numbers.length ? numbers.reduce((sum, value) => sum + value, 0) / numbers.length : 0;
+  }
+
   function macroWhy(id) {
     const text = {
       FEDFUNDS: "Leitzinsen setzen den Takt für Finanzierungskosten, Bewertungsmultiples und Risk-on/Risk-off.",
       CPIAUCSL: "Inflation bestimmt, wie viel Spielraum Zentralbanken für Zinssenkungen haben.",
       UNRATE: "Der Arbeitsmarkt zeigt, ob Wachstum robust bleibt oder eine Abkühlung droht.",
+      DGS2: "Die 2Y-Rendite reagiert stark auf Zentralbank- und Zinspfad-Erwartungen.",
       DGS10: "Die 10Y-Rendite ist ein zentraler Diskontierungsanker für Aktien und Gold.",
+      YCURVE: "Die 2Y-10Y-Kurve hilft, späten Zyklus, Rezessionsrisiko und Zinsstress einzuordnen.",
+      M2: "M2 zeigt die breitere US-Liquidität und ergänzt Risikoappetit und Kreditbedingungen.",
+      EURUSD: "EUR/USD beeinflusst europäische Assets, Dollar-Gewinne, Rohstoffe und globale ETFs.",
+      USDJPY: "USD/JPY zeigt Zinsdifferenz- und Carry-Kontext zwischen USA und Japan.",
+      USDCNY: "USD/CNY hilft beim China-, Schwellenländer- und Rohstoff-Kontext.",
       DXY: "Der Dollar beeinflusst Rohstoffe, Emerging Markets, US-Gewinne und globale Liquidität."
     };
     return text[id] || "Makroindikator für Liquidität, Wachstum, Inflation oder Risikoappetit.";
@@ -7670,7 +11398,13 @@
       FEDFUNDS: "Steigend wirkt restriktiv; fallend kann Risikoassets entlasten.",
       CPIAUCSL: "Steigende Inflation belastet Zinssenkungsfantasie; fallende Inflation hilft Multiples.",
       UNRATE: "Starker Anstieg kann Rezessionsrisiko signalisieren; zu niedrige Werte können Lohndruck bedeuten.",
+      DGS2: "Steigende 2Y-Renditen zeigen restriktivere Zinserwartungen.",
       DGS10: "Steigende Renditen belasten lange Duration; fallende Renditen helfen Growth und Gold.",
+      YCURVE: "Inversion ist ein Stresssignal; Re-Steepening kann Wendepunkt oder Abschwächung anzeigen.",
+      M2: "Mehr Liquidität kann Risikoassets stützen; schwächeres M2 wirkt eher bremsend.",
+      EURUSD: "Euro-Stärke/-Schwäche wirkt auf europäische Margen, internationale ETFs und Dollarpreise.",
+      USDJPY: "Hohe Werte können Carry- und Dollarstress anzeigen.",
+      USDCNY: "CNY-Schwäche kann EM- und Rohstoffstress andeuten.",
       DXY: "Dollar-Stärke kann Rohstoffe und internationale Gewinne belasten."
     };
     return text[id] || "Interpretation hängt von Trend, Niveau und Marktregime ab.";
@@ -7893,6 +11627,217 @@
     return bias[sector] || 0;
   }
 
+  function screenerRowsForView() {
+    return ASSETS.map((asset) => snapshotFor(asset.symbol));
+  }
+
+  function screenerScoreV2(context) {
+    const { symbol, asset, quote, profile, fundamentals, analysis, rating, dataStatus } = context;
+    const etf = etfDataForSymbol(symbol);
+    const nextEvents = eventsForSymbol(symbol).filter((eventItem) => eventItem.date >= startOfToday()).sort(sortEventsForHub);
+    const eventContext = screenerEventContext(nextEvents);
+    const macroContext = screenerMacroContextFor(asset, analysis);
+    const dataQuality = screenerDataQualityScore(dataStatus);
+    const momentum = screenerMomentumScore(quote, analysis, rating);
+    const value = screenerValueScore(asset, fundamentals, analysis, etf);
+    const growth = screenerGrowthScore(asset, fundamentals, analysis, eventContext);
+    const quality = screenerQualityScore(asset, fundamentals, analysis, etf, dataQuality);
+    const risk = screenerRiskScore(asset, analysis, value.score, eventContext, dataQuality, etf);
+    const event = {
+      score: eventContext.score,
+      label: "Event",
+      shortLabel: "Event",
+      labelText: eventContext.label,
+      text: eventContext.text,
+      tone: eventContext.tone
+    };
+    const macro = {
+      score: macroContext.score,
+      label: "Makro",
+      shortLabel: "Makro",
+      labelText: macroContext.label,
+      text: macroContext.text,
+      tone: macroContext.tone
+    };
+    const components = { momentum, value, growth, quality, risk, event, macro, dataQuality };
+    const weights = screenerWeightsForMode(dashboardPrefs().mode, asset.type);
+    const total = Math.round(clamp(
+      momentum.score * weights.momentum +
+      value.score * weights.value +
+      growth.score * weights.growth +
+      quality.score * weights.quality +
+      (100 - risk.score) * weights.risk +
+      event.score * weights.event +
+      macro.score * weights.macro +
+      dataQuality.score * weights.dataQuality,
+      0,
+      100
+    ));
+    const category = screenerPickCategory(total, components);
+    const drivers = screenerDrivers(components, category);
+    const cautions = screenerCautions(components, context);
+    return {
+      total,
+      components,
+      weights,
+      category,
+      drivers,
+      cautions,
+      eventContext,
+      macroContext,
+      explanation: screenerExplanation(asset.symbol, category, drivers, cautions, dataStatus)
+    };
+  }
+
+  function screenerMomentumScore(quote, analysis, rating) {
+    const overheatPenalty = Number(analysis.rsi || 0) >= 72 ? 12 : Number(analysis.volatility || 0) >= 78 ? 8 : 0;
+    const raw = clamp(analysis.momentum * 0.42 + analysis.trend * 0.25 + analysis.performance1m * 1.2 + Number(quote.changePct || 0) * 2.4 + rating.score * 0.18 - overheatPenalty, 0, 100);
+    const labelText = raw >= 72 ? "Momentum stark" : raw <= 42 ? "Momentum schwach" : "Momentum neutral";
+    return { score: Math.round(raw), label: "Momentum Score", shortLabel: "Mom", labelText, text: `${formatPercent(analysis.performance1m)} 1M, Trend ${formatNumber(analysis.trend)}, RSI ${formatNumber(analysis.rsi)}.`, tone: raw >= 72 ? "bull" : raw <= 42 ? "bear" : "neutral" };
+  }
+
+  function screenerValueScore(asset, fundamentals, analysis, etf) {
+    if (etf) {
+      const raw = clamp(82 - Number(etf.ter || 0) * 140 - Math.max(0, etfHoldingConcentration(etf) - 20) * 0.45, 25, 88);
+      return { score: Math.round(raw), label: "Value Score", shortLabel: "Value", labelText: raw >= 65 ? "Kosten attraktiv" : "Kosten/Struktur prüfen", text: `ETF TER ${formatNumber(etf.ter)}%, Top-Holdings ${formatNumber(etfHoldingConcentration(etf))}%.`, tone: raw >= 65 ? "bull" : "neutral" };
+    }
+    const pe = valueOr(fundamentals.pe, asset.fallback.pe);
+    if (!Number.isFinite(Number(pe)) || Number(pe) <= 0) {
+      return { score: Math.round(clamp(analysis.value * 0.65, 20, 55)), label: "Value Score", shortLabel: "Value", labelText: "Daten eingeschränkt", text: "KGV/Fundamentals fehlen oder sind nur fallback-basiert.", tone: "neutral" };
+    }
+    const raw = clamp(analysis.value * 0.62 + (pe < 20 ? 18 : pe < 35 ? 8 : pe > 55 ? -12 : 0), 15, 92);
+    const labelText = raw >= 70 ? "günstiger" : raw >= 50 ? "fair/gemischt" : "ambitioniert";
+    return { score: Math.round(raw), label: "Value Score", shortLabel: "Value", labelText, text: `KGV ${formatNumber(pe, "x")}; Value-Modell ${formatNumber(analysis.value)}.`, tone: raw >= 70 ? "bull" : raw < 45 ? "bear" : "neutral" };
+  }
+
+  function screenerGrowthScore(asset, fundamentals, analysis, eventContext) {
+    const revenueGrowth = Number(fundamentals.revenueGrowth ?? analysis.revenueGrowth);
+    const growthInput = Number.isFinite(revenueGrowth) ? clamp(50 + revenueGrowth * 1.25, 10, 90) : analysis.growth;
+    const eventBoost = eventContext.type === "earnings" ? 4 : 0;
+    const raw = clamp(growthInput * 0.72 + analysis.growth * 0.28 + eventBoost, 0, 100);
+    const labelText = raw >= 72 ? "Growth stark" : raw >= 55 ? "Growth solide" : "Growth schwächer";
+    return { score: Math.round(raw), label: "Growth Score", shortLabel: "Growth", labelText, text: Number.isFinite(revenueGrowth) ? `Wachstumsproxy ${formatNumber(revenueGrowth)}%, Modell ${formatNumber(analysis.growth)}.` : `Growth-Modell ${formatNumber(analysis.growth)}; keine harte Wachstumsrate erzwungen.`, tone: raw >= 72 ? "bull" : raw < 45 ? "bear" : "neutral" };
+  }
+
+  function screenerQualityScore(asset, fundamentals, analysis, etf, dataQuality) {
+    if (etf) {
+      const concentration = etfHoldingConcentration(etf);
+      const raw = clamp(74 - Math.max(0, concentration - 18) * 0.65 - Number(etf.ter || 0) * 60 + dataQuality.score * 0.18, 20, 92);
+      return { score: Math.round(raw), label: "Quality Score", shortLabel: "Qual", labelText: raw >= 68 ? "ETF-Struktur solide" : "ETF-Struktur prüfen", text: `TER ${formatNumber(etf.ter)}%, Konzentration ${formatNumber(concentration)}%, ${etf.structureType || "Struktur offen"}.`, tone: raw >= 68 ? "bull" : raw < 45 ? "bear" : "neutral" };
+    }
+    const margin = Number(fundamentals.margin ?? analysis.margin);
+    const cashflow = Number(fundamentals.cashflow ?? analysis.cashflow);
+    const raw = clamp(analysis.quality * 0.62 + dataQuality.score * 0.2 + (Number.isFinite(margin) && margin > 20 ? 7 : 0) + (Number.isFinite(cashflow) && cashflow > 0 ? 5 : 0), 15, 94);
+    const labelText = raw >= 72 ? "Qualität hoch" : raw >= 52 ? "Qualität solide" : "Qualität gemischt";
+    return { score: Math.round(raw), label: "Quality Score", shortLabel: "Qual", labelText, text: `Quality-Modell ${formatNumber(analysis.quality)}; Datenqualität ${dataQuality.labelText}.`, tone: raw >= 72 ? "bull" : raw < 45 ? "bear" : "neutral" };
+  }
+
+  function screenerRiskScore(asset, analysis, valueScore, eventContext, dataQuality, etf) {
+    const valuationRisk = valueScore < 40 ? 14 : valueScore < 55 ? 6 : 0;
+    const eventRisk = eventContext.score >= 75 ? 8 : eventContext.score >= 60 ? 4 : 0;
+    const dataRisk = dataQuality.score < 50 ? 12 : dataQuality.score < 65 ? 5 : 0;
+    const etfRisk = etf ? Math.max(0, etfHoldingConcentration(etf) - 20) * 0.65 : 0;
+    const typeRisk = asset.type === "Crypto" ? 16 : asset.type === "Commodity" ? 6 : 0;
+    const raw = clamp(analysis.volatility * 0.54 + Math.max(0, 55 - analysis.momentum) * 0.24 + valuationRisk + eventRisk + dataRisk + etfRisk + typeRisk, 0, 100);
+    const labelText = raw >= 70 ? "Risiko hoch" : raw >= 52 ? "Risiko erhöht" : raw >= 34 ? "Risiko moderat" : "Risiko niedrig";
+    return { score: Math.round(raw), label: "Risk Score", shortLabel: "Risk", labelText, text: `Volatilität ${formatNumber(analysis.volatility)}, Bewertungs-/Event-/Datenrisiko kombiniert.`, tone: raw >= 70 ? "bear" : raw >= 52 ? "neutral" : "bull" };
+  }
+
+  function screenerDataQualityScore(status) {
+    const normalized = normalizeScreenerStatus(status);
+    const score = normalized === "live" ? 86 : normalized === "hybrid" ? 70 : normalized === "local" ? 55 : normalized === "fallback" ? 44 : 30;
+    const labelText = normalized === "live" ? "Live" : normalized === "hybrid" ? "Hybrid" : normalized === "local" ? "Lokal" : normalized === "fallback" ? "Fallback" : "eingeschränkt";
+    return { score, label: "Data Quality Score", shortLabel: "Daten", labelText, text: `Datenstatus ${labelText}; Scores bleiben entsprechend vorsichtig.`, tone: score >= 75 ? "bull" : score < 50 ? "bear" : "neutral" };
+  }
+
+  function screenerEventContext(events) {
+    const next = events[0] || null;
+    if (!next) {
+      return { score: 48, type: "none", label: "kein nahes Event", text: "Kein naher Termin im Event-Hub-Fenster.", tone: "neutral", next: null };
+    }
+    const type = eventTypeKey(next);
+    const timing = matchesEventWindow(next, "today") ? "today" : next.date <= daysFromNow(7) ? "week" : "later";
+    const relevance = eventRelevance(next);
+    const score = clamp(48 + relevance * 0.42 + (timing === "today" ? 18 : timing === "week" ? 10 : 0), 0, 100);
+    return { score: Math.round(score), type, timing, label: eventTypeLabel(next), text: `${eventTimingLabel(next)}: ${next.title}. Event kann Chance und Risiko sein.`, tone: score >= 75 ? "bull" : "neutral", next };
+  }
+
+  function screenerMacroContextFor(asset, analysis) {
+    const control = macroCountryComparisonForView().control;
+    let score = control.score;
+    let label = "neutral";
+    let text = control.label;
+    if (control.score < 45 && (analysis.volatility >= 62 || ["Crypto", "Commodity"].includes(asset.type))) {
+      score -= 12;
+      label = "belastend";
+      text = "Risk-off-Makro belastet volatile oder liquiditätssensitive Werte stärker.";
+    } else if (control.score >= 60 && ["ETF", "Index"].includes(asset.type)) {
+      score += 7;
+      label = "unterstützend";
+      text = "Makrobild wirkt für breite Marktbausteine etwas unterstützender.";
+    } else if (asset.sector === "Precious Metals" && control.label.includes("restriktiv")) {
+      score -= 5;
+      label = "belastend";
+      text = "Restriktive Realzinslage kann Gold zeitweise belasten.";
+    }
+    score = clamp(score, 0, 100);
+    return { score: Math.round(score), label, text, tone: score >= 60 ? "bull" : score < 45 ? "bear" : "neutral" };
+  }
+
+  function screenerWeightsForMode(mode, assetType) {
+    const base = { momentum: 0.21, value: 0.13, growth: 0.14, quality: 0.15, risk: 0.14, event: 0.08, macro: 0.08, dataQuality: 0.07 };
+    if (mode === "trader") {
+      return { ...base, momentum: 0.28, event: 0.12, value: 0.08, quality: 0.11 };
+    }
+    if (mode === "etf" || assetType === "ETF") {
+      return { ...base, quality: 0.23, risk: 0.18, value: 0.16, growth: 0.08, event: 0.04 };
+    }
+    if (mode === "macro") {
+      return { ...base, macro: 0.17, momentum: 0.17, event: 0.06 };
+    }
+    if (mode === "portfolio") {
+      return { ...base, quality: 0.19, risk: 0.2, event: 0.06 };
+    }
+    return base;
+  }
+
+  function screenerPickCategory(score, components) {
+    if (components.risk.score >= 72 || components.momentum.score <= 38) {
+      return { key: "risk", label: "Risk-Kandidat", tone: "bear" };
+    }
+    if (score >= 72 && components.risk.score < 62 && components.dataQuality.score >= 50) {
+      return { key: "long", label: "Long-Kandidat", tone: "bull" };
+    }
+    if (score >= 58 || components.event.score >= 68 || components.quality.score >= 68) {
+      return { key: "watch", label: "Watch-Kandidat", tone: "neutral" };
+    }
+    return { key: "neutral", label: "Neutral", tone: "neutral" };
+  }
+
+  function screenerDrivers(components, category) {
+    return Object.values(components)
+      .filter((component) => component.shortLabel !== "Daten")
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((component) => ({ label: `${component.shortLabel} ${component.score}`, text: component.text, tone: component.tone }))
+      .concat(category.key === "long" ? [{ label: "Setup prüfen", text: "Kandidat wirkt stark, aber ist keine Kaufempfehlung.", tone: "bull" }] : []);
+  }
+
+  function screenerCautions(components, context) {
+    const cautions = [];
+    if (components.risk.score >= 58) cautions.push({ label: `Risk ${components.risk.score}`, text: components.risk.text, tone: "bear" });
+    if (components.value.score < 45) cautions.push({ label: "Bewertung", text: components.value.text, tone: "neutral" });
+    if (components.dataQuality.score < 55) cautions.push({ label: "Datenlage", text: components.dataQuality.text, tone: "bear" });
+    if (context.analysis.rsi >= 72) cautions.push({ label: "Überhitzung", text: "RSI/Trend wirken im Modell heiß; Momentum nicht blind als Qualität lesen.", tone: "neutral" });
+    return cautions.slice(0, 3);
+  }
+
+  function screenerExplanation(symbol, category, drivers, cautions, status) {
+    const driverText = drivers.slice(0, 2).map((item) => item.label).join(", ") || "gemischte Treiber";
+    const cautionText = cautions[0] ? ` Gegenpunkt: ${cautions[0].label}.` : "";
+    return `${symbol} ist ${category.label}, weil ${driverText} aktuell auffallen.${cautionText} Datenstatus: ${statusLabel(status)}.`;
+  }
+
   function snapshotFor(symbol) {
     const asset = getAsset(symbol);
     const quote = quoteFor(symbol);
@@ -7903,15 +11848,11 @@
     const marketCap = valueOr(valueOr(profile.marketCap, valueOr(fundamentals.marketCap, quote.marketCap)), asset.fallback.marketCap);
     const sector = profile.sector || asset.sector;
     const dataStatus = bestDataStatus([quote.meta.status, profile.meta.status, fundamentals.meta.status, analysis.meta?.status]);
-    const score = Math.round(clamp(
-      rating.score * 0.44 +
-      analysis.value * 0.16 +
-      analysis.growth * 0.18 +
-      analysis.quality * 0.12 +
-      asset.sentiment * 0.10,
-      0,
-      100
-    ));
+    const scoreV2 = screenerScoreV2({ symbol: asset.symbol, asset, quote, profile, fundamentals, analysis, rating, dataStatus });
+    const score = scoreV2.total;
+    const region = screenerRegionFor(asset.symbol, asset);
+    const marketCapBucket = marketCapBucketFor(marketCap, asset.type);
+    const normalizedStatus = normalizeScreenerStatus(dataStatus);
     return {
       symbol: asset.symbol,
       name: profile.name || asset.name,
@@ -7924,35 +11865,80 @@
       analysis,
       rating,
       marketCap,
+      region,
+      marketCapBucket,
+      normalizedStatus,
       dataStatus,
       score,
-      valueScore: analysis.value,
-      growthScore: analysis.growth,
-      momentumScore: analysis.momentum,
+      scores: scoreV2.components,
+      scoreWeights: scoreV2.weights,
+      valueScore: scoreV2.components.value.score,
+      growthScore: scoreV2.components.growth.score,
+      momentumScore: scoreV2.components.momentum.score,
+      qualityScore: scoreV2.components.quality.score,
+      riskScore: scoreV2.components.risk.score,
+      eventScore: scoreV2.components.event.score,
+      macroScore: scoreV2.components.macro.score,
+      dataQualityScore: scoreV2.components.dataQuality.score,
+      eventContext: scoreV2.eventContext,
+      macroContext: scoreV2.macroContext,
+      pickCategory: scoreV2.category.key,
+      pickLabel: scoreV2.category.label,
+      pickTone: scoreV2.category.tone,
+      drivers: scoreV2.drivers,
+      cautions: scoreV2.cautions,
+      explanation: scoreV2.explanation,
+      isWatchlist: state.watchlist.includes(asset.symbol),
+      isFavorite: isFavoriteSymbol(asset.symbol),
       performance1m: analysis.performance1m,
-      pickReason: pickReasonFor(score, rating, analysis)
+      pickReason: scoreV2.explanation
     };
   }
 
-  function filteredScreenerRows() {
-    const filters = state.screener;
-    let rows = ASSETS.map((asset) => snapshotFor(asset.symbol));
+  function filteredScreenerRows(rows = screenerRowsForView()) {
+    const filters = { ...SCREENER_DEFAULT_FILTERS, ...state.screener };
+    let next = rows.slice();
     const query = String(filters.search || "").trim().toLowerCase();
     if (query) {
-      rows = rows.filter((row) => `${row.symbol} ${row.name} ${row.sector} ${row.type}`.toLowerCase().includes(query));
+      next = next.filter((row) => `${row.symbol} ${row.name} ${row.sector} ${row.type} ${row.region} ${row.explanation}`.toLowerCase().includes(query));
     }
-    rows = rows.filter((row) => passesNumberFilter(row.momentumScore, filters.momentum));
-    rows = rows.filter((row) => passesNumberFilter(row.valueScore, filters.value));
-    rows = rows.filter((row) => passesNumberFilter(row.growthScore, filters.growth));
-    rows = rows.filter((row) => passesMarketCapFilter(row, filters.marketCap));
-    rows = rows.filter((row) => filters.sector === "all" || row.sector === filters.sector);
-    rows = rows.filter((row) => passesPerformanceFilter(row, filters.performance));
-    return sortScreenerRows(rows, filters.sort);
+    next = next.filter((row) => filters.assetType === "all" || row.type === filters.assetType);
+    next = next.filter((row) => filters.region === "all" || row.region === filters.region);
+    next = next.filter((row) => filters.sector === "all" || row.sector === filters.sector);
+    next = next.filter((row) => passesStyleFilter(row, filters.style));
+    next = next.filter((row) => passesMarketCapFilter(row, filters.marketCap));
+    next = next.filter((row) => filters.dataStatus === "all" || row.normalizedStatus === filters.dataStatus);
+    next = next.filter((row) => passesPersonalFilter(row, filters.personal));
+    next = next.filter((row) => passesEventContextFilter(row, filters.eventContext));
+    next = next.filter((row) => passesRatingFilter(row, filters.rating));
+    next = next.filter((row) => passesNumberFilter(row.momentumScore, filters.momentum));
+    next = next.filter((row) => passesNumberFilter(row.valueScore, filters.value));
+    next = next.filter((row) => passesNumberFilter(row.growthScore, filters.growth));
+    next = next.filter((row) => passesPerformanceFilter(row, filters.performance));
+    return sortScreenerRows(next, filters.sort);
   }
 
   function topPicksForView() {
+    const sourceRows = Array.isArray(arguments[0]) ? arguments[0] : screenerRowsForView();
+    const byScore = sourceRows.slice().sort((a, b) => b.score - a.score);
+    const long = byScore
+      .filter((row) => row.pickCategory === "long")
+      .slice(0, 5);
+    const watch = byScore
+      .filter((row) => row.pickCategory === "watch" || (row.pickCategory === "neutral" && row.score >= 54))
+      .slice(0, 5);
+    const risk = sourceRows.slice()
+      .filter((row) => row.pickCategory === "risk" || row.riskScore >= 64)
+      .sort((a, b) => b.riskScore - a.riskScore || a.score - b.score)
+      .slice(0, 5);
+    const personal = sourceRows.slice()
+      .filter((row) => row.isWatchlist || row.isFavorite)
+      .sort((a, b) => b.score - a.score || b.eventScore - a.eventScore)
+      .slice(0, 5);
+    return { long, watch, risk, personal };
+
     const rows = ASSETS.map((asset) => snapshotFor(asset.symbol));
-    const long = rows
+    const legacyLong = rows
       .filter((row) => row.rating.rating !== "SELL")
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
@@ -7963,7 +11949,7 @@
         setup: row.rating.rating === "BUY" ? "Momentum bestätigt" : "Qualität beobachten",
         reason: row.pickReason
       }));
-    const risk = rows
+    const legacyRisk = rows
       .sort((a, b) => riskRank(b) - riskRank(a))
       .slice(0, 5)
       .map((row) => ({
@@ -7973,7 +11959,167 @@
         setup: row.rating.rating === "SELL" ? "Trend/Risiko schwach" : "Volatilität hoch",
         reason: row.rating.rating === "SELL" ? row.rating.reason : "Setup hat Chance, aber Risiko/Volatilität ist überdurchschnittlich."
       }));
-    return { long, risk };
+    return { long: legacyLong, risk: legacyRisk };
+  }
+
+  function screenerSummary(rows = [], filtered = rows) {
+    const picks = topPicksForView(rows);
+    const sortedBy = (key) => rows.slice().sort((a, b) => Number(b[key] || 0) - Number(a[key] || 0))[0] || null;
+    const status = combinedDataStatus(rows.map((row) => row.dataStatus));
+    const fallbackCount = rows.filter((row) => ["fallback", "local"].includes(row.normalizedStatus)).length;
+    const comment = fallbackCount > rows.length / 2
+      ? {
+          title: "Hybrid mit sichtbaren Fallback-Anteilen",
+          text: "Der Screener nutzt vorhandene Live-/Hybrid-Daten, markiert aber Werte mit lokaler oder fallback-basierter Datenlage bewusst vorsichtiger."
+        }
+      : picks.risk.length >= picks.long.length
+        ? {
+            title: "Selektiver Markt mit Risiko-Hinweisen",
+            text: "Risk- und Watch-Kandidaten sind prominent, weil Momentum, Volatilitaet oder Datenqualitaet nicht bei allen Werten sauber genug wirken."
+          }
+        : {
+            title: "Starke Setups, aber keine Empfehlung",
+            text: "Long-Kandidaten fallen durch Momentum, Growth, Quality oder Event-Kontext auf. Jede Zeile zeigt auch Gegenargumente und Datenstatus."
+          };
+    return {
+      total: rows.length,
+      filtered: filtered.length,
+      longCount: picks.long.length,
+      watchCount: picks.watch.length,
+      riskCount: picks.risk.length,
+      momentum: sortedBy("momentumScore"),
+      value: sortedBy("valueScore"),
+      growth: sortedBy("growthScore"),
+      risk: sortedBy("riskScore"),
+      status,
+      comment
+    };
+  }
+
+  function normalizeScreenerStatus(status) {
+    if (status === "live" || status === "stale") return "live";
+    if (status === "hybrid") return "hybrid";
+    if (status === "local") return "local";
+    return "fallback";
+  }
+
+  function screenerRegionFor(symbol, asset = getAsset(symbol)) {
+    const normalized = normalizeSymbol(symbol);
+    if (["DAX", "SAP"].includes(normalized)) return "Deutschland";
+    if (["ASML", "NOVO", "AIR.PA"].includes(normalized)) return "Europa";
+    if (["BTC", "ETH", "GOLD"].includes(normalized) || ["Crypto", "Commodity"].includes(asset.type)) return "Global";
+    if (asset.sector === "Germany") return "Deutschland";
+    if (asset.currency === "EUR") return "Europa";
+    return "USA";
+  }
+
+  function marketCapBucketFor(marketCap, type) {
+    const value = Number(marketCap || 0);
+    if (!value || ["ETF", "Index", "Commodity"].includes(type)) return "unknown";
+    if (value >= 1000000000000) return "mega";
+    if (value >= 10000000000) return "large";
+    if (value >= 2000000000) return "mid";
+    return "small";
+  }
+
+  function eventTypeKey(eventItem) {
+    const type = String(eventItem?.type || "").toLowerCase();
+    if (type.includes("earnings")) return "earnings";
+    if (type.includes("dividend") || type.includes("dividende") || type.includes("split")) return "dividend";
+    if (type.includes("makro")) return "macro";
+    if (type.includes("ipo")) return "ipo";
+    return type || "event";
+  }
+
+  function applyScreenerPreset(id) {
+    const preset = SCREENER_PRESETS.find((item) => item.id === id) || SCREENER_PRESETS[0];
+    state.screener = {
+      ...SCREENER_DEFAULT_FILTERS,
+      ...preset.filters,
+      preset: preset.id
+    };
+    saveModuleDefault("screener", { ...state.screener });
+    render();
+  }
+
+  function passesStyleFilter(row, filter) {
+    if (!filter || filter === "all") return true;
+    if (filter === "momentum") return row.momentumScore >= 70;
+    if (filter === "value") return row.valueScore >= 60;
+    if (filter === "growth") return row.growthScore >= 70;
+    if (filter === "quality") return row.qualityScore >= 68;
+    if (filter === "dividend") {
+      const etf = etfDataForSymbol(row.symbol);
+      return String(etf?.distribution || "").toLowerCase().includes("aussch") || ["Financials", "Utilities", "Energy"].includes(row.sector);
+    }
+    if (filter === "riskLow") return row.riskScore <= 42;
+    if (filter === "highVolatility") return row.riskScore >= 62 || Number(row.analysis?.volatility || 0) >= 68;
+    if (filter === "eventDriven") return row.eventScore >= 65;
+    return true;
+  }
+
+  function passesPersonalFilter(row, filter) {
+    if (!filter || filter === "all") return true;
+    if (filter === "watchlist") return row.isWatchlist;
+    if (filter === "favorites") return row.isFavorite;
+    return true;
+  }
+
+  function passesEventContextFilter(row, filter) {
+    if (!filter || filter === "all") return true;
+    if (filter === "none") return row.eventContext.type === "none";
+    if (filter === "today") return row.eventContext.timing === "today";
+    if (filter === "week") return row.eventContext.timing === "week" || row.eventContext.timing === "today";
+    return row.eventContext.type === filter;
+  }
+
+  function passesRatingFilter(row, filter) {
+    if (!filter || filter === "all") return true;
+    if (filter === "risk") return row.pickCategory === "risk";
+    if (filter === "long") return row.pickCategory === "long";
+    if (filter === "watch") return row.pickCategory === "watch";
+    if (filter === "neutral") return row.pickCategory === "neutral";
+    return true;
+  }
+
+  function screenerAssetTypeOptions() {
+    const types = unique(["Stock", "ETF", "Index", "Crypto", "Commodity", ...ASSETS.map((asset) => asset.type)]);
+    const labels = { Stock: "Aktie", ETF: "ETF", Index: "Index", Crypto: "Krypto", Commodity: "Rohstoff", Currency: "Waehrung" };
+    return [["all", "Alle"], ...types.map((type) => [type, labels[type] || type])];
+  }
+
+  function screenerRegionOptions() {
+    return [["all", "Alle"], ["USA", "USA"], ["Europa", "Europa"], ["Deutschland", "Deutschland"], ["China", "China"], ["Global", "Global"], ["Sonstige", "Sonstige / unbekannt"]];
+  }
+
+  function screenerStyleOptions() {
+    return [
+      ["all", "Alle"],
+      ["momentum", "Momentum"],
+      ["value", "Value"],
+      ["growth", "Growth"],
+      ["quality", "Quality"],
+      ["dividend", "Dividende"],
+      ["riskLow", "risikoarm"],
+      ["highVolatility", "hochvolatil"],
+      ["eventDriven", "Event-getrieben"]
+    ];
+  }
+
+  function screenerMarketCapOptions() {
+    return [["all", "Alle"], ["mega", "Mega Cap"], ["large", "Large Cap"], ["mid", "Mid Cap"], ["small", "Small Cap"], ["unknown", "unbekannt / nicht Aktie"]];
+  }
+
+  function screenerDataStatusOptions() {
+    return [["all", "Alle"], ["live", "Live"], ["hybrid", "Hybrid"], ["fallback", "Fallback"], ["local", "Lokal"]];
+  }
+
+  function screenerEventOptions() {
+    return [["all", "Alle"], ["today", "Event heute"], ["week", "Event diese Woche"], ["earnings", "Earnings bald"], ["dividend", "Dividende bald"], ["macro", "Makrotermin"], ["ipo", "IPO / Corporate Action"], ["none", "keine nahen Events"]];
+  }
+
+  function screenerSortOptions() {
+    return [["score", "Gesamtscore"], ["momentum", "Momentum"], ["value", "Value"], ["growth", "Growth"], ["quality", "Quality"], ["risk", "Risiko"], ["event", "Event"], ["macro", "Makro"], ["dataQuality", "Datenqualitaet"], ["performance", "1M Performance"], ["marketCap", "Market Cap"], ["name", "Name"]];
   }
 
   function dailyBriefingForView() {
@@ -8562,6 +12708,7 @@
         </div>
         <div class="row-actions event-card-actions">
           ${assetMap.has(eventItem.symbol) ? `<button class="tiny-button" type="button" data-symbol="${escAttr(eventItem.symbol)}">Asset öffnen</button>` : ""}
+          ${assetMap.has(eventItem.symbol) ? `<button class="tiny-button" type="button" data-journal-open="${escAttr(eventItem.symbol)}" data-journal-context="event">Journal</button>` : ""}
           <button class="tiny-button" type="button"
             data-alert-event-title="${escAttr(eventItem.title)}"
             data-alert-event-symbol="${escAttr(eventItem.symbol)}"
@@ -8644,6 +12791,7 @@
           <button class="tiny-button" type="button" data-alert-snooze="${escAttr(alert.id)}" data-alert-snooze-duration="week">1 Woche</button>
         </div>
         <button class="tiny-button" type="button" data-alert-done="${escAttr(alert.id)}">Erledigt</button>
+        ${hasAsset ? `<button class="tiny-button" type="button" data-journal-open="${escAttr(alert.symbol)}" data-journal-context="alert">Journal</button>` : ""}
         <button class="icon-button danger-button" type="button" data-alert-delete="${escAttr(alert.id)}" aria-label="Alert löschen">X</button>
       </div>
     `;
@@ -8686,13 +12834,25 @@
     const leftMap = new Map(left.holdings.map(([name, weight]) => [name, weight]));
     const overlap = right.holdings
       .filter(([name]) => leftMap.has(name))
-      .map(([name, weight]) => [name, Math.min(weight, leftMap.get(name))]);
+      .map(([name, weight]) => ({
+        name,
+        left: Number(leftMap.get(name) || 0),
+        right: Number(weight || 0),
+        weight: Math.min(Number(weight || 0), Number(leftMap.get(name) || 0))
+      }))
+      .sort((a, b) => b.weight - a.weight);
     const region = regionOverlap(left, right);
+    const sector = sectorOverlap(left, right);
     return {
-      score: overlap.reduce((sum, [, weight]) => sum + weight, 0),
-      names: overlap.map(([name]) => name),
+      score: overlap.reduce((sum, row) => sum + row.weight, 0),
+      names: overlap.map((row) => row.name),
+      holdingRows: overlap,
       regionScore: region.score,
-      regionNames: region.names
+      regionNames: region.names,
+      regionRows: region.rows,
+      sectorScore: sector.score,
+      sectorNames: sector.names,
+      sectorRows: sector.rows
     };
   }
 
@@ -8700,10 +12860,35 @@
     const leftMap = new Map(left.region.map(([name, weight]) => [name, weight]));
     const overlap = right.region
       .filter(([name]) => leftMap.has(name))
-      .map(([name, weight]) => [name, Math.min(weight, leftMap.get(name))]);
+      .map(([name, weight]) => ({
+        name,
+        left: Number(leftMap.get(name) || 0),
+        right: Number(weight || 0),
+        weight: Math.min(Number(weight || 0), Number(leftMap.get(name) || 0))
+      }))
+      .sort((a, b) => b.weight - a.weight);
     return {
-      score: overlap.reduce((sum, [, weight]) => sum + weight, 0),
-      names: overlap.map(([name]) => name)
+      score: overlap.reduce((sum, row) => sum + row.weight, 0),
+      names: overlap.map((row) => row.name),
+      rows: overlap
+    };
+  }
+
+  function sectorOverlap(left, right) {
+    const leftMap = new Map((left.sectors || []).map(([name, weight]) => [name, weight]));
+    const overlap = (right.sectors || [])
+      .filter(([name]) => leftMap.has(name))
+      .map(([name, weight]) => ({
+        name,
+        left: Number(leftMap.get(name) || 0),
+        right: Number(weight || 0),
+        weight: Math.min(Number(weight || 0), Number(leftMap.get(name) || 0))
+      }))
+      .sort((a, b) => b.weight - a.weight);
+    return {
+      score: overlap.reduce((sum, row) => sum + row.weight, 0),
+      names: overlap.map((row) => row.name),
+      rows: overlap
     };
   }
 
@@ -8712,6 +12897,9 @@
   }
 
   function distributionExplanation(etf) {
+    if (etf.distribution === "Keine Ausschüttung") {
+      return "Keine laufende Ausschüttung. Der Nutzen liegt nicht im Cashflow, sondern in Preis-/Absicherungswirkung.";
+    }
     return etf.distribution === "Thesaurierend"
       ? "Erträge werden automatisch wieder angelegt. Praktisch für langfristigen Vermögensaufbau."
       : "Erträge werden ausgeschüttet. Praktisch für Cashflow, aber Wiederanlage muss selbst passieren.";
@@ -8733,6 +12921,9 @@
       return;
     }
     state.etf[name] = input.type === "number" ? Number(input.value) : input.value;
+    if (["left", "right", "amount", "monthly", "years", "returnRate"].includes(name)) {
+      saveModuleDefault("etf", { [name]: state.etf[name] });
+    }
     if (state.route === "etf") {
       render();
     }
@@ -8748,6 +12939,9 @@
       return;
     }
     state.compare[name] = symbol;
+    if (["left", "right"].includes(name)) {
+      saveModuleDefault("compare", { [name]: symbol });
+    }
     if (["home", "compare"].includes(state.route)) {
       render();
     }
@@ -8779,7 +12973,23 @@
     if (assetMap.has(rightSymbol)) {
       state.compare.right = rightSymbol;
     }
+    recordActivity("Compare", `${state.compare.left} vs ${state.compare.right}`, { route: "compare" });
+    awardXp("first-compare", 20, "Quick Compare genutzt");
     navigate("compare");
+  }
+
+  function openEtfPortfolioFit(symbol) {
+    const normalized = normalizeSymbol(symbol);
+    if (!assetMap.has(normalized)) {
+      toast("ETF nicht im Asset-Universum gefunden.");
+      return;
+    }
+    state.portfolioScenario.symbol = normalized;
+    state.portfolioScenario.quantity = 1;
+    state.portfolioScenario.avgPrice = quoteFor(normalized).price || "";
+    state.portfolioScenario.cashChange = 0;
+    toast(`${normalized} ist in der Portfolio-Simulation vorbereitet.`);
+    navigate("portfolio");
   }
 
   function swapCompareAssets() {
@@ -8795,6 +13005,9 @@
       return;
     }
     state.eventHub[name] = input.value;
+    if (["window", "type", "scope", "relevance"].includes(name)) {
+      saveModuleDefault("eventHub", { [name]: input.value });
+    }
     const target = document.getElementById("eventHubResults");
     const count = document.getElementById("eventHubCount");
     if (target) {
@@ -8830,6 +13043,7 @@
   function setActivePortfolio(id) {
     state.activePortfolioId = id;
     storageSet(STORAGE_KEYS.activePortfolioId, id);
+    saveModuleDefault("portfolio", { activePortfolioId: id });
     render();
   }
 
@@ -8852,6 +13066,8 @@
     state.portfolios = [...state.portfolios, portfolio];
     state.activePortfolioId = portfolio.id;
     savePortfolios();
+    recordActivity("Portfolio", `${name} erstellt`, { route: "portfolio" });
+    awardXp("portfolio-created", 25, "Portfolio erstellt");
     form.reset();
     render();
   }
@@ -9345,6 +13561,7 @@
           <button class="tiny-button" type="button" data-symbol="${escAttr(position.symbol)}">Research</button>
           <button class="tiny-button" type="button" data-compare-open="${escAttr(position.symbol)}">Compare</button>
           <button class="tiny-button" type="button" data-alert-quick="${escAttr(position.symbol)}" data-alert-quick-type="price">Alert</button>
+          <button class="tiny-button" type="button" data-journal-open="${escAttr(position.symbol)}" data-journal-context="portfolio">Journal</button>
         </div>
       </div>
     `;
@@ -9414,42 +13631,252 @@
   }
 
   function dashboardPrefs() {
-    const mode = state.dashboardPrefs.mode || "standard";
-    return {
-      mode,
-      favorites: state.dashboardPrefs.favorites || [],
-      modules: state.dashboardPrefs.modules || DASHBOARD_MODES[mode] || DASHBOARD_MODES.standard
+    return normalizeUserPreferences(state.userPreferences, state.dashboardPrefs);
+  }
+
+  function persistUserPreferences() {
+    state.userPreferences = normalizeUserPreferences(state.userPreferences, state.dashboardPrefs);
+    storageSet(STORAGE_KEYS.userPreferences, state.userPreferences);
+  }
+
+  function applyPreferenceDefaults() {
+    const prefs = dashboardPrefs();
+    state.screener = { ...state.screener, ...prefs.defaults.screener };
+    state.eventHub = { ...state.eventHub, ...prefs.defaults.eventHub };
+    state.etf = {
+      ...state.etf,
+      ...prefs.defaults.etf,
+      left: etfBySymbol(prefs.defaults.etf.left) ? normalizeSymbol(prefs.defaults.etf.left) : state.etf.left,
+      right: etfBySymbol(prefs.defaults.etf.right) ? normalizeSymbol(prefs.defaults.etf.right) : state.etf.right
     };
+    if (assetMap.has(normalizeSymbol(prefs.defaults.compare.left))) {
+      state.compare.left = normalizeSymbol(prefs.defaults.compare.left);
+    }
+    if (assetMap.has(normalizeSymbol(prefs.defaults.compare.right))) {
+      state.compare.right = normalizeSymbol(prefs.defaults.compare.right);
+    }
+    if (state.portfolios.some((portfolio) => portfolio.id === prefs.defaults.portfolio.activePortfolioId)) {
+      state.activePortfolioId = prefs.defaults.portfolio.activePortfolioId;
+      storageSet(STORAGE_KEYS.activePortfolioId, state.activePortfolioId);
+    }
+    document.body.dataset.detail = prefs.display.detail;
+    document.body.dataset.dataStatus = prefs.display.dataStatus;
   }
 
   function setDashboardMode(mode) {
     if (!DASHBOARD_MODES[mode]) {
       return;
     }
-    state.dashboardPrefs = {
-      ...state.dashboardPrefs,
+    const config = DASHBOARD_MODES[mode];
+    const current = dashboardPrefs();
+    state.userPreferences = normalizeUserPreferences({
+      ...current,
       mode,
-      modules: DASHBOARD_MODES[mode]
-    };
-    storageSet(STORAGE_KEYS.dashboardPrefs, state.dashboardPrefs);
-    toast(`Dashboard Modus: ${capitalize(mode)}`);
+      modules: normalizedModulePreferences(config.modules, "hidden"),
+      shortcuts: sanitizeShortcuts(config.shortcuts),
+      profile: {
+        ...current.profile,
+        ...config.profile,
+        focus: sanitizeFocusList(config.profile.focus)
+      },
+      display: {
+        ...current.display,
+        beginnerHelp: config.profile.experience === "beginner" ? true : current.display.beginnerHelp
+      }
+    });
+    persistUserPreferences();
+    applyPreferenceDefaults();
+    toast(`Dashboard-Modus: ${config.label}`);
     render();
   }
 
   function isFavoriteSymbol(symbol) {
-    return dashboardPrefs().favorites.includes(symbol);
+    return dashboardPrefs().favorites.includes(normalizeSymbol(symbol));
   }
 
   function toggleFavoriteSymbol(symbol) {
     const normalized = normalizeSymbol(symbol);
+    if (!assetMap.has(normalized)) {
+      toast("Asset nicht gefunden.");
+      return;
+    }
     const prefs = dashboardPrefs();
-    const favorites = prefs.favorites.includes(normalized)
+    const exists = prefs.favorites.includes(normalized);
+    const favorites = exists
       ? prefs.favorites.filter((item) => item !== normalized)
-      : [...prefs.favorites, normalized].slice(0, 8);
-    state.dashboardPrefs = { ...state.dashboardPrefs, favorites };
-    storageSet(STORAGE_KEYS.dashboardPrefs, state.dashboardPrefs);
-    toast(prefs.favorites.includes(normalized) ? `${normalized} aus Favoriten entfernt.` : `${normalized} als Favorit gespeichert.`);
+      : unique([normalized, ...prefs.favorites]).slice(0, 12);
+    state.userPreferences = normalizeUserPreferences({ ...prefs, favorites });
+    persistUserPreferences();
+    toast(exists ? `${normalized} aus Favoriten entfernt.` : `${normalized} als Favorit gespeichert.`);
     render();
+  }
+
+  function setHomeModulePreference(moduleId, priority) {
+    if (!HOME_MODULE_CATALOG.some((module) => module.id === moduleId) || !["high", "normal", "hidden"].includes(priority)) {
+      return;
+    }
+    const prefs = dashboardPrefs();
+    state.userPreferences = normalizeUserPreferences({
+      ...prefs,
+      modules: {
+        ...prefs.modules,
+        [moduleId]: priority
+      }
+    });
+    persistUserPreferences();
+    render();
+  }
+
+  function togglePreferenceShortcut(shortcutId) {
+    if (!SHORTCUT_CATALOG.some((shortcut) => shortcut.id === shortcutId)) {
+      return;
+    }
+    const prefs = dashboardPrefs();
+    const selected = prefs.shortcuts.includes(shortcutId);
+    if (!selected && prefs.shortcuts.length >= 6) {
+      toast("Maximal 6 Schnellzugriffe aktiv.");
+      return;
+    }
+    state.userPreferences = normalizeUserPreferences({
+      ...prefs,
+      shortcuts: selected ? prefs.shortcuts.filter((id) => id !== shortcutId) : [...prefs.shortcuts, shortcutId]
+    });
+    persistUserPreferences();
+    render();
+  }
+
+  function toggleProfileFocus(focusId) {
+    if (!PROFILE_OPTION_LABELS.focus[focusId]) {
+      return;
+    }
+    const prefs = dashboardPrefs();
+    const selected = prefs.profile.focus.includes(focusId);
+    if (!selected && prefs.profile.focus.length >= 5) {
+      toast("Maximal 5 Fokusbereiche aktiv.");
+      return;
+    }
+    state.userPreferences = normalizeUserPreferences({
+      ...prefs,
+      profile: {
+        ...prefs.profile,
+        focus: selected ? prefs.profile.focus.filter((item) => item !== focusId) : [...prefs.profile.focus, focusId]
+      }
+    });
+    persistUserPreferences();
+    render();
+  }
+
+  function resetUserPreferences() {
+    state.userPreferences = defaultUserPreferences("investor");
+    persistUserPreferences();
+    applyPreferenceDefaults();
+    toast("Personalisierung auf Standard zurueckgesetzt.");
+    render();
+  }
+
+  function updatePreferenceControl(input) {
+    const name = input.name;
+    if (!name) {
+      return;
+    }
+    const prefs = dashboardPrefs();
+    const value = preferenceControlValue(input);
+    let next = prefs;
+
+    if (name === "mode") {
+      setDashboardMode(value);
+      return;
+    }
+    if (name.startsWith("profile.")) {
+      const key = name.replace("profile.", "");
+      next = { ...prefs, profile: { ...prefs.profile, [key]: value } };
+    } else if (name.startsWith("display.")) {
+      const key = name.replace("display.", "");
+      next = { ...prefs, display: { ...prefs.display, [key]: value } };
+    } else if (name.startsWith("defaults.")) {
+      next = setPreferenceDefaultValue(prefs, name.replace("defaults.", ""), value);
+    } else {
+      return;
+    }
+
+    state.userPreferences = normalizeUserPreferences(next);
+    persistUserPreferences();
+    applyPreferenceDefaults();
+    if (input.type === "checkbox" || input.tagName === "SELECT") {
+      render();
+    }
+  }
+
+  function preferenceControlValue(input) {
+    if (input.type === "checkbox") {
+      return input.checked;
+    }
+    if (input.type === "number") {
+      return Number(input.value || 0);
+    }
+    if (["left", "right"].includes(input.name.split(".").pop())) {
+      const symbol = normalizeSymbol(input.value);
+      return assetMap.has(symbol) ? symbol : input.value;
+    }
+    return input.value;
+  }
+
+  function setPreferenceDefaultValue(prefs, path, value) {
+    const [group, key] = path.split(".");
+    if (!prefs.defaults[group] || !key) {
+      return prefs;
+    }
+    return {
+      ...prefs,
+      defaults: {
+        ...prefs.defaults,
+        [group]: {
+          ...prefs.defaults[group],
+          [key]: value
+        }
+      }
+    };
+  }
+
+  function saveModuleDefault(group, values = {}) {
+    const prefs = dashboardPrefs();
+    state.userPreferences = normalizeUserPreferences({
+      ...prefs,
+      defaults: {
+        ...prefs.defaults,
+        [group]: {
+          ...prefs.defaults[group],
+          ...values
+        }
+      }
+    });
+    persistUserPreferences();
+  }
+
+  function preferenceModeLabel(mode) {
+    return DASHBOARD_MODES[mode]?.label || "Investor";
+  }
+
+  function modulePriorityLabel(priority) {
+    const labels = { high: "oben", normal: "normal", hidden: "ausblenden" };
+    return labels[priority] || "normal";
+  }
+
+  function profileOptionLabel(group, value) {
+    return PROFILE_OPTION_LABELS[group]?.[value] || value || "nicht gesetzt";
+  }
+
+  function favoriteAssetCandidates() {
+    const prefs = dashboardPrefs();
+    return unique([...prefs.favorites, ...state.watchlist, ...state.recents, ...HOME_TICKER, "SPY", "QQQ", "GLD", "BTC"])
+      .map(getAsset)
+      .filter(Boolean)
+      .slice(0, 18);
+  }
+
+  function selectedShortcuts() {
+    const prefs = dashboardPrefs();
+    return prefs.shortcuts.map((id) => SHORTCUT_CATALOG.find((shortcut) => shortcut.id === id)).filter(Boolean);
   }
 
   function journalEntriesFor(symbol) {
@@ -9509,11 +13936,986 @@
     render();
   }
 
+  function renderJournalPage() {
+    ensureHomeData();
+    ensureEventData();
+    const entries = journalEntriesForView();
+    const filteredEntries = filteredJournalEntries(entries);
+    const stats = journalStats(entries);
+    const draft = journalDraftForForm();
+
+    app.innerHTML = `
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Journal / Psychologie / Fehleranalyse V2</p>
+            <h1>Entscheidungen besser verstehen.</h1>
+            <p>Lokales Investment- und Trading-Journal für These, Emotion, Regel-Check, Fehleranalyse, Review und Monatsrückblick. Keine Psychologie-Blackbox, sondern nachvollziehbare Reflexionslogik.</p>
+          </div>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-journal-open="${escAttr(state.activeSymbol || "NVDA")}" data-journal-context="quick">Eintrag für ${esc(state.activeSymbol || "NVDA")}</button>
+            <button class="ghost-button" type="button" data-route="asset">Aktives Asset öffnen</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        ${renderJournalDashboard(stats)}
+      </section>
+
+      <section class="section">
+        <div class="journal-layout">
+          ${renderJournalEntryForm(draft)}
+          <article class="card journal-list-card">
+            <div class="card-topline">
+              <div>
+                <span class="card-label">Journal-Liste</span>
+                <h3><span id="journalFilterCount">${filteredEntries.length}</span> gefilterte Entscheidungen</h3>
+                <p>Suche nach Asset, These, Emotion, Fehlerklasse oder Review-Status. Alles bleibt lokal im Browser gespeichert.</p>
+              </div>
+              ${renderDataMeta(journalDataMeta(entries), true)}
+            </div>
+            ${renderJournalFilters()}
+            <div class="journal-entry-list" id="journalResults">
+              ${filteredEntries.map(renderJournalEntryCard).join("") || renderEmptyState("Noch keine passenden Journal-Einträge. Lege links den ersten Eintrag an.")}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="grid three">
+          ${renderJournalMistakeCard(entries)}
+          ${renderJournalBiasCard(entries)}
+          ${renderJournalMonthlyReview(entries)}
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="grid two">
+          ${renderJournalBestWorstCard(entries, "best")}
+          ${renderJournalBestWorstCard(entries, "worst")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderJournalDashboard(stats) {
+    return `
+      <article class="card journal-dashboard-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Entscheidungsqualität</span>
+            <h3>${esc(stats.label)}</h3>
+            <p>${esc(stats.summary)}</p>
+          </div>
+          <div class="journal-score-badge ${escAttr(stats.tone)}">
+            <strong>${stats.score}</strong>
+            <span>/100</span>
+          </div>
+        </div>
+        <div class="journal-dashboard-grid">
+          ${renderMiniMetric("Einträge", String(stats.count))}
+          ${renderMiniMetric("Reviewed", `${formatNumber(stats.reviewQuote)}%`)}
+          ${renderMiniMetric("Regeltreue", `${formatNumber(stats.ruleAdherence)}%`)}
+          ${renderMiniMetric("Emotionale Stabilität", `${formatNumber(stats.emotionalStability)}%`)}
+          ${renderMiniMetric("These-Klarheit", `${formatNumber(stats.thesisClarity)}%`)}
+          ${renderMiniMetric("Häufigster Fehler", stats.topMistake || "noch offen")}
+        </div>
+        <div class="journal-method-note">
+          <span class="pill">Lokal / Produktlogik</span>
+          <p>Der Score kombiniert Regeltreue, These-Klarheit, emotionale Stabilität und Review-Quote. Er bewertet Muster in deinen Eingaben, nicht deine Persönlichkeit und keine objektive Markt-Wahrheit.</p>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderJournalEntryForm(entry) {
+    const isEditing = Boolean(entry.id && state.journal.some((item) => item.id === entry.id));
+    return `
+      <article class="card journal-form-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">${isEditing ? "Eintrag bearbeiten" : "Neuer Eintrag"}</span>
+            <h3>${isEditing ? "Entscheidung sauber nachziehen" : "Entscheidung dokumentieren"}</h3>
+            <p>These, Gefühl, Regel-Check und Fehlerklassen werden strukturiert gespeichert, damit spätere Reviews möglich werden.</p>
+          </div>
+          ${isEditing ? `<button class="tiny-button" type="button" data-journal-clear-draft>Neu starten</button>` : ""}
+        </div>
+        <form class="journal-form journal-entry-form" data-journal-form>
+          <input type="hidden" name="id" value="${escAttr(isEditing ? entry.id : "")}">
+          <div class="form-grid">
+            <label class="field"><span>Datum / Zeitpunkt</span><input name="timestamp" type="datetime-local" value="${escAttr(toDateTimeLocal(entry.timestamp || Date.now()))}"></label>
+            <label class="field"><span>Asset / Symbol</span><input name="symbol" value="${escAttr(entry.symbol || state.activeSymbol || "NVDA")}" placeholder="NVDA, SPY, BTC"></label>
+            <label class="field"><span>Entscheidung</span><select name="type">${renderSelectOptions(JOURNAL_DECISION_TYPES, entry.type || "observe")}</select></label>
+            <label class="field"><span>Kategorie</span><select name="category">${renderSelectOptions(JOURNAL_CATEGORIES, entry.category || "longterm")}</select></label>
+            <label class="field"><span>Positionsgröße / Umfang</span><input name="size" value="${escAttr(entry.size || "")}" placeholder="z. B. 3% Portfolio, 1.000 €, Sparrate"></label>
+            <label class="field"><span>Zeithorizont</span><select name="horizon">${renderSelectOptions([
+              { value: "days", label: "Tage" },
+              { value: "weeks", label: "Wochen" },
+              { value: "months", label: "Monate" },
+              { value: "years", label: "Jahre" }
+            ], entry.horizon || "months")}</select></label>
+          </div>
+
+          <label class="field"><span>These / Hauptgrund</span><textarea name="thesis" placeholder="Warum treffe ich diese Entscheidung?">${esc(entry.thesis || "")}</textarea></label>
+          <label class="field"><span>1–3 Kernargumente</span><textarea name="arguments" placeholder="Ein Argument pro Zeile">${esc((entry.arguments || []).join("\n"))}</textarea></label>
+          <div class="form-grid">
+            <label class="field"><span>Bull Case / Chance</span><textarea name="bullCase" placeholder="Was müsste positiv laufen?">${esc(entry.bullCase || "")}</textarea></label>
+            <label class="field"><span>Bear Case / Risiko</span><textarea name="bearCase" placeholder="Was kann schiefgehen?">${esc(entry.bearCase || "")}</textarea></label>
+            <label class="field"><span>Trigger / Beobachten</span><input name="trigger" value="${escAttr(entry.trigger || "")}" placeholder="Earnings, Support, Makrodaten, News"></label>
+            <label class="field"><span>Meinung ändern, wenn...</span><input name="invalidation" value="${escAttr(entry.invalidation || "")}" placeholder="Welche Bedingung kippt die These?"></label>
+            <label class="field full-field"><span>Ziel / Erwartung</span><input name="target" value="${escAttr(entry.target || "")}" placeholder="Kein Kursziel nötig: auch qualitative Erwartung reicht."></label>
+          </div>
+
+          <div class="journal-form-section">
+            <div class="mini-section-head">
+              <span class="card-label">Psychologie</span>
+              <strong>Gefühl und Druck festhalten</strong>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>Gefühl</span><select name="emotion">${renderSelectOptions(JOURNAL_EMOTIONS, entry.emotion || "neutral")}</select></label>
+              <label class="field"><span>Emotionsstärke 1–10</span><input name="emotionStrength" type="number" min="1" max="10" value="${escAttr(entry.emotionStrength || 4)}"></label>
+              <label class="field"><span>Conviction 1–10</span><input name="conviction" type="number" min="1" max="10" value="${escAttr(entry.conviction || 6)}"></label>
+              <label class="field"><span>Entscheidungsdruck</span><select name="pressure">${renderSelectOptions([
+                { value: "low", label: "Niedrig" },
+                { value: "medium", label: "Mittel" },
+                { value: "high", label: "Hoch" }
+              ], entry.pressure || "medium")}</select></label>
+            </div>
+          </div>
+
+          <div class="journal-form-section">
+            <div class="mini-section-head">
+              <span class="card-label">Regel-Check</span>
+              <strong>War die Entscheidung sauber?</strong>
+            </div>
+            <div class="form-grid">
+              ${renderJournalRuleField("plan", "Plan eingehalten?", entry.rule?.plan)}
+              ${renderJournalRuleField("entry", "Setup regelkonform?", entry.rule?.entry)}
+              ${renderJournalRuleField("risk", "Risiko angemessen?", entry.rule?.risk)}
+              ${renderJournalRuleField("reason", "Klarer Grund?", entry.rule?.reason)}
+              ${renderJournalRuleField("impulse", "Nicht impulsiv?", entry.rule?.impulse)}
+              ${renderJournalRuleField("size", "Positionsgröße sinnvoll?", entry.rule?.size)}
+            </div>
+            <label class="field"><span>Was habe ich ignoriert?</span><textarea name="ignored" placeholder="Warnsignal, Risiko, Gegenargument oder Regelverstoß">${esc(entry.ignored || "")}</textarea></label>
+          </div>
+
+          <div class="journal-form-section">
+            <div class="mini-section-head">
+              <span class="card-label">Fehlerklassen</span>
+              <strong>Welche Muster könnten relevant sein?</strong>
+            </div>
+            <div class="journal-checkbox-grid">
+              ${JOURNAL_MISTAKE_TAGS.map((tag) => `
+                <label class="journal-check-chip">
+                  <input type="checkbox" name="mistakes" value="${escAttr(tag.value)}" ${(entry.mistakes || []).includes(tag.value) ? "checked" : ""}>
+                  <span>${esc(tag.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+
+          <label class="field"><span>Kommentar / Kontext</span><textarea name="comment" placeholder="Was war noch wichtig?">${esc(entry.comment || "")}</textarea></label>
+          <button class="primary-button" type="submit">${isEditing ? "Eintrag aktualisieren" : "Journal-Eintrag speichern"}</button>
+        </form>
+      </article>
+    `;
+  }
+
+  function renderJournalRuleField(name, label, value = "partial") {
+    return `<label class="field"><span>${esc(label)}</span><select name="rule_${escAttr(name)}">${renderSelectOptions(JOURNAL_RULE_OPTIONS, value || "partial")}</select></label>`;
+  }
+
+  function renderJournalFilters() {
+    const filters = state.journalFilters;
+    const mistakeOptions = [{ value: "all", label: "Alle Fehlerklassen" }, ...JOURNAL_MISTAKE_TAGS];
+    return `
+      <div class="journal-filter-panel">
+        <label class="field"><span>Suche</span><input data-journal-control name="search" value="${escAttr(filters.search || "")}" placeholder="Symbol, These, Trigger, Kommentar"></label>
+        <label class="field"><span>Entscheidung</span><select data-journal-control name="type">${renderSelectOptions([{ value: "all", label: "Alle Entscheidungen" }, ...JOURNAL_DECISION_TYPES], filters.type || "all")}</select></label>
+        <label class="field"><span>Kategorie</span><select data-journal-control name="category">${renderSelectOptions([{ value: "all", label: "Alle Kategorien" }, ...JOURNAL_CATEGORIES], filters.category || "all")}</select></label>
+        <label class="field"><span>Emotion</span><select data-journal-control name="emotion">${renderSelectOptions([{ value: "all", label: "Alle Emotionen" }, ...JOURNAL_EMOTIONS], filters.emotion || "all")}</select></label>
+        <label class="field"><span>Fehlerklasse</span><select data-journal-control name="mistake">${renderSelectOptions(mistakeOptions, filters.mistake || "all")}</select></label>
+        <label class="field"><span>Review</span><select data-journal-control name="review">${renderSelectOptions([
+          { value: "all", label: "Alle" },
+          { value: "open", label: "Ohne Review" },
+          { value: "reviewed", label: "Reviewed" }
+        ], filters.review || "all")}</select></label>
+      </div>
+    `;
+  }
+
+  function renderJournalEntryCard(entry) {
+    const quality = journalDecisionQualityScore(entry);
+    const rule = journalRuleSummary(entry);
+    const asset = assetMap.has(entry.symbol) ? getAsset(entry.symbol) : null;
+    const event = asset ? eventsForSymbol(entry.symbol)[0] : null;
+    const status = journalReviewed(entry) ? "Reviewed" : "Offen";
+    const mistakeChips = entry.mistakes.length
+      ? entry.mistakes.slice(0, 4).map((tag) => `<span class="pill ${tag === "rule_break" || tag === "fomo" ? "bear" : ""}">${esc(journalMistakeLabel(tag))}</span>`).join("")
+      : `<span class="pill">Keine Fehlerklasse</span>`;
+    return `
+      <article class="journal-entry-card">
+        <div class="journal-entry-head">
+          <button class="symbol-button" type="button" ${asset ? `data-symbol="${escAttr(entry.symbol)}"` : ""}>
+            <strong>${esc(entry.symbol)}</strong>
+            <span>${asset ? esc(asset.name) : "Thema / manuell"}</span>
+          </button>
+          <div class="journal-entry-meta">
+            <span class="pill">${esc(journalDecisionTypeLabel(entry.type))}</span>
+            <span class="pill">${esc(journalCategoryLabel(entry.category))}</span>
+            <span class="pill ${journalReviewed(entry) ? "bull" : ""}">${esc(status)}</span>
+          </div>
+        </div>
+        <div class="journal-entry-body">
+          <div>
+            <span class="card-label">${formatTimestamp(entry.timestamp)}</span>
+            <h3>${esc(entry.thesis || "These noch nicht ausformuliert")}</h3>
+            <p>${esc(entry.trigger || entry.invalidation || "Kein Trigger dokumentiert.")}</p>
+            ${entry.arguments.length ? `<div class="journal-argument-list">${entry.arguments.slice(0, 3).map((item) => `<span>${esc(item)}</span>`).join("")}</div>` : ""}
+          </div>
+          <div class="journal-quality-panel">
+            <span class="score-pill ${escAttr(quality.tone)}">${quality.score}</span>
+            <strong>${esc(quality.label)}</strong>
+            <small>${esc(rule.label)} · ${esc(journalEmotionLabel(entry.emotion))} · Druck ${esc(journalPressureLabel(entry.pressure))}</small>
+          </div>
+        </div>
+        <div class="journal-chip-row">${mistakeChips}</div>
+        <div class="journal-entry-context">
+          <span><strong>Chance:</strong> ${esc(entry.bullCase || "nicht festgehalten")}</span>
+          <span><strong>Risiko:</strong> ${esc(entry.bearCase || "nicht festgehalten")}</span>
+          <span><strong>Nächster Bezug:</strong> ${esc(event ? `${eventTimingLabel(event)} · ${event.title}` : "kein Event verknüpft")}</span>
+        </div>
+        <details class="journal-review-card">
+          <summary>Review / Lernen</summary>
+          ${renderJournalReviewForm(entry)}
+        </details>
+        <div class="row-actions journal-entry-actions">
+          ${asset ? `<button class="tiny-button" type="button" data-symbol="${escAttr(entry.symbol)}">Asset</button>` : ""}
+          ${asset ? `<button class="tiny-button" type="button" data-compare-open="${escAttr(entry.symbol)}">Compare</button>` : ""}
+          ${asset ? `<button class="tiny-button" type="button" data-alert-quick="${escAttr(entry.symbol)}" data-alert-quick-type="price">Alert</button>` : ""}
+          <button class="tiny-button" type="button" data-journal-edit="${escAttr(entry.id)}">Bearbeiten</button>
+          <button class="tiny-button danger-button" type="button" data-journal-delete="${escAttr(entry.id)}">Löschen</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderJournalReviewForm(entry) {
+    const review = entry.review || {};
+    return `
+      <form class="journal-review-form" data-journal-review-form>
+        <input type="hidden" name="id" value="${escAttr(entry.id)}">
+        <div class="form-grid">
+          <label class="field"><span>Ergebnis</span><select name="outcome">${renderSelectOptions([
+            { value: "open", label: "Noch offen" },
+            { value: "positive", label: "Positiv" },
+            { value: "mixed", label: "Gemischt" },
+            { value: "negative", label: "Negativ" }
+          ], review.outcome || "open")}</select></label>
+          <label class="field"><span>These aufgegangen?</span><select name="thesisWorked">${renderSelectOptions([
+            { value: "open", label: "Noch offen" },
+            { value: "yes", label: "Ja" },
+            { value: "partial", label: "Teilweise" },
+            { value: "no", label: "Nein" }
+          ], review.thesisWorked || "open")}</select></label>
+          <label class="field"><span>Noch einmal so handeln?</span><select name="repeat">${renderSelectOptions([
+            { value: "open", label: "Noch offen" },
+            { value: "yes", label: "Ja" },
+            { value: "partial", label: "Teilweise" },
+            { value: "no", label: "Nein" }
+          ], review.repeat || "open")}</select></label>
+          <label class="field"><span>Entscheidungsqualität</span><select name="quality">${renderSelectOptions([
+            { value: "open", label: "Noch offen" },
+            { value: "strong", label: "Gut trotz Ergebnis" },
+            { value: "ok", label: "Solide" },
+            { value: "weak", label: "Schwach / impulsiv" }
+          ], review.quality || "open")}</select></label>
+          <label class="field full-field"><span>Learning</span><textarea name="learning" placeholder="Was nehme ich aus dieser Entscheidung mit?">${esc(review.learning || "")}</textarea></label>
+        </div>
+        <button class="primary-button" type="submit">Review speichern</button>
+      </form>
+    `;
+  }
+
+  function renderJournalMistakeCard(entries) {
+    const mistakes = journalMistakeStats(entries).slice(0, 6);
+    return `
+      <article class="card journal-insight-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Fehleranalyse</span>
+            <h3>Wiederkehrende Muster</h3>
+            <p>Aus Fehler-Tags, Regel-Check und Emotionen abgeleitet. Keine Diagnose, nur sichtbare Muster.</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="journal-insight-list">
+          ${mistakes.map((item) => `
+            <div class="journal-insight-row">
+              <span class="pill ${item.count >= 3 ? "bear" : ""}">${esc(item.label)}</span>
+              <strong>${item.count}x</strong>
+            </div>
+          `).join("") || renderEmptyState("Noch keine Fehlermuster erkennbar.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderJournalBiasCard(entries) {
+    const hints = journalBiasHints(entries);
+    return `
+      <article class="card journal-insight-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Bias / Disziplin</span>
+            <h3>Hinweise statt Urteil</h3>
+            <p>Die App zeigt einfache Muster wie FOMO, Stress, Regelbrüche und niedrige Review-Quote.</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="journal-insight-list">
+          ${hints.map((hint) => `
+            <div class="insight-row">
+              <span class="pill ${escAttr(hint.tone || "")}">${esc(hint.label)}</span>
+              <p>${esc(hint.text)}</p>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderJournalMonthlyReview(entries) {
+    const review = journalMonthlyReview(entries);
+    return `
+      <article class="card journal-insight-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">Monatsreview</span>
+            <h3>${esc(review.title)}</h3>
+            <p>${esc(review.summary)}</p>
+          </div>
+          ${renderStatusBadge("local")}
+        </div>
+        <div class="metric-grid">
+          ${renderMiniMetric("Einträge", String(review.count))}
+          ${renderMiniMetric("Regeltreue", `${formatNumber(review.ruleAdherence)}%`)}
+          ${renderMiniMetric("Top-Emotion", review.topEmotion)}
+          ${renderMiniMetric("Review-Quote", `${formatNumber(review.reviewQuote)}%`)}
+        </div>
+        <div class="journal-method-note">
+          <span class="pill">Nächster Monat</span>
+          <p>${esc(review.learning)}</p>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderJournalBestWorstCard(entries, mode) {
+    const rows = journalBestWorst(entries, mode);
+    const isBest = mode === "best";
+    return `
+      <article class="card journal-rank-card">
+        <div class="card-topline">
+          <div>
+            <span class="card-label">${isBest ? "Beste Entscheidungen" : "Schlechteste Entscheidungen"}</span>
+            <h3>${isBest ? "Was gut funktioniert hat" : "Was du prüfen solltest"}</h3>
+            <p>${isBest ? "Bewertet werden Qualität, Review, Regeltreue und Ergebnis-Hinweis." : "Niedrige Qualität heißt nicht automatisch Verlust, sondern oft unsauberer Prozess."}</p>
+          </div>
+        </div>
+        <div class="journal-rank-list">
+          ${rows.map((row) => `
+            <button class="journal-rank-row" type="button" ${assetMap.has(row.symbol) ? `data-symbol="${escAttr(row.symbol)}"` : ""}>
+              <span class="rank">${row.rank}</span>
+              <span>
+                <strong>${esc(row.symbol)} · ${esc(journalDecisionTypeLabel(row.type))}</strong>
+                <small>${esc(row.reason)}</small>
+              </span>
+              <span class="${escAttr(row.tone)}">${row.score}</span>
+            </button>
+          `).join("") || renderEmptyState("Noch nicht genug Journal-Daten für diese Auswertung.")}
+        </div>
+      </article>
+    `;
+  }
+
+  function journalEntriesFor(symbol) {
+    return journalEntriesForView()
+      .filter((entry) => entry.symbol === normalizeSymbol(symbol))
+      .slice(0, 6);
+  }
+
+  function journalEntriesForView() {
+    return (state.journal || [])
+      .map(normalizeJournalEntry)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  function filteredJournalEntries(entries) {
+    const filters = state.journalFilters || {};
+    const search = String(filters.search || "").trim().toLowerCase();
+    return entries.filter((entry) => {
+      if (filters.type && filters.type !== "all" && entry.type !== filters.type) return false;
+      if (filters.category && filters.category !== "all" && entry.category !== filters.category) return false;
+      if (filters.emotion && filters.emotion !== "all" && entry.emotion !== filters.emotion) return false;
+      if (filters.mistake && filters.mistake !== "all" && !entry.mistakes.includes(filters.mistake)) return false;
+      if (filters.review === "open" && journalReviewed(entry)) return false;
+      if (filters.review === "reviewed" && !journalReviewed(entry)) return false;
+      if (!search) return true;
+      return [
+        entry.symbol,
+        entry.thesis,
+        entry.trigger,
+        entry.comment,
+        entry.bullCase,
+        entry.bearCase,
+        entry.ignored,
+        entry.arguments.join(" "),
+        entry.mistakes.map(journalMistakeLabel).join(" ")
+      ].some((value) => String(value || "").toLowerCase().includes(search));
+    });
+  }
+
+  function journalDraftForForm() {
+    return state.journalDraft ? normalizeJournalEntry(state.journalDraft) : normalizeJournalEntry({
+      symbol: state.activeSymbol || "NVDA",
+      type: "observe",
+      category: assetMap.get(state.activeSymbol)?.type === "ETF" ? "etf" : "longterm",
+      timestamp: Date.now()
+    });
+  }
+
+  function normalizeJournalEntry(entry = {}) {
+    const rawSymbol = normalizeSymbol(entry.symbol || state.activeSymbol || "NVDA");
+    const emotion = normalizeJournalEmotion(entry.emotion);
+    const rule = normalizeJournalRule(entry.rule ? { ...entry, ...entry.rule } : entry);
+    const mistakes = uniqueList([
+      ...(Array.isArray(entry.mistakes) ? entry.mistakes : []),
+      ...inferJournalMistakes({ ...entry, emotion, rule })
+    ]).filter((tag) => JOURNAL_MISTAKE_TAGS.some((item) => item.value === tag));
+    const review = {
+      outcome: String(entry.review?.outcome || entry.outcome || "open"),
+      thesisWorked: String(entry.review?.thesisWorked || entry.thesisWorked || "open"),
+      repeat: String(entry.review?.repeat || entry.repeat || "open"),
+      quality: String(entry.review?.quality || entry.quality || "open"),
+      learning: String(entry.review?.learning || entry.learning || "").trim(),
+      reviewedAt: Number(entry.review?.reviewedAt || entry.reviewedAt || 0)
+    };
+    const normalized = {
+      id: String(entry.id || `journal-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+      symbol: rawSymbol || "NVDA",
+      timestamp: normalizeJournalTimestamp(entry.timestamp),
+      type: normalizeOptionValue(entry.type || entry.decisionType || "observe", JOURNAL_DECISION_TYPES, "observe"),
+      category: normalizeOptionValue(entry.category || "longterm", JOURNAL_CATEGORIES, "longterm"),
+      size: String(entry.size || entry.positionSize || "").trim(),
+      thesis: String(entry.thesis || "").trim(),
+      arguments: Array.isArray(entry.arguments) ? entry.arguments.map(String).map((item) => item.trim()).filter(Boolean) : splitLines(entry.arguments || entry.argumentsText),
+      invalidation: String(entry.invalidation || "").trim(),
+      bullCase: String(entry.bullCase || "").trim(),
+      bearCase: String(entry.bearCase || "").trim(),
+      trigger: String(entry.trigger || "").trim(),
+      horizon: String(entry.horizon || "months"),
+      target: String(entry.target || "").trim(),
+      emotion,
+      emotionStrength: clamp(Number(entry.emotionStrength || 4), 1, 10),
+      conviction: clamp(Number(entry.conviction || 6), 1, 10),
+      pressure: ["low", "medium", "high"].includes(entry.pressure) ? entry.pressure : "medium",
+      rule,
+      ignored: String(entry.ignored || "").trim(),
+      mistakes,
+      comment: String(entry.comment || "").trim(),
+      review
+    };
+    normalized.ruleCheck = journalRuleSummary(normalized).label;
+    return normalized;
+  }
+
+  function normalizeJournalRule(source = {}) {
+    const oldRuleCheck = String(source.ruleCheck || "");
+    const fallback = oldRuleCheck === "ok" ? "yes" : oldRuleCheck === "risk" ? "no" : "partial";
+    return {
+      plan: normalizeRuleValue(source.plan || source.rule_plan || fallback),
+      entry: normalizeRuleValue(source.entry || source.rule_entry || fallback),
+      risk: normalizeRuleValue(source.risk || source.rule_risk || fallback),
+      reason: normalizeRuleValue(source.reason || source.rule_reason || (source.thesis ? "yes" : fallback)),
+      impulse: normalizeRuleValue(source.impulse || source.rule_impulse || (["fomo", "stress", "euphoria"].includes(source.emotion) ? "no" : fallback)),
+      size: normalizeRuleValue(source.size || source.rule_size || fallback)
+    };
+  }
+
+  function normalizeJournalTimestamp(value) {
+    if (!value) return Date.now();
+    if (Number.isFinite(Number(value))) return Number(value);
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  }
+
+  function normalizeJournalEmotion(value) {
+    const raw = String(value || "neutral").toLowerCase();
+    const aliases = {
+      rational: "calm",
+      ruhig: "calm",
+      "überzeugt": "convinced",
+      ueberzeugt: "convinced",
+      unsicher: "unsure",
+      angst: "fear",
+      euphorie: "euphoria",
+      frust: "frustration"
+    };
+    const normalized = aliases[raw] || raw;
+    return JOURNAL_EMOTIONS.some((item) => item.value === normalized) ? normalized : "neutral";
+  }
+
+  function normalizeRuleValue(value) {
+    return ["yes", "partial", "no"].includes(value) ? value : "partial";
+  }
+
+  function normalizeOptionValue(value, options, fallback) {
+    return options.some((item) => item.value === value) ? value : fallback;
+  }
+
+  function inferJournalMistakes(entry) {
+    const mistakes = [];
+    if (entry.emotion === "fomo") mistakes.push("fomo");
+    if (["stress", "fear", "frustration"].includes(entry.emotion) && Number(entry.emotionStrength || 0) >= 7) mistakes.push("loss_aversion");
+    if (entry.emotion === "euphoria" && Number(entry.conviction || 0) >= 8) mistakes.push("overconfidence");
+    if (!String(entry.thesis || "").trim()) mistakes.push("no_thesis");
+    if (Object.values(entry.rule || {}).some((value) => value === "no")) mistakes.push("rule_break");
+    if (entry.rule?.size === "no") mistakes.push("position_size");
+    if (entry.rule?.impulse === "no") mistakes.push("impatience");
+    return mistakes;
+  }
+
+  function journalQualityHint(entry) {
+    if (!entry) {
+      return {
+        label: "These offen",
+        text: "Ein guter Eintrag nennt These, Trigger und Regel-Check. So wird aus Intuition später überprüfbares Lernen."
+      };
+    }
+    const normalized = normalizeJournalEntry(entry);
+    const quality = journalDecisionQualityScore(normalized);
+    if (quality.score < 50 || normalized.mistakes.includes("rule_break")) {
+      return {
+        label: "Noch einmal prüfen",
+        text: "Der letzte Eintrag zeigt Regelbruch, Stress oder schwache These. Vor der nächsten Entscheidung Setup und Positionsgröße kontrollieren."
+      };
+    }
+    if (!journalReviewed(normalized)) {
+      return {
+        label: "Review offen",
+        text: "Der Eintrag ist dokumentiert, aber noch nicht überprüft. Später prüfen: These aufgegangen oder nur Ergebnisglück?"
+      };
+    }
+    return {
+      label: "Plan wirkt sauber",
+      text: "These, Regel-Check und Review sind nachvollziehbar dokumentiert. Das stärkt wiederholbare Entscheidungsqualität."
+    };
+  }
+
+  function saveJournalEntryFromForm(form) {
+    const data = new FormData(form);
+    const symbol = normalizeSymbol(data.get("symbol"));
+    const thesis = String(data.get("thesis") || "").trim();
+    const comment = String(data.get("comment") || "").trim();
+    if (!symbol || (!thesis && !comment)) {
+      toast("Bitte mindestens Symbol und These oder Kommentar eintragen.");
+      return;
+    }
+    const id = String(data.get("id") || "").trim();
+    const entry = normalizeJournalEntry({
+      id: id || `journal-${Date.now()}`,
+      symbol,
+      timestamp: data.get("timestamp"),
+      type: String(data.get("type") || "observe"),
+      category: String(data.get("category") || "longterm"),
+      size: data.get("size"),
+      thesis,
+      arguments: splitLines(data.get("arguments")),
+      invalidation: data.get("invalidation"),
+      bullCase: data.get("bullCase"),
+      bearCase: data.get("bearCase"),
+      trigger: data.get("trigger"),
+      horizon: data.get("horizon"),
+      target: data.get("target"),
+      emotion: data.get("emotion"),
+      emotionStrength: data.get("emotionStrength"),
+      conviction: data.get("conviction"),
+      pressure: data.get("pressure"),
+      ruleCheck: data.get("ruleCheck"),
+      rule: {
+        plan: data.get("rule_plan"),
+        entry: data.get("rule_entry"),
+        risk: data.get("rule_risk"),
+        reason: data.get("rule_reason"),
+        impulse: data.get("rule_impulse"),
+        size: data.get("rule_size")
+      },
+      ignored: data.get("ignored"),
+      mistakes: data.getAll("mistakes").map(String),
+      comment
+    });
+    const existingIndex = state.journal.findIndex((item) => item.id === id);
+    if (existingIndex >= 0) {
+      const previous = normalizeJournalEntry(state.journal[existingIndex]);
+      state.journal[existingIndex] = { ...entry, review: previous.review };
+      toast("Journal-Eintrag aktualisiert.");
+    } else {
+      state.journal = [entry, ...state.journal].slice(0, 220);
+      toast("Journal-Eintrag gespeichert.");
+    }
+    state.journalDraft = null;
+    storageSet(STORAGE_KEYS.journal, state.journal);
+    form.reset();
+    render();
+  }
+
+  function saveJournalReviewFromForm(form) {
+    const data = new FormData(form);
+    const id = String(data.get("id") || "").trim();
+    const index = state.journal.findIndex((entry) => entry.id === id);
+    if (index < 0) {
+      toast("Journal-Eintrag nicht gefunden.");
+      return;
+    }
+    const current = normalizeJournalEntry(state.journal[index]);
+    current.review = {
+      outcome: String(data.get("outcome") || "open"),
+      thesisWorked: String(data.get("thesisWorked") || "open"),
+      repeat: String(data.get("repeat") || "open"),
+      quality: String(data.get("quality") || "open"),
+      learning: String(data.get("learning") || "").trim(),
+      reviewedAt: Date.now()
+    };
+    state.journal[index] = current;
+    storageSet(STORAGE_KEYS.journal, state.journal);
+    toast("Review gespeichert.");
+    render();
+  }
+
+  function openJournalDraft(symbol, context = "") {
+    const normalized = normalizeSymbol(symbol || state.activeSymbol || "NVDA");
+    const asset = assetMap.get(normalized);
+    state.journalDraft = normalizeJournalEntry({
+      symbol: asset ? normalized : (state.activeSymbol || "NVDA"),
+      type: context === "portfolio" ? "portfolio" : "observe",
+      category: asset?.type === "ETF" ? "etf" : "longterm",
+      trigger: context === "portfolio" ? "Portfolio-Review / Positionsentscheidung" : "",
+      comment: context ? `Aus ${context} geöffnet.` : ""
+    });
+    if (state.route === "journal") {
+      render();
+    } else {
+      navigate("journal");
+    }
+  }
+
+  function editJournalEntry(id) {
+    const entry = journalEntriesForView().find((item) => item.id === id);
+    if (!entry) {
+      toast("Journal-Eintrag nicht gefunden.");
+      return;
+    }
+    state.journalDraft = entry;
+    if (state.route === "journal") {
+      render();
+    } else {
+      navigate("journal");
+    }
+  }
+
+  function deleteJournalEntry(id) {
+    const entry = state.journal.find((item) => item.id === id);
+    if (!entry) return;
+    if (!window.confirm("Journal-Eintrag wirklich löschen?")) return;
+    state.journal = state.journal.filter((item) => item.id !== id);
+    storageSet(STORAGE_KEYS.journal, state.journal);
+    toast("Journal-Eintrag gelöscht.");
+    render();
+  }
+
+  function updateJournalFilterState(input) {
+    if (!input.name) return;
+    state.journalFilters[input.name] = input.value;
+    const target = document.getElementById("journalResults");
+    if (target) {
+      const entries = filteredJournalEntries(journalEntriesForView());
+      const count = document.getElementById("journalFilterCount");
+      target.innerHTML = entries.map(renderJournalEntryCard).join("") || renderEmptyState("Noch keine passenden Journal-Einträge. Lege links den ersten Eintrag an.");
+      if (count) {
+        count.textContent = String(entries.length);
+      }
+    } else if (state.route === "journal") {
+      render();
+    }
+  }
+
+  function journalStats(entries) {
+    const count = entries.length;
+    const ruleAdherence = count ? average(entries.map(journalRuleScore)) : 0;
+    const emotionalStability = count ? average(entries.map(journalEmotionalStabilityScore)) : 0;
+    const thesisClarity = count ? average(entries.map(journalThesisClarityScore)) : 0;
+    const reviewQuote = count ? journalReviewedEntries(entries).length / count * 100 : 0;
+    const score = count ? Math.round(clamp(ruleAdherence * 0.3 + emotionalStability * 0.22 + thesisClarity * 0.28 + reviewQuote * 0.2, 0, 100)) : 0;
+    const mistakes = journalMistakeStats(entries);
+    const label = !count ? "Noch kein Journal" : score >= 75 ? "Disziplin wirkt stabil" : score >= 58 ? "Solide, aber verbesserbar" : "Entscheidungsprozess prüfen";
+    const tone = score >= 75 ? "bull" : score >= 58 ? "neutral" : "bear";
+    const summary = !count
+      ? "Starte mit einem ersten Eintrag. Der Nutzen entsteht, wenn These, Gefühl, Regel-Check und spätere Reviews zusammenkommen."
+      : score >= 75
+        ? "Viele Einträge wirken geplant, nachvollziehbar und reviewfähig. Achte weiter auf wiederkehrende Fehlerklassen."
+        : "Die Auswertung zeigt Verbesserungspotenzial bei Regeltreue, emotionalem Druck, These-Klarheit oder Review-Disziplin.";
+    return {
+      count,
+      score,
+      label,
+      tone,
+      summary,
+      ruleAdherence,
+      emotionalStability,
+      thesisClarity,
+      reviewQuote,
+      topMistake: mistakes[0]?.label || ""
+    };
+  }
+
+  function journalDecisionQualityScore(entry) {
+    const rule = journalRuleScore(entry);
+    const emotion = journalEmotionalStabilityScore(entry);
+    const thesis = journalThesisClarityScore(entry);
+    const review = journalReviewed(entry) ? 82 : 42;
+    const score = Math.round(clamp(rule * 0.33 + emotion * 0.22 + thesis * 0.3 + review * 0.15, 0, 100));
+    return {
+      score,
+      label: score >= 76 ? "Sauberer Prozess" : score >= 58 ? "Solide dokumentiert" : score >= 42 ? "Nacharbeit nötig" : "Disziplin prüfen",
+      tone: score >= 76 ? "bull" : score >= 58 ? "neutral" : "bear"
+    };
+  }
+
+  function journalRuleScore(entry) {
+    const values = Object.values(entry.rule || {});
+    if (!values.length) return 50;
+    const score = values.reduce((sum, value) => sum + (value === "yes" ? 100 : value === "partial" ? 55 : 10), 0) / values.length;
+    return clamp(score, 0, 100);
+  }
+
+  function journalRuleSummary(entry) {
+    const score = journalRuleScore(entry);
+    if (score >= 76) return { label: "Regelkonform", tone: "bull" };
+    if (score >= 55) return { label: "Teilweise sauber", tone: "neutral" };
+    return { label: "Regelbruch prüfen", tone: "bear" };
+  }
+
+  function journalEmotionalStabilityScore(entry) {
+    const calmBase = {
+      calm: 92,
+      neutral: 78,
+      convinced: 74,
+      unsure: 58,
+      fear: 45,
+      stress: 38,
+      fomo: 32,
+      euphoria: 42,
+      frustration: 36
+    }[entry.emotion] || 60;
+    const pressurePenalty = entry.pressure === "high" ? 12 : entry.pressure === "medium" ? 4 : 0;
+    const intensityPenalty = ["fomo", "stress", "euphoria", "fear", "frustration"].includes(entry.emotion) ? Math.max(0, Number(entry.emotionStrength || 0) - 5) * 5 : 0;
+    return clamp(calmBase - pressurePenalty - intensityPenalty, 0, 100);
+  }
+
+  function journalThesisClarityScore(entry) {
+    let score = 0;
+    if (entry.thesis.length >= 18) score += 30;
+    if (entry.arguments.length) score += Math.min(entry.arguments.length, 3) * 10;
+    if (entry.bullCase) score += 10;
+    if (entry.bearCase) score += 10;
+    if (entry.trigger) score += 10;
+    if (entry.invalidation) score += 10;
+    if (entry.horizon) score += 5;
+    if (entry.target) score += 5;
+    return clamp(score, 0, 100);
+  }
+
+  function journalReviewed(entry) {
+    const review = entry.review || {};
+    return Boolean(
+      review.learning ||
+      ["positive", "mixed", "negative"].includes(review.outcome) ||
+      ["yes", "partial", "no"].includes(review.thesisWorked) ||
+      ["yes", "partial", "no"].includes(review.repeat) ||
+      ["strong", "ok", "weak"].includes(review.quality)
+    );
+  }
+
+  function journalReviewedEntries(entries) {
+    return entries.filter(journalReviewed);
+  }
+
+  function journalMistakeStats(entries) {
+    const counts = new Map();
+    entries.forEach((entry) => {
+      entry.mistakes.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1));
+    });
+    return [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count, label: journalMistakeLabel(tag) }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }
+
+  function journalBiasHints(entries) {
+    if (!entries.length) {
+      return [{ label: "Startpunkt", text: "Noch keine Muster vorhanden. Dokumentiere zuerst ein paar Entscheidungen mit Emotion und Regel-Check.", tone: "neutral" }];
+    }
+    const hints = [];
+    const stats = journalStats(entries);
+    const fomoStress = entries.filter((entry) => ["fomo", "stress", "euphoria"].includes(entry.emotion)).length;
+    const ruleBreaks = entries.filter((entry) => journalRuleScore(entry) < 55).length;
+    const calmEntries = entries.filter((entry) => ["calm", "neutral"].includes(entry.emotion));
+    const emotionalEntries = entries.filter((entry) => ["fomo", "stress", "euphoria", "fear", "frustration"].includes(entry.emotion));
+    if (fomoStress >= Math.max(2, entries.length * 0.28)) {
+      hints.push({ label: "Emotion", text: "Mehrere Einträge zeigen FOMO, Stress oder Euphorie. Vor schnellen Entscheidungen hilft ein kurzer Regel-Check.", tone: "bear" });
+    }
+    if (ruleBreaks >= Math.max(2, entries.length * 0.25)) {
+      hints.push({ label: "Regelbruch", text: "Regelverstöße häufen sich. Prüfe Positionsgröße, klaren Grund und ob die Entscheidung wirklich geplant war.", tone: "bear" });
+    }
+    if (stats.reviewQuote < 35 && entries.length >= 4) {
+      hints.push({ label: "Review", text: "Viele Einträge sind noch nicht überprüft. Ohne Review bleibt schwer erkennbar, ob These oder Ergebnis zufällig war.", tone: "neutral" });
+    }
+    if (calmEntries.length && emotionalEntries.length) {
+      const calmScore = average(calmEntries.map((entry) => journalDecisionQualityScore(entry).score));
+      const emotionalScore = average(emotionalEntries.map((entry) => journalDecisionQualityScore(entry).score));
+      if (calmScore > emotionalScore + 10) {
+        hints.push({ label: "Muster", text: "Ruhige Entscheidungen wirken in deinen Einträgen strukturierter als emotionale Setups.", tone: "bull" });
+      }
+    }
+    if (!hints.length) {
+      hints.push({ label: "Stabil", text: "Noch kein auffälliges Bias-Muster. Sammle weiter Reviews, damit die Auswertung belastbarer wird.", tone: "bull" });
+    }
+    return hints.slice(0, 4);
+  }
+
+  function journalBestWorst(entries, mode) {
+    const rows = entries.map((entry) => {
+      const base = journalDecisionQualityScore(entry).score;
+      const outcome = { positive: 12, mixed: 0, negative: -12, open: 0 }[entry.review?.outcome || "open"] || 0;
+      const reviewQuality = { strong: 14, ok: 4, weak: -18, open: 0 }[entry.review?.quality || "open"] || 0;
+      const score = Math.round(clamp(base + outcome + reviewQuality, 0, 120));
+      const reason = journalReviewed(entry)
+        ? `${journalReviewOutcomeLabel(entry.review.outcome)} · ${journalReviewQualityLabel(entry.review.quality)} · ${journalRuleSummary(entry).label}`
+        : `${journalDecisionQualityScore(entry).label} · Review noch offen`;
+      return { ...entry, score, reason, tone: score >= 75 ? "bull" : score >= 55 ? "neutral" : "bear" };
+    });
+    const sorted = rows.sort((a, b) => mode === "best" ? b.score - a.score : a.score - b.score);
+    return sorted.slice(0, 5).map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }
+
+  function journalMonthlyReview(entries) {
+    const now = new Date();
+    const current = entries.filter((entry) => {
+      const date = new Date(entry.timestamp);
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    });
+    const rows = current.length ? current : entries.slice(0, 8);
+    const count = rows.length;
+    const stats = count ? journalStats(rows) : { ruleAdherence: 0, reviewQuote: 0 };
+    const emotions = countBy(rows.map((entry) => journalEmotionLabel(entry.emotion)));
+    const topEmotion = emotions[0]?.label || "offen";
+    const mistakes = journalMistakeStats(rows);
+    const learning = !count
+      ? "Erster sinnvoller Schritt: eine Entscheidung mit These, Emotion und Regel-Check erfassen."
+      : mistakes[0]
+        ? `Nächster Fokus: ${mistakes[0].label} bewusst prüfen und vor der nächsten Entscheidung eine Gegenfrage notieren.`
+        : "Weiter dokumentieren und mindestens einige Entscheidungen später reviewen.";
+    return {
+      title: current.length ? "Aktueller Monat" : "Letzte Einträge",
+      count,
+      ruleAdherence: stats.ruleAdherence || 0,
+      reviewQuote: stats.reviewQuote || 0,
+      topEmotion,
+      summary: count ? `${count} dokumentierte Entscheidungen. Häufigste Emotion: ${topEmotion}.` : "Noch keine Journal-Daten für ein Monatsreview.",
+      learning
+    };
+  }
+
+  function journalDataMeta(entries) {
+    const latest = entries[0]?.timestamp || BOOT_TIME;
+    return makeMeta("Lokales Journal + Entscheidungslogik", "local", latest, "Einträge, Reviews und Muster bleiben lokal im Browser. Keine Betreiber-Konfiguration im Journal.");
+  }
+
+  function countBy(values) {
+    const counts = new Map();
+    values.filter(Boolean).forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+    return [...counts.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  }
+
+  function average(values) {
+    const numbers = values.map(Number).filter(Number.isFinite);
+    return numbers.length ? numbers.reduce((sum, value) => sum + value, 0) / numbers.length : 0;
+  }
+
+  function uniqueList(values) {
+    return [...new Set(values.map(String).filter(Boolean))];
+  }
+
+  function splitLines(value) {
+    return String(value || "").split(/\r?\n|;/).map((item) => item.trim()).filter(Boolean).slice(0, 5);
+  }
+
+  function toDateTimeLocal(timestamp) {
+    const date = new Date(timestamp || Date.now());
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  function renderSelectOptions(options, selected) {
+    return options.map((option) => `<option value="${escAttr(option.value)}" ${option.value === selected ? "selected" : ""}>${esc(option.label)}</option>`).join("");
+  }
+
+  function journalDecisionTypeLabel(value) {
+    return JOURNAL_DECISION_TYPES.find((item) => item.value === value)?.label || "Beobachtung";
+  }
+
+  function journalCategoryLabel(value) {
+    return JOURNAL_CATEGORIES.find((item) => item.value === value)?.label || "Langfrist-Investment";
+  }
+
+  function journalEmotionLabel(value) {
+    return JOURNAL_EMOTIONS.find((item) => item.value === value)?.label || "Neutral";
+  }
+
+  function journalPressureLabel(value) {
+    if (value === "high") return "hoch";
+    if (value === "low") return "niedrig";
+    return "mittel";
+  }
+
+  function journalMistakeLabel(value) {
+    return JOURNAL_MISTAKE_TAGS.find((item) => item.value === value)?.label || value;
+  }
+
+  function journalReviewOutcomeLabel(value) {
+    if (value === "positive") return "Ergebnis positiv";
+    if (value === "negative") return "Ergebnis negativ";
+    if (value === "mixed") return "Ergebnis gemischt";
+    return "Ergebnis offen";
+  }
+
+  function journalReviewQualityLabel(value) {
+    if (value === "strong") return "gute Entscheidung";
+    if (value === "weak") return "schwacher Prozess";
+    if (value === "ok") return "solide Entscheidung";
+    return "Qualität offen";
+  }
+
   function openReport(type, symbol = "") {
     closeReport();
     const html = buildReportHtml(type, symbol);
     document.body.classList.add("report-open");
     document.body.insertAdjacentHTML("beforeend", html);
+    persistOnboarding({ ...state.onboarding, reportExported: true });
+    recordActivity("Report", `${reportTypeLabel(type)} geoeffnet`, { route: "research", symbol });
+    awardXp(type === "macro" ? "macro-report" : "first-report", type === "macro" ? 20 : 30, `${reportTypeLabel(type)} geoeffnet`);
   }
 
   function closeReport() {
@@ -9525,98 +14927,698 @@
   }
 
   function buildReportHtml(type, symbol) {
-    const title = type === "portfolio" ? "Portfolio Report" : type === "topPicks" ? "Top Picks Research Report" : `${normalizeSymbol(symbol || state.activeSymbol)} Equity Report`;
-    const body = type === "portfolio" ? portfolioReportBody() : type === "topPicks" ? topPicksReportBody() : assetReportBody(normalizeSymbol(symbol || state.activeSymbol));
+    const config = reportConfig(type, symbol);
+    const createdAt = new Date();
     return `
       <div class="report-overlay" id="reportOverlay">
         <div class="report-actions no-print">
-          <button class="ghost-button" type="button" data-close-report>Schließen</button>
+          <button class="ghost-button" type="button" data-close-report>Zurück zum Modul</button>
+          <button class="ghost-button" type="button" data-report="${escAttr(config.type)}" ${config.symbol ? `data-symbol="${escAttr(config.symbol)}"` : ""}>Report aktualisieren</button>
           <button class="primary-button" type="button" data-print-report>Als PDF speichern / Drucken</button>
         </div>
         <article class="report-page">
           <header class="report-header">
-            <span>MH Analytics Research</span>
-            <h1>${esc(title)}</h1>
-            <p>${new Date().toLocaleDateString("de-DE")} | Statische Report-Ansicht für Browser-PDF</p>
+            <span>MH Analytics Research Export V2</span>
+            <h1>${esc(config.title)}</h1>
+            <p>${esc(config.context)} | Erstellt: ${esc(createdAt.toLocaleString("de-DE"))}</p>
           </header>
-          ${body}
+          ${config.body}
           <footer class="report-footer">
-            <strong>Quellen / Status</strong>
-            <p>API-Daten, lokale Fallback-Daten und Provider-Zustände sind jeweils in der App gekennzeichnet. Keine Anlageberatung.</p>
+            ${reportDisclaimer()}
           </footer>
         </article>
       </div>
     `;
   }
 
+  function reportConfig(type, symbol = "") {
+    const normalized = normalizeSymbol(symbol || state.activeSymbol);
+    const configs = {
+      asset: {
+        type: "asset",
+        symbol: normalized,
+        title: `${normalized} Research Report`,
+        context: "Asset-Report mit 5-Minuten-Research, Chancen, Risiken, Triggern und Datenstatus",
+        body: assetReportBody(normalized)
+      },
+      portfolio: {
+        type: "portfolio",
+        title: "Portfolio / Risiko / Exposure Report",
+        context: "Portfolio-Report mit Risiko, Exposure, Rebalancing und What-if",
+        body: portfolioReportBody()
+      },
+      etf: {
+        type: "etf",
+        title: "ETF Analyse Report",
+        context: "ETF-Report mit Kosten, Overlap, Holdings, Regionen und Portfolio-Fit",
+        body: etfReportBody()
+      },
+      macro: {
+        type: "macro",
+        title: "Makro- / Ländervergleich Report",
+        context: "Makroampel, Ländervergleich, Risiken, Asset-Implikationen und Quellenstatus",
+        body: macroReportBody()
+      },
+      dailyRecap: {
+        type: "dailyRecap",
+        title: "Tages-Recap Report",
+        context: "Was heute wichtig war, was Watchlist und Events betrifft",
+        body: dailyRecapReportBody()
+      },
+      watchlist: {
+        type: "watchlist",
+        title: "Watchlist Research Report",
+        context: "Bewegungen, Events, Alerts und Research-Hinweise für beobachtete Werte",
+        body: watchlistReportBody()
+      },
+      screener: {
+        type: "screener",
+        title: "Screener / Ratings V2 Report",
+        context: "Transparenter Screener-Report mit Score-Komponenten, Filtern, Top-Kandidaten und Datenstatus",
+        body: screenerReportBody()
+      },
+      topPicks: {
+        type: "topPicks",
+        title: "Top Picks Research Report",
+        context: "Ranking-Report aus technischer, fundamentaler und lokaler Produktlogik",
+        body: topPicksReportBody()
+      }
+    };
+    return configs[type] || configs.asset;
+  }
+
   function assetReportBody(symbol) {
     const asset = getAsset(symbol);
     const quote = quoteFor(symbol);
+    const profile = profileFor(symbol);
     const fundamentals = fundamentalsFor(symbol);
+    const news = newsFor(symbol);
+    const sentiment = sentimentFor(symbol, quote, news);
     const technical = technicalFor(symbol, quote);
-    const fundamental = fundamentalInterpretation(asset, fundamentals);
     const events = eventsForSymbol(symbol);
-    const liquidity = liquidityNarrativeForView();
+    const context = { symbol, asset, quote, profile, fundamentals, news, sentiment, technical, events };
+    const snapshot = buildAssetResearchSnapshot(context);
+    const etf = snapshot.etf;
+    const dataRows = [
+      { label: "Preis", meta: quote.meta },
+      { label: "Profil", meta: profile.meta },
+      { label: "Fundamentals", meta: fundamentals.meta },
+      { label: "News", meta: news.meta },
+      { label: "Events", meta: events[0]?.meta || makeMeta("Event-Kalender", "fallback", BOOT_TIME) }
+    ];
     return `
-      <section class="report-section">
-        <h2>${esc(asset.symbol)} - ${esc(asset.name)}</h2>
-        <div class="report-grid">
-          ${renderMiniMetric("Preis", formatMoney(quote.price, asset.currency))}
-          ${renderMiniMetric("Tagesveränderung", formatPercent(quote.changePct))}
-          ${renderMiniMetric("Rating", technical.rating)}
-          ${renderMiniMetric("KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x"))}
-          ${renderMiniMetric("Liquidität", `${formatNumber(liquidity.score)} / 100`)}
+      ${reportExecutiveSummary(snapshot.headline, snapshot.summary, snapshot.conclusion)}
+      ${reportSection("Wichtigste Kennzahlen", reportMetricGrid([
+        ["Asset", `${asset.symbol} · ${assetTypeLabel(asset)}`],
+        ["Preis", formatMoney(quote.price, asset.currency)],
+        ["Tagesbewegung", formatPercent(quote.changePct)],
+        ["Research-Score", `${snapshot.score}/100`],
+        ["Technik", snapshot.technical.label],
+        etf ? ["TER", `${formatNumber(etf.ter)}%`] : ["KGV", formatNumber(valueOr(fundamentals.pe, asset.fallback.pe), "x")]
+      ]))}
+      ${reportSection("5-Minuten-Research", `
+        <div class="report-two-column">
+          <div>${reportMiniBlock("Asset-Charakter", snapshot.identity.character, snapshot.identity.text)}</div>
+          <div>${reportMiniBlock("Bewertung / Struktur", snapshot.valuation.label, snapshot.valuation.text)}</div>
+          <div>${reportMiniBlock("Technik", snapshot.technical.label, snapshot.technical.text)}</div>
+          <div>${reportMiniBlock("Datenqualität", snapshot.dataQuality.label, snapshot.dataQuality.text)}</div>
         </div>
-        <h3>These</h3>
-        <p>${esc(asset.thesis)}</p>
-        <h3>Chancen</h3>
-        <p>${esc(technical.reason)} Fundamental wirkt aktuell: ${esc(fundamental.label)}.</p>
-        <h3>Risiken</h3>
-        <p>${esc(asset.risks)}</p>
-        <h3>Marktumfeld</h3>
-        <p>${esc(liquidity.summary)}</p>
-        <h3>Trigger</h3>
-        <p>${esc(events[0] ? `${events[0].title} am ${events[0].date.toLocaleDateString("de-DE")}` : "Kein konkreter Event im lokalen Kalender.")}</p>
-        ${renderDataMeta(quote.meta)}
-      </section>
+      `)}
+      ${reportSection("Chancen", reportInsightList(snapshot.opportunities))}
+      ${reportSection("Risiken", reportInsightList(snapshot.risks))}
+      ${reportSection("Trigger / nächste Termine", reportTriggerList(snapshot.triggers))}
+      ${etf ? reportEtfAssetAddendum(etf) : reportSection("News- und Event-Hinweise", reportNewsAndEvents(news, events))}
+      ${reportDataStatusSection(dataRows)}
+      ${reportSourceSection([
+        "Quote/Profile/Fundamentals: Finnhub, Alpha Vantage oder Fallback je nach Status",
+        "Events/Earnings: Event-Hub, Finnhub/Alpha-Vantage-Pfade oder lokaler Kalender",
+        etf ? "ETF-Struktur: lokale ETF-V2-Datenbasis" : "Research-Snapshot: lokale Produktlogik plus verfügbare Marktinputs"
+      ])}
     `;
   }
 
   function portfolioReportBody() {
     const portfolio = activePortfolio();
     const analysis = portfolioAnalysis(portfolio);
+    const scenario = portfolioScenarioAnalysis(portfolio, analysis);
     return `
-      <section class="report-section">
-        <h2>${esc(portfolio.name)}</h2>
-        <div class="report-grid">
-          ${renderMiniMetric("Gesamtwert", formatMoney(analysis.totalValue, "USD"))}
-          ${renderMiniMetric("Performance", formatPercent(analysis.performancePct))}
-          ${renderMiniMetric("Cash", `${formatNumber(analysis.cashPct)}%`)}
-          ${renderMiniMetric("Positionen", String(portfolio.positions.length))}
-          ${renderMiniMetric("Risiko-Score", `${formatNumber(analysis.riskScore)} / 100`)}
+      ${reportExecutiveSummary(`${portfolio.name}: ${analysis.health.label}`, analysis.health.summary, analysis.priorityHint)}
+      ${reportSection("Portfolio-Kontrollzentrum", reportMetricGrid([
+        ["Typ", portfolio.type === "real" ? "Echtgeld" : "Testportfolio"],
+        ["Gesamtwert", formatMoney(analysis.totalValue, "USD")],
+        ["Performance", `${formatMoney(analysis.performanceAbs, "USD")} / ${formatPercent(analysis.performancePct)}`],
+        ["Cash", `${formatMoney(analysis.cashValue, "USD")} (${formatNumber(analysis.cashPct)}%)`],
+        ["Positionen", String(portfolio.positions.length)],
+        ["Risiko-Level", `${analysis.riskLevel.label} · ${formatNumber(analysis.riskScore)}/100`]
+      ]))}
+      ${reportSection("Exposure", `
+        <div class="report-two-column">
+          ${reportExposureList("Sektor", analysis.sectorExposure)}
+          ${reportExposureList("Land / Region", analysis.countryExposure)}
+          ${reportExposureList("Währung", analysis.currencyExposure)}
+          ${reportExposureList("Asset-Typ", analysis.assetTypeExposure)}
         </div>
-        <h3>Klarblick</h3>
-        <p>${esc(analysis.priorityHint)}</p>
-        <h3>Risiko & Rebalancing</h3>
-        <p>${esc(analysis.concentrationHint)} ${esc(analysis.diversificationHint)} ${esc(analysis.rebalanceHint)}</p>
-        ${renderDataMeta(makeMeta("Lokaler Portfolio Report", "live", Date.now()))}
-      </section>
+      `)}
+      ${reportSection("Größte Positionen", reportPositionRows(analysis.positions.slice(0, 8)))}
+      ${reportSection("Risiko / Klumpenrisiko", reportInsightList(analysis.riskItems))}
+      ${reportSection("Rebalancing-Hinweise", reportInsightList(analysis.rebalancingHints))}
+      ${reportSection("Was ist jetzt wichtig?", reportInsightList(analysis.focusItems))}
+      ${reportSection("What-if-Simulation", reportMetricGrid([
+        ["Szenario-Wert", formatMoney(scenario.projectedValue, "USD")],
+        ["Nach Schock", formatMoney(scenario.shockedValue, "USD")],
+        ["12M mit Beitrag", formatMoney(scenario.oneYearValue, "USD")],
+        ["Risiko-Veränderung", `${scenario.riskDelta >= 0 ? "+" : ""}${formatNumber(scenario.riskDelta)} Punkte`]
+      ]) + `<p>${esc(scenario.summary)}</p>`)}
+      ${reportDataStatusSection([{ label: "Portfolio", meta: analysis.meta }])}
+      ${reportSourceSection([
+        "Positionen, Cash, Notizen und Portfolio-Typ: lokal gespeichert",
+        "Kurse und Bewegungen: vorhandene Quote-Pfade live/hybrid/fallback",
+        "Risiko, Exposure, Rebalancing und What-if: lokale Produktlogik"
+      ])}
+    `;
+  }
+
+  function etfReportBody() {
+    const etf = etfBySymbol(state.etf.left) || ETF_DATA[0];
+    const compare = etfBySymbol(state.etf.right) || ETF_DATA[1];
+    const overlap = etfOverlap(etf, compare);
+    const overlapLevel = etfOverlapLevel(overlap);
+    const amount = Number(state.etf.amount || 0);
+    const monthly = Number(state.etf.monthly || 0);
+    const years = Number(state.etf.years || 0);
+    const returnRate = Number(state.etf.returnRate || 0);
+    const cost = etfCostProjection(amount, monthly, years, etf.ter, returnRate);
+    const compareCost = etfCostProjection(amount, monthly, years, compare.ter, returnRate);
+    return `
+      ${reportExecutiveSummary(`${etf.symbol}: ${etfPortfolioFitLabel(etf)}`, etf.useCase, `${etf.symbol} hat ${formatNumber(etf.ter)}% TER, ${formatNumber(etfHoldingConcentration(etf))}% Top-5-Konzentration und ${etfTopRegion(etf)?.[0] || "offene"} Regionenlast. ETF-Daten sind lokal/strukturiert, keine Live-Holdings.`)}
+      ${reportSection("ETF-Kennzahlen", reportMetricGrid([
+        ["Name", etf.name],
+        ["Symbol / ISIN", `${etf.symbol}${etf.isin ? ` / ${etf.isin}` : ""}`],
+        ["Einsatzbereich", etf.role || etf.useCase],
+        ["TER", `${formatNumber(etf.ter)}%`],
+        ["Ausschüttung", etf.distribution],
+        ["Währung", `${etf.currency} / Fonds ${etf.fundCurrency || etf.currency}`]
+      ]))}
+      ${reportSection("Holdings-Analyse", `
+        ${reportMetricGrid([
+          ["Top-Holding", etf.holdings[0] ? `${etf.holdings[0][0]} ${formatNumber(etf.holdings[0][1])}%` : "nicht verfügbar"],
+          ["Top-5", `${formatNumber(etfHoldingConcentration(etf))}%`],
+          ["Top-10", `${formatNumber(etfTop10Concentration(etf))}%`],
+          ["Konzentration", etfConcentrationLabel(etf)]
+        ])}
+        ${reportMiniBarList(etf.holdings)}
+      `)}
+      ${reportSection("Regionen und Sektoren", `
+        <div class="report-two-column">
+          ${reportExposureList("Regionen", etf.region.map(([label, value]) => ({ label, value })))}
+          ${reportExposureList("Sektoren / Themen", (etf.sectors || []).map(([label, value]) => ({ label, value })))}
+        </div>
+      `)}
+      ${reportSection("Ausschüttung, Währung und Struktur", reportMetricGrid([
+        ["Ausschüttung", distributionExplanation(etf)],
+        ["Domizil", etf.domicile || "nicht verfügbar"],
+        ["Replikation", etf.replication || "nicht verfügbar"],
+        ["Struktur", etf.structureType || "nicht verfügbar"],
+        ["Währungsrisiko", etf.fxRisk || "nicht verfügbar"],
+        ["Hinweis", "Keine Steuerberatung; Struktur und Steuern separat prüfen."]
+      ]))}
+      ${reportSection("Overlap mit Vergleichs-ETF", `
+        ${reportMetricGrid([
+          ["Vergleich", `${etf.symbol} vs ${compare.symbol}`],
+          ["Holdings-Overlap", `${formatNumber(overlap.score)}%`],
+          ["Regionen-Overlap", `${formatNumber(overlap.regionScore)}%`],
+          ["Sektoren-Overlap", `${formatNumber(overlap.sectorScore)}%`],
+          ["Einordnung", overlapLevel.label],
+          ["TER-Differenz", `${formatNumber(Math.abs(etf.ter - compare.ter))}%`]
+        ])}
+        <p>${esc(etfOverlapText(overlap))}</p>
+      `)}
+      ${reportSection("Kostenrechner-Ergebnis", reportMetricGrid([
+        ["Anlagebetrag", formatMoney(amount, etf.currency)],
+        ["Sparplan", `${formatMoney(monthly, etf.currency)} / Monat`],
+        ["Laufzeit", `${formatNumber(years)} Jahre`],
+        ["Renditeannahme", `${formatNumber(returnRate)}% p.a.`],
+        [`${etf.symbol} TER-Effekt`, formatMoney(cost.feeDrag, etf.currency)],
+        [`${compare.symbol} TER-Effekt`, formatMoney(compareCost.feeDrag, compare.currency)]
+      ]) + `<p>Simulation ohne Tracking Difference, Spreads und Steuern. TER-Effekt ist eine Näherung.</p>`)}
+      ${reportSection("Portfolio-Fit", reportInsightList(etfPortfolioFitHints(etf)))}
+      ${reportDataStatusSection([{ label: "ETF-Struktur", meta: etfDataMeta(etf) }, { label: "ETF-Overlap", meta: makeMeta("Lokaler ETF-Overlap V2", "local", BOOT_TIME) }])}
+      ${reportSourceSection([
+        "ETF-Struktur, TER, Holdings, Regionen und Sektoren: lokale ETF-V2-Datenbasis",
+        "Kurse: vorhandene Quote-Pfade live/hybrid/fallback, falls Asset im Universum enthalten ist",
+        "Kosten und Overlap: lokale Simulation und strukturierte Schätzung"
+      ])}
+    `;
+  }
+
+  function macroReportBody() {
+    const snapshot = macroCountryComparisonForView();
+    return `
+      ${reportExecutiveSummary(`Makroampel: ${snapshot.control.label}`, snapshot.control.summary, snapshot.control.drivers.map((driver) => `${driver.label}: ${driver.text}`).join(" "))}
+      ${reportSection("Makro-Kontrollzentrum", reportMetricGrid([
+        ["Gesamtstatus", snapshot.control.label],
+        ["Makro-Score", `${formatNumber(snapshot.control.score)} / 100`],
+        ["Inflation", snapshot.control.tiles[0]?.value || "--"],
+        ["Zinsen", snapshot.control.tiles[1]?.value || "--"],
+        ["Wachstum", snapshot.control.tiles[2]?.value || "--"],
+        ["Risikoampel", snapshot.control.tiles[5]?.value || "--"]
+      ]))}
+      ${reportSection("Ländervergleich", reportMacroCountryRows(snapshot.countries))}
+      ${reportSection("Zinsen / Yield Curve / Realzins", reportInsightList(snapshot.countries.map((country) => ({
+        label: `${country.name} · ${country.policyRate.display}`,
+        text: `10Y ${country.yield10.display}, Realzins ${country.realRate.display}, 2Y-10Y ${country.yieldCurve.display}: ${country.yieldCurve.comment}.`
+      }))))}
+      ${reportSection("Wichtigste Makro-Risiken", reportInsightList(snapshot.control.drivers))}
+      ${reportSection("Asset-Implikationen", reportInsightList(snapshot.assetImplications.map((item) => ({
+        label: `${item.asset} · ${item.signal}`,
+        text: item.text
+      }))))}
+      ${reportDataStatusSection(snapshot.sourceRows)}
+      ${reportSourceSection([
+        "FRED: Fed Funds, CPI/FRED-Fallback, Arbeitsmarkt, US-Renditen, Geldmenge und Dollarindex, serverseitig über /api/fred.",
+        "BLS/Treasury: CPI/Arbeitsmarkt und Yield-Curve-Daten über /api/opendata.",
+        "World Bank/IMF: Wachstum und Debt-to-GDP über Open-Data-Normalisierung, ergänzt durch lokale Länderstrukturwerte.",
+        "ECB/Eurostat/OECD: Euro-Kontext eingeordnet; nicht jede Reihe ist bereits vollständig live integriert.",
+        "FX/Frankfurter: EUR/USD, USD/JPY und USD/CNY über /api/fx, falls im Deployment erreichbar."
+      ])}
+    `;
+  }
+
+  function dailyRecapReportBody() {
+    ensureHomeData();
+    ensureEventData();
+    const recap = dailyRecapForView();
+    return `
+      ${reportExecutiveSummary(`Tagesfazit: ${recap.conclusion.label}`, recap.conclusion.text, `Priorisierte Punkte: ${recap.priorityItems.length}. Watchlist-Hinweise: ${recap.watchlistItems.length}. Events heute: ${recap.todayEventCount}.`)}
+      ${reportSection("Wichtigste Marktbewegungen", reportRecapMoveRows(recap.moves.slice(0, 8)))}
+      ${reportSection("Wichtigste Events", reportEventRows(recap.events.slice(0, 8)))}
+      ${reportSection("Was betrifft deine Watchlist?", reportRecapWatchlistRows(recap.watchlistItems.slice(0, 8)))}
+      ${reportSection("News / Treiber", reportRecapNewsRows(recap.news.slice(0, 8)))}
+      ${reportSection("Alerts / relevante Hinweise", reportAlertRows(recap.alerts.slice(0, 8)))}
+      ${reportDataStatusSection([{ label: "Tages-Recap", meta: makeMeta("Daily-Recap: Watchlist + Events + Alerts + News", recap.status, Date.now(), "Relevanz wird lokal aus vorhandenen Daten priorisiert.") }])}
+      ${reportSourceSection([
+        "Marktbewegungen: Home-Ticker, Watchlist und vorhandene Quote-Pfade",
+        "Events: Event-/Earnings-Hub mit Finnhub/Alpha-Vantage-Pfaden oder Fallback",
+        "News und Alerts: vorhandene App-Daten plus lokale Priorisierung"
+      ])}
+    `;
+  }
+
+  function watchlistReportBody() {
+    ensureHomeData();
+    ensureEventData();
+    const watchNews = watchlistNewsForView();
+    const rows = state.watchlist.map((symbol) => {
+      const asset = getAsset(symbol);
+      const quote = quoteFor(symbol);
+      const analysis = analysisFor(symbol);
+      const events = eventsForSymbol(symbol).filter((eventItem) => eventItem.date >= startOfToday()).slice(0, 2);
+      const alerts = state.alerts.map(normalizeAlertRecord).filter((alert) => alert.symbol === symbol && normalizeAlertStatus(alert) !== "done");
+      return { symbol, asset, quote, analysis, events, alerts };
+    });
+    const status = bestDataStatus(rows.map((row) => row.quote.meta?.status));
+    return `
+      ${reportExecutiveSummary("Watchlist-Überblick", `${state.watchlist.length} beobachtete Werte mit Bewegungen, Events, Alerts und Research-Hinweisen.`, "Dieser Report dokumentiert, was bei den gespeicherten Werten gerade wichtig ist.")}
+      ${reportSection("Watchlist-Kennzahlen", reportMetricGrid([
+        ["Assets", String(state.watchlist.length)],
+        ["Stärkste Bewegung", rows[0] ? strongestWatchlistMove(rows) : "nicht verfügbar"],
+        ["Events", String(rows.reduce((sum, row) => sum + row.events.length, 0))],
+        ["Aktive Alerts", String(rows.reduce((sum, row) => sum + row.alerts.length, 0))],
+        ["Datenstatus", statusLabel(status)]
+      ]))}
+      ${reportSection("Beobachtete Assets", reportWatchlistRows(rows))}
+      ${reportSection("Watchlist-News & Events", reportWatchNewsRows(watchNews.slice(0, 10)))}
+      ${reportSection("Relevante Alerts", reportAlertRows(state.alerts.map(normalizeAlertRecord).filter((alert) => state.watchlist.includes(alert.symbol)).slice(0, 10)))}
+      ${reportDataStatusSection(rows.map((row) => ({ label: row.symbol, meta: row.quote.meta })))}
+      ${reportSourceSection([
+        "Watchlist: lokal gespeichert",
+        "Kurse und Bewegungen: vorhandene Quote-Pfade live/hybrid/fallback",
+        "Events und Alerts: Event-Hub, Alerts V2 und lokale Statuslogik"
+      ])}
+    `;
+  }
+
+  function screenerReportBody() {
+    ensureHomeData();
+    ensureScreenerData();
+    ensureEventData();
+    const rows = screenerRowsForView();
+    const filtered = filteredScreenerRows(rows);
+    const summary = screenerSummary(rows, filtered);
+    const picks = topPicksForView(rows);
+    const filters = { ...SCREENER_DEFAULT_FILTERS, ...state.screener };
+    return `
+      ${reportExecutiveSummary("Screener / Ratings V2", `${filtered.length} von ${rows.length} Assets im aktuellen Filter. Der Score kombiniert Momentum, Value, Growth, Quality, Risiko, Event, Makro und Datenqualitaet.`, summary.comment.text)}
+      ${reportSection("Screener-Kontrollzentrum", reportMetricGrid([
+        ["Analysierte Assets", String(rows.length)],
+        ["Gefiltert", String(filtered.length)],
+        ["Long-Kandidaten", String(summary.longCount)],
+        ["Watch-Kandidaten", String(summary.watchCount)],
+        ["Risk-Kandidaten", String(summary.riskCount)],
+        ["Datenstatus", statusLabel(summary.status)]
+      ]))}
+      ${reportSection("Aktive Filter", reportMetricGrid([
+        ["Preset", filters.preset || "custom"],
+        ["Asset-Typ", filters.assetType],
+        ["Region", filters.region],
+        ["Sektor", filters.sector],
+        ["Stil", filters.style],
+        ["Datenstatus", filters.dataStatus],
+        ["Persoenlich", filters.personal],
+        ["Sortierung", filters.sort]
+      ]))}
+      ${reportSection("Top-Ranking im aktuellen Filter", reportScreenerRows(filtered.slice(0, 10)))}
+      ${reportSection("Long-Kandidaten", reportPickRows(picks.long))}
+      ${reportSection("Watch-Kandidaten", reportPickRows(picks.watch))}
+      ${reportSection("Risk-/Short-Kandidaten", reportPickRows(picks.risk))}
+      ${reportSection("Watchlist / Favoriten", reportPickRows(picks.personal))}
+      ${reportSection("Score-Modell V2", reportInsightList([
+        { label: "Momentum", text: "Tagesbewegung, 1M-Performance, Trend, RSI, Aktivitaet und Ueberhitzung werden kombiniert." },
+        { label: "Value / Growth / Quality", text: "Fundamentale Inputs werden genutzt, wenn vorhanden; fehlende Daten werden als eingeschraenkt markiert statt erfunden." },
+        { label: "Risk", text: "Volatilitaet, Bewertungsdruck, Event-Risiko, Datenqualitaet und ETF-Konzentration erzeugen eine transparente Warnlogik." },
+        { label: "Event / Makro", text: "Event-Hub und Makro-V2 liefern Kontext. Das ist Einordnung, keine Prognose und keine Anlageberatung." }
+      ]))}
+      ${reportDataStatusSection(rows.slice(0, 12).map((row) => ({ label: row.symbol, meta: makeMeta("Screener V2 Datenmix", row.dataStatus, Date.now(), row.explanation) })))}
+      ${reportSourceSection([
+        "Quotes/Profile/Fundamentals: vorhandene serverseitige /api/... Pfade oder Fallbacks.",
+        "Technik und Scores: lokale, transparente Produktlogik mit Live-/Hybrid-/Fallback-Kennzeichnung.",
+        "Events: Event-/Earnings-Hub; Makro: Makro-/Laendervergleich V2.",
+        "Watchlist/Favoriten: lokale User Preferences und Watchlist-Daten."
+      ])}
     `;
   }
 
   function topPicksReportBody() {
     const picks = topPicksForView();
     return `
-      <section class="report-section">
-        <h2>Methodik</h2>
-        <p>Die Picks kombinieren Technical Rating, Momentum, Value/Growth, Risiko, Sentiment und verfügbare Live-/Fallback-Daten. Das ist ein Research-Werkzeug, keine Anlageberatung.</p>
-        <h2>Long Picks</h2>
-        ${picks.long.map((pick) => `<p><strong>${esc(pick.symbol)} ${pick.score}%</strong> - ${esc(pick.reason)}</p>`).join("")}
-        <h2>Risk Picks</h2>
-        ${picks.risk.map((pick) => `<p><strong>${esc(pick.symbol)} ${pick.score}%</strong> - ${esc(pick.reason)}</p>`).join("")}
-        ${renderDataMeta(makeMeta("Lokale Top Picks Engine", "fallback", Date.now()))}
+      ${reportExecutiveSummary("Top Picks Research V2", "Die Picks kombinieren Momentum, Value, Growth, Quality, Risiko, Event-Kontext, Makro-Kontext und Datenqualitaet.", "Research-Werkzeug, keine Anlageberatung. Jeder Pick zeigt Gruende, Gegenpunkte und Datenstatus.")}
+      ${reportSection("Long Picks", reportPickRows(picks.long))}
+      ${reportSection("Watch Picks", reportPickRows(picks.watch))}
+      ${reportSection("Risk Picks", reportPickRows(picks.risk))}
+      ${reportSection("Watchlist / Favoriten", reportPickRows(picks.personal))}
+      ${reportDataStatusSection([...picks.long, ...picks.watch, ...picks.risk, ...picks.personal].slice(0, 12).map((pick) => ({ label: pick.symbol, meta: makeMeta("Top Picks V2 Datenmix", pick.dataStatus, Date.now(), pick.explanation) })))}
+      ${reportSourceSection(["Screener V2 Score-Komponenten: Momentum, Value, Growth, Quality, Risiko, Event, Makro und Datenqualitaet.", "Top Picks sind transparente Kandidatenlisten, keine Kauf-/Verkaufsempfehlungen."])}
+    `;
+
+    return `
+      ${reportExecutiveSummary("Top Picks Research", "Die Picks kombinieren Technical Rating, Momentum, Value/Growth, Risiko, Sentiment und verfügbare Live-/Fallback-Daten.", "Research-Werkzeug, keine Anlageberatung. Scores bleiben lokale Produktlogik.")}
+      ${reportSection("Long Picks", reportPickRows(picks.long))}
+      ${reportSection("Risk Picks", reportPickRows(picks.risk))}
+      ${reportDataStatusSection([{ label: "Top Picks", meta: makeMeta("Lokale Top Picks Engine", "fallback", Date.now()) }])}
+      ${reportSourceSection(["Technik, Momentum, Value/Growth, Risiko und Sentiment: lokale Scoring-Logik plus vorhandene Dateninputs"])}
+    `;
+  }
+
+  function reportExecutiveSummary(title, text, conclusion) {
+    return `
+      <section class="report-section report-executive-summary">
+        <span class="report-kicker">Executive Summary</span>
+        <h2>${esc(title)}</h2>
+        <p>${esc(text)}</p>
+        <div class="report-callout">
+          <strong>Kurzfazit</strong>
+          <p>${esc(conclusion)}</p>
+        </div>
       </section>
     `;
+  }
+
+  function reportSection(title, content) {
+    return `
+      <section class="report-section">
+        <h2>${esc(title)}</h2>
+        ${content}
+      </section>
+    `;
+  }
+
+  function reportMetricGrid(items) {
+    return `
+      <div class="report-metric-grid">
+        ${items.filter(Boolean).map(([label, value]) => `
+          <div class="report-metric">
+            <span>${esc(label)}</span>
+            <strong>${esc(value ?? "nicht verfügbar")}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function reportMiniBlock(label, title, text) {
+    return `
+      <div class="report-mini-block">
+        <span>${esc(label)}</span>
+        <strong>${esc(title)}</strong>
+        <p>${esc(text)}</p>
+      </div>
+    `;
+  }
+
+  function reportInsightList(items = []) {
+    return `
+      <div class="report-list">
+        ${items.map((item) => `
+          <div class="report-list-item">
+            <span>${esc(item.label || item.title || "Hinweis")}</span>
+            <p>${esc(item.text || item.reason || item.summary || "")}</p>
+          </div>
+        `).join("") || `<p class="report-muted">Keine strukturierten Hinweise verfügbar.</p>`}
+      </div>
+    `;
+  }
+
+  function reportTriggerList(items = []) {
+    return `
+      <div class="report-list">
+        ${items.map((item) => `
+          <div class="report-list-item">
+            <span>${esc(item.label || "Trigger")} · ${esc(statusLabel(item.status || "fallback"))}</span>
+            <p><strong>${esc(item.title || "")}</strong> ${esc(item.text || "")}</p>
+          </div>
+        `).join("") || `<p class="report-muted">Keine Trigger im aktuellen Datenfenster.</p>`}
+      </div>
+    `;
+  }
+
+  function reportNewsAndEvents(news, events) {
+    const newsRows = (news.items || []).slice(0, 4).map((item) => ({
+      label: item.source || "News",
+      text: `${item.headline} ${item.sentiment ? `(${item.sentiment})` : ""}`
+    }));
+    const eventRows = events.slice(0, 4).map((eventItem) => ({
+      label: eventTypeLabel(eventItem),
+      text: `${eventItem.title} · ${formatEventDate(eventItem.date)} · ${eventSourceLabel(eventItem)}`
+    }));
+    return reportInsightList([...newsRows, ...eventRows]);
+  }
+
+  function reportEtfAssetAddendum(etf) {
+    return `
+      ${reportSection("ETF-spezifische Struktur", reportMetricGrid([
+        ["TER", `${formatNumber(etf.ter)}%`],
+        ["Ausschüttung", etf.distribution],
+        ["Top-Region", etfTopRegion(etf) ? `${etfTopRegion(etf)[0]} ${formatNumber(etfTopRegion(etf)[1])}%` : "nicht verfügbar"],
+        ["Top-5", `${formatNumber(etfHoldingConcentration(etf))}%`],
+        ["Fondswährung", etf.fundCurrency || etf.currency],
+        ["Struktur", `${etf.structureType || "nicht verfügbar"} · ${etf.replication || "nicht verfügbar"}`]
+      ]) + `<p>${esc(etf.fxRisk)} ${esc(etfPortfolioFitLabel(etf))}.</p>`)}
+      ${reportSection("ETF-Holdings und Regionen", `
+        <div class="report-two-column">
+          ${reportExposureList("Top Holdings", etf.holdings.map(([label, value]) => ({ label, value })))}
+          ${reportExposureList("Regionen", etf.region.map(([label, value]) => ({ label, value })))}
+        </div>
+      `)}
+      ${reportSection("Portfolio-Fit-Hinweise", reportInsightList(etfPortfolioFitHints(etf)))}
+    `;
+  }
+
+  function reportDataStatusSection(rows = []) {
+    return reportSection("Datenstatus / Quellenqualität", `
+      <div class="report-source-grid">
+        ${rows.map((row) => {
+          const meta = row.meta || makeMeta("Nicht verfügbar", "unknown", BOOT_TIME);
+          return `
+            <div class="report-source-item">
+              <span>${esc(row.label)}</span>
+              <strong>${esc(statusLabel(meta.status))}</strong>
+              <p>${esc(meta.source || "Quelle offen")} · ${esc(formatTimestamp(meta.timestamp))}</p>
+              ${meta.message ? `<small>${esc(meta.message)}</small>` : ""}
+            </div>
+          `;
+        }).join("") || `<p class="report-muted">Kein Datenstatus verfügbar.</p>`}
+      </div>
+    `);
+  }
+
+  function reportSourceSection(items = []) {
+    return reportSection("Quellen / verwendete Datenbereiche", `
+      <ul class="report-source-list">
+        ${items.map((item) => `<li>${esc(item)}</li>`).join("")}
+      </ul>
+    `);
+  }
+
+  function reportDisclaimer() {
+    return `
+      <strong>Disclaimer</strong>
+      <p>Dieser Report ist keine Anlageberatung, keine persönliche Empfehlung und keine Aufforderung zum Kauf, Verkauf oder Halten von Wertpapieren. Daten können verzögert, unvollständig oder fehlerhaft sein. Live-, Hybrid-, Fallback- und lokale Datenstände sind zu beachten. Entscheidungen liegen ausschließlich beim Nutzer.</p>
+    `;
+  }
+
+  function reportExposureList(title, items = []) {
+    return `
+      <div class="report-exposure">
+        <h3>${esc(title)}</h3>
+        ${items.slice(0, 8).map((item) => `
+          <div class="report-bar-row">
+            <span>${esc(item.label)}</span>
+            <div><i style="width:${clamp(Number(item.value || 0), 0, 100)}%"></i></div>
+            <strong>${formatNumber(item.value)}%</strong>
+          </div>
+        `).join("") || `<p class="report-muted">Keine Exposure-Daten verfügbar.</p>`}
+      </div>
+    `;
+  }
+
+  function reportMiniBarList(rows = []) {
+    return `
+      <div class="report-mini-bars">
+        ${rows.slice(0, 10).map(([label, value]) => `
+          <div class="report-bar-row">
+            <span>${esc(label)}</span>
+            <div><i style="width:${clamp(Number(value || 0), 0, 100)}%"></i></div>
+            <strong>${formatNumber(value)}%</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function reportPositionRows(rows = []) {
+    return `
+      <div class="report-table">
+        <div class="report-table-row report-table-head"><span>Position</span><span>Gewicht</span><span>Performance</span><span>Hinweis</span></div>
+        ${rows.map((row) => `
+          <div class="report-table-row">
+            <span><strong>${esc(row.symbol)}</strong><small>${esc(row.asset.name)}</small></span>
+            <span>${formatNumber(row.weight)}%</span>
+            <span>${formatPercent(row.performancePct)}</span>
+            <span>${esc(row.riskHint?.text || row.role || "prüfen")}</span>
+          </div>
+        `).join("") || `<p class="report-muted">Keine Positionen vorhanden.</p>`}
+      </div>
+    `;
+  }
+
+  function reportMacroCountryRows(rows = []) {
+    return `
+      <div class="report-table macro-report-table">
+        <div class="report-table-row report-table-head"><span>Region</span><span>Inflation</span><span>Realzins</span><span>Makrobild</span></div>
+        ${rows.map((country) => `
+          <div class="report-table-row">
+            <span><strong>${esc(country.name)}</strong><small>BIP ${esc(country.gdp.display)} · Schulden ${esc(country.debt.display)}</small></span>
+            <span>${esc(country.inflation.display)}<small>${esc(country.inflation.comment)}</small></span>
+            <span>${esc(country.realRate.display)}<small>${esc(country.yieldCurve.comment)}</small></span>
+            <span>${esc(country.risk.label)}<small>${esc(country.risk.summary)}</small></span>
+          </div>
+        `).join("") || `<p class="report-muted">Keine Makro-Länderwerte verfügbar.</p>`}
+      </div>
+    `;
+  }
+
+  function reportRecapMoveRows(rows = []) {
+    return reportInsightList(rows.map((item) => ({
+      label: `${item.symbol} · ${formatPercent(item.changePct)}`,
+      text: `${item.name || item.symbol}: ${item.reason || recapRelevanceLabel(item.score)}`
+    })));
+  }
+
+  function reportEventRows(rows = []) {
+    return reportInsightList(rows.map((eventItem) => ({
+      label: `${eventTypeLabel(eventItem)} · ${formatEventDate(eventItem.date)}`,
+      text: `${eventItem.title} · ${eventSourceLabel(eventItem)} · ${statusLabel(eventItem.meta?.status || "fallback")}`
+    })));
+  }
+
+  function reportRecapWatchlistRows(rows = []) {
+    return reportInsightList(rows.map((item) => ({
+      label: item.symbol || item.label || "Watchlist",
+      text: item.text || item.title || item.reason || "Watchlist-Hinweis"
+    })));
+  }
+
+  function reportRecapNewsRows(rows = []) {
+    return reportInsightList(rows.map((item) => ({
+      label: `${item.symbol || "News"} · Score ${Math.round(item.score || 0)}`,
+      text: item.headline || item.text || "News-Hinweis"
+    })));
+  }
+
+  function reportAlertRows(rows = []) {
+    return reportInsightList(rows.map((alert) => {
+      const normalized = normalizeAlertRecord(alert.alert || alert);
+      return {
+        label: `${normalized.symbol} · ${alertTypeLabel(normalized.type)} · ${priorityLabel(normalized.priority)}`,
+        text: `${alertStatusLabel(normalized)} · ${alert.message || alertLabel(normalized)}`
+      };
+    }));
+  }
+
+  function reportWatchlistRows(rows = []) {
+    return `
+      <div class="report-table">
+        <div class="report-table-row report-table-head"><span>Asset</span><span>Preis</span><span>Bewegung</span><span>Research-Hinweis</span></div>
+        ${rows.map((row) => `
+          <div class="report-table-row">
+            <span><strong>${esc(row.symbol)}</strong><small>${esc(row.asset.name)}</small></span>
+            <span>${formatMoney(row.quote.price, row.asset.currency)}</span>
+            <span>${formatPercent(row.quote.changePct)}</span>
+            <span>${esc(row.asset.thesis)}</span>
+          </div>
+        `).join("") || `<p class="report-muted">Keine Watchlist-Werte vorhanden.</p>`}
+      </div>
+    `;
+  }
+
+  function reportWatchNewsRows(rows = []) {
+    return reportInsightList(rows.map((item) => ({
+      label: `${item.symbol} · ${item.kind}`,
+      text: item.text
+    })));
+  }
+
+  function reportPickRows(rows = []) {
+    return reportInsightList(rows.map((pick) => ({
+      label: `${pick.symbol} - ${pick.pickLabel || pick.direction || "Kandidat"} - ${pick.score}%`,
+      text: pick.explanation || pick.reason || pick.pickReason || ""
+    })));
+
+    return reportInsightList(rows.map((pick) => ({
+      label: `${pick.symbol} · ${pick.score}%`,
+      text: pick.reason
+    })));
+  }
+
+  function reportScreenerRows(rows = []) {
+    return `
+      <div class="report-table">
+        <div class="report-table-row report-table-head"><span>Asset</span><span>Score</span><span>Treiber</span><span>Daten</span></div>
+        ${rows.map((row) => `
+          <div class="report-table-row">
+            <span><strong>${esc(row.symbol)}</strong><small>${esc(row.name)}</small></span>
+            <span>${row.score}%</span>
+            <span>${esc(row.explanation)}</span>
+            <span>${esc(statusLabel(row.dataStatus))}</span>
+          </div>
+        `).join("") || `<p class="report-muted">Keine Screener-Treffer im aktuellen Filter.</p>`}
+      </div>
+    `;
+  }
+
+  function strongestWatchlistMove(rows = []) {
+    const strongest = rows.slice().sort((a, b) => Math.abs(Number(b.quote.changePct || 0)) - Math.abs(Number(a.quote.changePct || 0)))[0];
+    return strongest ? `${strongest.symbol} ${formatPercent(strongest.quote.changePct)}` : "nicht verfügbar";
   }
 
   function capitalize(value) {
@@ -9628,10 +15630,19 @@
     if (!name) {
       return;
     }
-    state.screener[name] = input.value;
+    state.screener = { ...SCREENER_DEFAULT_FILTERS, ...state.screener, [name]: input.value };
+    if (name !== "preset") {
+      state.screener.preset = "custom";
+    }
+    saveModuleDefault("screener", { ...state.screener });
     const target = document.getElementById("screenerResults");
     if (target) {
-      target.innerHTML = renderScreenerResults();
+      const filtered = filteredScreenerRows();
+      target.innerHTML = renderScreenerResults(filtered);
+      const count = document.getElementById("screenerResultCount");
+      if (count) {
+        count.textContent = String(filtered.length);
+      }
     }
   }
 
@@ -9651,17 +15662,7 @@
     if (!filter || filter === "all") {
       return true;
     }
-    if (filter === "nonEquity") {
-      return row.type !== "Stock";
-    }
-    const marketCap = Number(row.marketCap || 0);
-    if (filter === "mega") {
-      return marketCap >= 1000000000000;
-    }
-    if (filter === "large") {
-      return marketCap >= 10000000000 && marketCap < 1000000000000;
-    }
-    return true;
+    return row.marketCapBucket === filter || (filter === "nonEquity" && row.type !== "Stock");
   }
 
   function passesPerformanceFilter(row, filter) {
@@ -9684,6 +15685,30 @@
     const next = [...rows];
     if (sort === "name") {
       return next.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (sort === "momentum") {
+      return next.sort((a, b) => b.momentumScore - a.momentumScore);
+    }
+    if (sort === "value") {
+      return next.sort((a, b) => b.valueScore - a.valueScore);
+    }
+    if (sort === "growth") {
+      return next.sort((a, b) => b.growthScore - a.growthScore);
+    }
+    if (sort === "quality") {
+      return next.sort((a, b) => b.qualityScore - a.qualityScore);
+    }
+    if (sort === "risk") {
+      return next.sort((a, b) => b.riskScore - a.riskScore);
+    }
+    if (sort === "event") {
+      return next.sort((a, b) => b.eventScore - a.eventScore);
+    }
+    if (sort === "macro") {
+      return next.sort((a, b) => b.macroScore - a.macroScore);
+    }
+    if (sort === "dataQuality") {
+      return next.sort((a, b) => b.dataQualityScore - a.dataQualityScore);
     }
     if (sort === "performance") {
       return next.sort((a, b) => b.performance1m - a.performance1m);
@@ -9834,6 +15859,8 @@
   function addAlert(alert, message = "Alert gespeichert.") {
     state.alerts = [alert, ...state.alerts].slice(0, 60);
     saveAlerts();
+    recordActivity("Alert", `${alert.symbol || alert.displaySymbol} ${alertTypeLabel(alert.type)} angelegt`, { route: "alerts", symbol: alert.symbol });
+    awardXp("first-alert", 20, "Ersten Alert gesetzt");
     toast(message);
     checkAlerts(false);
     render();
@@ -10344,8 +16371,13 @@
   }
 
   function searchAssets(query) {
+    const favorites = dashboardPrefs().favorites.map(getAsset).filter(Boolean);
     if (!query) {
-      return state.recents.map(getAsset).filter(Boolean).concat(ASSETS.filter((asset) => !state.recents.includes(asset.symbol))).slice(0, 7);
+      return unique([...favorites.map((asset) => asset.symbol), ...state.recents])
+        .map(getAsset)
+        .filter(Boolean)
+        .concat(ASSETS.filter((asset) => !favorites.some((fav) => fav.symbol === asset.symbol) && !state.recents.includes(asset.symbol)))
+        .slice(0, 7);
     }
 
     return ASSETS
@@ -10367,16 +16399,17 @@
 
   function scoreAssetMatch(asset, query) {
     const q = query.toLowerCase();
+    const favoriteBoost = isFavoriteSymbol(asset.symbol) ? -0.5 : 0;
     if (asset.symbol.toLowerCase() === q) {
-      return 0;
+      return favoriteBoost;
     }
     if (asset.symbol.toLowerCase().startsWith(q)) {
-      return 1;
+      return 1 + favoriteBoost;
     }
     if (asset.name.toLowerCase().startsWith(q)) {
-      return 2;
+      return 2 + favoriteBoost;
     }
-    return 5;
+    return 5 + favoriteBoost;
   }
 
   function addToWatchlist(rawSymbol) {
@@ -10392,6 +16425,8 @@
     state.watchlist = unique([...state.watchlist, symbol]);
     storageSet(STORAGE_KEYS.watchlist, state.watchlist);
     ensureHomeData(true);
+    recordActivity("Watchlist", `${symbol} hinzugefuegt`, { route: "portfolio", symbol });
+    awardXp("first-watchlist", 20, "Watchlist erstellt");
     toast(`${symbol} wurde zur Watchlist hinzugefügt.`);
     render();
   }
@@ -10411,34 +16446,6 @@
     if (shouldSave) {
       storageSet(STORAGE_KEYS.recents, state.recents);
     }
-  }
-
-  function buildFredProxyTestRequest() {
-    const url = fredProxyUrl({ action: "test" });
-    return {
-      url: url.toString(),
-      responseType: "json",
-      providerId: "fred",
-      method: "GET"
-    };
-  }
-
-  function buildFinnhubProxyTestRequest() {
-    return {
-      url: finnhubProxyUrl({ endpoint: "quote", symbol: "AAPL" }),
-      responseType: "json",
-      providerId: "finnhub",
-      method: "GET"
-    };
-  }
-
-  function buildAlphaProxyTestRequest() {
-    return {
-      url: alphaProxyUrl({ endpoint: "quote", symbol: "AAPL" }),
-      responseType: "json",
-      providerId: "alphaVantage",
-      method: "GET"
-    };
   }
 
   function fredProxyUrl(params = {}) {
@@ -10484,21 +16491,6 @@
     return window.location.protocol === "https:" || window.location.protocol === "http:";
   }
 
-  function fredProxyDiagnostics(request, responseInfo = {}) {
-    return {
-      kind: "fred-vercel-function",
-      codePath: "testProviderById > runFredVercelProviderTest > /api/fred > FRED API",
-      frontendEndpoint: request.url,
-      pageOrigin: window.location.origin || "file://",
-      frontendKeyExposure: "nein, der Browser sendet keinen FRED-Key",
-      contentType: "unbekannt",
-      functionError: "",
-      fredError: "",
-      note: "",
-      ...responseInfo
-    };
-  }
-
   function parsedProviderBody(text) {
     const body = String(text || "");
     if (!body.trim()) {
@@ -10511,64 +16503,6 @@
     }
   }
 
-  async function fetchProviderTestPayload(request) {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 9000);
-    try {
-      const response = await fetch(request.url, {
-        signal: controller.signal,
-        cache: "no-store",
-        headers: request.headers || {}
-      });
-      const text = await response.text();
-      const contentType = response.headers.get("content-type") || "";
-      const parsed = request.responseType === "text" ? { ok: true, data: text, empty: !text } : parsedProviderBody(text);
-      if (!response.ok) {
-        const error = new Error(providerHttpMessage(response, text, parsed.ok ? parsed.data : null, request.providerId));
-        error.kind = response.status === 429 ? "rate-limit" : "http";
-        error.httpStatus = response.status;
-        error.responseText = text;
-        error.responseData = parsed.ok ? parsed.data : null;
-        error.contentType = contentType;
-        error.parseOk = parsed.ok;
-        error.apiMessage = extractProviderErrorMessage(parsed.ok ? parsed.data : null, text);
-        throw error;
-      }
-      if (request.responseType === "text") {
-        return { data: text, response, text, contentType, parseOk: true };
-      }
-      if (parsed.ok) {
-        return { data: parsed.data, response, text, contentType, parseOk: true };
-      }
-      {
-        const error = new Error("Parse-Fehler: Provider lieferte keine gültige JSON-Antwort. Prüfe, ob ein JSON-Parameter nötig ist.");
-        error.kind = "parse";
-        error.cause = parsed.error;
-        error.httpStatus = response.status;
-        error.responseText = text;
-        error.contentType = contentType;
-        error.parseOk = false;
-        throw error;
-      }
-    } catch (error) {
-      if (error.name === "AbortError") {
-        const timeoutError = new Error("Endpoint nicht erreichbar oder Zeitlimit überschritten.");
-        timeoutError.kind = "timeout";
-        throw timeoutError;
-      }
-      if (error instanceof TypeError) {
-        const browserError = new Error("Browserzugriff blockiert oder Netzwerk/CORS-Problem.");
-        browserError.kind = "browser";
-        browserError.cause = error;
-        browserError.browserMessage = error.message || "";
-        throw browserError;
-      }
-      throw error;
-    } finally {
-      window.clearTimeout(timer);
-    }
-  }
-
   function providerHttpMessage(response, bodyText, data, providerId = "") {
     const apiMessage = extractProviderErrorMessage(data, bodyText);
     if (apiMessage) {
@@ -10577,10 +16511,10 @@
     }
     const body = String(bodyText || "").slice(0, 220);
     if (response.status === 401 || response.status === 403) {
-      return `HTTP ${response.status}: Key nicht akzeptiert oder Zugriff nicht erlaubt.`;
+      return `HTTP ${response.status}: Serverseitiger Zugriff nicht erlaubt.`;
     }
     if (response.status === 429) {
-      return "Rate Limit erreicht. Bitte später erneut testen.";
+      return "Rate Limit erreicht. Bitte später erneut versuchen.";
     }
     return `HTTP ${response.status}: Provider antwortet mit Fehler.${body ? ` Antwort: ${body}` : ""}`;
   }
@@ -10606,285 +16540,6 @@
     const text = String(bodyText || "");
     const match = text.match(/"error_message"\s*:\s*"([^"]+)"/);
     return match ? match[1] : "";
-  }
-
-  function describeProviderTestError(error) {
-    if (!error) {
-      return "Unbekannter Fehler beim Provider-Test.";
-    }
-    if (error.kind === "parse") {
-      return error.message;
-    }
-    if (error.kind === "rate-limit") {
-      return error.message;
-    }
-    if (error.kind === "http") {
-      return error.message;
-    }
-    if (error.kind === "browser") {
-      return "Browserzugriff blockiert, CORS-Problem oder Netzwerk offline.";
-    }
-    if (error.kind === "timeout") {
-      return error.message;
-    }
-    return error.message || "Unbekannter Fehler beim Provider-Test.";
-  }
-
-  function validateFinnhubQuote(data) {
-    if (data && data.error) {
-      throw new Error(`API-Antwort ungültig: ${data.error}`);
-    }
-    if (!data || !Number.isFinite(Number(data.c)) || Number(data.c) <= 0) {
-      throw new Error("API-Antwort ungültig: Finnhub liefert keinen gültigen AAPL-Preis.");
-    }
-    return "Test erfolgreich: Finnhub Quote für AAPL gültig. Das ist noch kein Modul-Liveabruf.";
-  }
-
-  function validateAlphaVantageQuote(data) {
-    if (data && data["Error Message"]) {
-      throw new Error(`API-Antwort ungültig: ${data["Error Message"]}`);
-    }
-    if (data && (data.Note || data.Information)) {
-      throw new Error(`Alpha Vantage Hinweis: ${data.Note || data.Information}`);
-    }
-    const quote = data && data["Global Quote"];
-    if (!quote || !Number.isFinite(Number(quote["05. price"]))) {
-      throw new Error("API-Antwort ungültig: Alpha Vantage liefert keinen GLOBAL_QUOTE-Preis.");
-    }
-    return "Test erfolgreich: Alpha Vantage GLOBAL_QUOTE gültig. In Aktien bleibt Finnhub Primärquelle.";
-  }
-
-  function validateFredObservations(data) {
-    if (data && data.error_code) {
-      throw new Error(`FRED API-Fehler ${data.error_code}: ${data.error_message || "Antwort ungültig."}`);
-    }
-    const observations = data && Array.isArray(data.observations) ? data.observations : [];
-    if (!observations.length || observations.every((row) => !row.value || row.value === ".")) {
-      throw new Error("API-Antwort ungültig: FRED JSON enthält keine nutzbaren Beobachtungen.");
-    }
-    return "Test erfolgreich: FRED liefert JSON-Beobachtungen für FEDFUNDS.";
-  }
-
-  function validateFredSeriesUpdates(data) {
-    if (data && data.ok === false) {
-      throw new Error(`FRED Function-Fehler: ${data.message || data.error || "unbekannter Fehler"}`);
-    }
-    const payload = data && data.data ? data.data : data;
-    if (data && data.error_code) {
-      throw new Error(`FRED API-Fehler ${data.error_code}: ${data.error_message || "Antwort ungültig."}`);
-    }
-    if (payload && payload.error_code) {
-      throw new Error(`FRED API-Fehler ${payload.error_code}: ${payload.error_message || "Antwort ungültig."}`);
-    }
-    const series = payload && Array.isArray(payload.seriess) ? payload.seriess : [];
-    if (!series.length) {
-      throw new Error("FRED-Antwort ungültig: JSON ist erreichbar, aber `seriess` fehlt oder ist leer.");
-    }
-    return "Test erfolgreich: /api/fred erreicht FRED serverseitig und liefert JSON.";
-  }
-
-  function validateBlsSeries(data) {
-    if (!data || data.status !== "REQUEST_SUCCEEDED") {
-      throw new Error(`BLS-Antwort ungültig: ${data?.status || "kein Status"}`);
-    }
-    const series = data.Results && Array.isArray(data.Results.series) ? data.Results.series : [];
-    if (!series.length || !series[0].data || !series[0].data.length) {
-      throw new Error("BLS-Antwort ungültig: keine Zeitreihendaten gefunden.");
-    }
-    return "Test erfolgreich: BLS Open Data liefert aktuelle CPI-Zeitreihe.";
-  }
-
-  function validateFiscalData(data) {
-    if (!data || !Array.isArray(data.data) || !data.data.length) {
-      throw new Error("Treasury-Antwort ungültig: keine Fiscal-Data-Zeilen gefunden.");
-    }
-    return "Test erfolgreich: Treasury Fiscal Data liefert Open-Data-Zeilen.";
-  }
-
-  function validateEiaResponse(data) {
-    if (data && data.error) {
-      throw new Error(`EIA API-Fehler: ${data.error}`);
-    }
-    if (!data || typeof data !== "object" || !data.response) {
-      throw new Error("EIA-Antwort ungültig: keine APIv2-Metadaten erhalten.");
-    }
-    return "Test erfolgreich: EIA APIv2 antwortet mit Metadaten.";
-  }
-
-  function validateWorldBankResponse(data) {
-    if (!Array.isArray(data) || !data[1] || !Array.isArray(data[1])) {
-      throw new Error("World-Bank-Antwort ungültig: erwartetes Indicator-Array fehlt.");
-    }
-    return "Test erfolgreich: World Bank Indicators API liefert JSON-Daten.";
-  }
-
-  function validateImfResponse(data) {
-    if (!data || typeof data.values !== "object") {
-      throw new Error("IMF-Antwort ungültig: DataMapper-Werte fehlen.");
-    }
-    return "Test erfolgreich: IMF DataMapper liefert JSON-Werte.";
-  }
-
-  function validateNonEmptyText(label) {
-    return (text) => {
-      if (!String(text || "").trim()) {
-        throw new Error(`${label} liefert keine verwertbare Antwort.`);
-      }
-      return `Test erfolgreich: ${label} antwortet.`;
-    };
-  }
-
-  async function testProviderById(providerId) {
-    const provider = providerById(providerId);
-    if (!provider) {
-      return;
-    }
-
-    if (providerId === "fred") {
-      await runFredVercelProviderTest(provider);
-      return;
-    }
-
-    setProviderTest(providerId, "warn", "Test läuft lokal im Browser...");
-    render();
-
-    if (provider.security === "backend-only" && provider.keyMode !== "serverEnv") {
-      setProviderTest(providerId, "warn", "Backend-only: Test im öffentlichen Browser bewusst nicht ausgeführt.");
-      toast(`${provider.name}: Browser-Test hier nicht sinnvoll.`);
-      render();
-      return;
-    }
-    if (provider.security === "browser-critical" && !provider.testRequest && !provider.testUrl) {
-      setProviderTest(providerId, "warn", provider.security === "browser-critical" ? "Browser-Test bewusst nicht implementiert: Quelle ist browserkritisch." : "Backend-only: Test im Browser bewusst nicht ausgeführt.");
-      toast(`${provider.name}: Browser-Test hier nicht sinnvoll.`);
-      render();
-      return;
-    }
-    const requestFactory = provider.testRequest || (provider.testUrl ? (() => ({ url: provider.testUrl(), responseType: "json" })) : null);
-    if (!requestFactory) {
-      setProviderTest(providerId, "warn", "Kein Browser-Test implementiert. Quelle ist nur zugeordnet, nicht als Browser-Livetest versprochen.");
-      toast(`${provider.name}: kein Browser-Test implementiert.`);
-      render();
-      return;
-    }
-
-    try {
-      const request = requestFactory();
-      const testResult = await fetchProviderTestPayload(request);
-      const message = provider.validateTest ? provider.validateTest(testResult.data, testResult.response) : "Provider hat im Browser-Test geantwortet.";
-      setProviderTest(providerId, "ok", message || "Provider hat im Browser-Test geantwortet.");
-      toast(`${provider.name}: Test erfolgreich.`);
-    } catch (error) {
-      setProviderTest(providerId, "error", describeProviderTestError(error));
-      toast(`${provider.name}: Test fehlgeschlagen.`);
-      logError(error);
-    }
-    render();
-  }
-
-  async function runFredVercelProviderTest(provider) {
-    const request = buildFredProxyTestRequest();
-
-    if (!serverApiAvailable()) {
-      setProviderTest("fred", "warn", "FRED läuft jetzt serverseitig über /api/fred. Im lokalen Datei-Modus ist diese Vercel Function nicht verfügbar.", fredProxyDiagnostics(request, {
-        stage: "nicht gesendet",
-        httpStatus: "kein Request",
-        responseFormat: "keine Antwort",
-        parseStatus: "nicht ausgeführt",
-        note: "Öffne die Vercel-Deployment-URL oder nutze Vercel lokal, damit /api/fred existiert."
-      }));
-      recordProviderHealth("fred", "fallback", "FRED Vercel Function im lokalen Datei-Modus nicht verfügbar.");
-      toast("FRED: Vercel Function lokal nicht verfügbar.");
-      render();
-      return;
-    }
-
-    setProviderTest("fred", "warn", "FRED Vercel-Function-Test läuft. Der API-Key bleibt serverseitig in FRED_API_KEY.", fredProxyDiagnostics(request, {
-      stage: "Request gebaut",
-      httpStatus: "wartet",
-      responseFormat: "wartet",
-      parseStatus: "wartet",
-      note: "Frontend ruft nur /api/fred auf; der FRED-Key wird nicht im Browser gesendet."
-    }));
-    render();
-
-    try {
-      const testResult = await fetchProviderTestPayload(request);
-      let message = "FRED Vercel Function hat geantwortet.";
-      try {
-        message = provider.validateTest ? provider.validateTest(testResult.data, testResult.response) : message;
-      } catch (validationError) {
-        validationError.httpStatus = testResult.response.status;
-        validationError.responseText = testResult.text;
-        validationError.responseData = testResult.data;
-        validationError.contentType = testResult.contentType || "";
-        validationError.parseOk = testResult.parseOk;
-        validationError.apiMessage = extractProviderErrorMessage(testResult.data, testResult.text);
-        throw validationError;
-      }
-      const details = fredProxyDiagnostics(request, {
-        stage: "Response erhalten",
-        httpStatus: testResult.response.status,
-        contentType: testResult.contentType || "unbekannt",
-        responseFormat: "JSON",
-        parseStatus: testResult.parseOk ? "Parsing erfolgreich" : "Parsing fehlgeschlagen",
-        fredError: "",
-        note: "Vercel Function konnte FRED serverseitig erreichen."
-      });
-      setProviderTest("fred", "ok", message, details);
-      toast("FRED: Vercel Function erfolgreich.");
-    } catch (error) {
-      const details = fredProxyDiagnostics(request, {
-        stage: error.httpStatus ? "Response erhalten" : "Fetch fehlgeschlagen",
-        httpStatus: error.httpStatus || "keine HTTP-Antwort",
-        contentType: error.contentType || "unbekannt",
-        responseFormat: error.parseOk === false ? "nicht JSON" : error.responseData ? "JSON" : "unbekannt",
-        parseStatus: error.parseOk === false ? "Parsing fehlgeschlagen" : error.responseData ? "Parsing erfolgreich" : "nicht ausgeführt",
-        functionError: error.responseData?.message || "",
-        fredError: error.responseData?.fredError || error.apiMessage || "",
-        browserFetchError: error.browserMessage || error.message || "",
-        responseBody: error.responseText ? String(error.responseText).slice(0, 420) : "",
-        note: "Wenn HTTP 500 mit missing_env erscheint, fehlt FRED_API_KEY in Vercel Environment Variables."
-      });
-      const message = describeProviderTestError(error);
-      setProviderTest("fred", "error", message, details);
-      toast("FRED: Vercel Function fehlgeschlagen.");
-      logError(error);
-    }
-    render();
-  }
-
-  async function testConfiguredProviders() {
-    const testable = visibleProviders().filter((provider) => {
-      const hasTest = Boolean(provider.testRequest || provider.testUrl);
-      if (!hasTest) {
-        return false;
-      }
-      if (provider.security === "browser-critical") {
-        return false;
-      }
-      return true;
-    });
-    if (!testable.length) {
-      toast("Keine testbaren öffentlichen Quellen vorhanden.");
-      return;
-    }
-    for (const provider of testable) {
-      await testProviderById(provider.id);
-    }
-  }
-
-  function setProviderTest(providerId, status, message, details = null) {
-    state.providerTests = {
-      ...state.providerTests,
-      [providerId]: {
-        status,
-        message,
-        timestamp: Date.now(),
-        details
-      }
-    };
-    storageSet(STORAGE_KEYS.providerTests, state.providerTests);
   }
 
   function exportWatchlist() {
@@ -10997,13 +16652,13 @@
       return "Live";
     }
     if (status === "stale") {
-      return "Veraltet";
+      return "Fallback";
     }
     if (status === "missing") {
-      return "Fehlt";
+      return "Unbekannt";
     }
     if (status === "prepared") {
-      return "Zugeordnet";
+      return "Unbekannt";
     }
     if (status === "hybrid") {
       return "Hybrid";
@@ -11018,13 +16673,13 @@
       return "Unbekannt";
     }
     if (status === "mapped" || status === "notUsed") {
-      return "Aktuell nicht genutzt";
+      return "Unbekannt";
     }
     if (status === "disabled") {
-      return "Deaktiviert";
+      return "Offline";
     }
     if (status === "error") {
-      return "Fehler";
+      return "Offline";
     }
     return "Fallback-Daten aktiv";
   }
@@ -11043,10 +16698,6 @@
 
   function normalizeSymbol(value) {
     return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9.]/g, "");
-  }
-
-  function cleanKey(value) {
-    return String(value || "").trim();
   }
 
   function storageGet(key, fallback) {
@@ -11089,7 +16740,13 @@
 
   function removeLegacyBrowserApiKeys() {
     try {
-      localStorage.removeItem("mh.apiKeys.v2");
+      [
+        "mh.apiKeys.v1",
+        "mh.apiKeys.v2",
+        "mh.providerKeys.v1",
+        "mh.providerKeys.v2",
+        "mh.providerTests.v1"
+      ].forEach((key) => localStorage.removeItem(key));
     } catch (error) {
       logError(error);
     }
@@ -11327,12 +16984,35 @@
   }
 
   function statusRank(status) {
-    const ranks = { live: 4, stale: 3, fallback: 2, missing: 1, error: 0 };
+    const ranks = { live: 6, stale: 5, hybrid: 4, local: 3, fallback: 2, prepared: 2, mapped: 2, notUsed: 1, missing: 1, unknown: 1, error: 0, offline: 0 };
     return ranks[status || ""] ?? 0;
   }
 
   function bestDataStatus(statuses) {
     return statuses.filter(Boolean).sort((a, b) => statusRank(b) - statusRank(a))[0] || "fallback";
+  }
+
+  function combinedDataStatus(statuses) {
+    const clean = statuses.filter(Boolean);
+    if (!clean.length) {
+      return "fallback";
+    }
+    const hasLive = clean.some((status) => status === "live" || status === "stale");
+    const hasFallback = clean.some((status) => ["fallback", "local", "prepared", "mapped", "notUsed", "missing", "unknown"].includes(status));
+    const hasError = clean.some((status) => status === "error" || status === "offline");
+    if (hasLive && hasFallback) {
+      return "hybrid";
+    }
+    if (hasLive) {
+      return clean.includes("stale") && !clean.includes("live") ? "stale" : "live";
+    }
+    if (hasError && !hasFallback) {
+      return "error";
+    }
+    if (clean.includes("local")) {
+      return "local";
+    }
+    return "fallback";
   }
 
   function esc(value) {

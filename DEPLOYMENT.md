@@ -2,7 +2,7 @@
 
 Diese Anleitung ist für Anfänger gedacht. MH Analytics bleibt im Frontend statisch: kein Build-Prozess, kein npm und kein eigener dauerlaufender Server.
 
-Die Online-Version nutzt Vercel Functions im Ordner `api`, damit geheime API-Keys nicht im Browser liegen.
+Die Online-Version nutzt Vercel Functions im Ordner `api`, damit geheime API-Keys nicht im Browser liegen. Die öffentliche Website zeigt nur Datenquellenstatus/Data Health und keine Provider-Konfiguration.
 
 ## Lokal öffnen
 
@@ -67,7 +67,9 @@ Für Frankfurter FX wird aktuell kein `FX_API_KEY` benötigt.
 6. Speichern.
 7. Danach neu deployen.
 
-Wichtig: Die Keys werden nicht in der Website-Oberfläche eingegeben. Normale Nutzer sehen nur den Reiter `Datenquellen` mit Statusinformationen.
+Wichtig: Die Keys werden nicht in der Website-Oberfläche eingegeben. Normale Nutzer sehen nur den Reiter `Datenquellen` mit Statusinformationen. Es gibt keine öffentlichen Key-Felder, keine Speicher-/Löschbuttons, keine Provider-Testbuttons und keine Browser-Diagnose.
+
+Alte Browser-Key-Daten aus früheren Versionen werden beim Start bereinigt. Neue Provider-Keys dürfen nicht in `localStorage`, Frontend-Code oder öffentliche Formulare geschrieben werden.
 
 ## Serverseitige Routen testen
 
@@ -76,17 +78,31 @@ Nach dem Deployment kannst du diese Routen direkt im Browser öffnen:
 ```text
 /api/fred?action=test
 /api/finnhub?endpoint=quote&symbol=AAPL
+/api/finnhub?endpoint=profile&symbol=AAPL
 /api/alphavantage?endpoint=quote&symbol=AAPL
 /api/eia?dataset=oil
 /api/fx?base=USD&quotes=EUR,JPY,GBP
 /api/coingecko?ids=bitcoin,ethereum&vs_currencies=usd
-/api/opendata?source=bls-cpi
 /api/opendata?source=treasury-rates
 /api/opendata?source=worldbank-growth
-/api/opendata?source=imf-growth
+/api/opendata?source=worldbank-debt
 ```
 
-Wenn eine Environment Variable fehlt, antwortet die jeweilige Function mit einem strukturierten Fehler wie `missing_env`.
+Eine erfolgreiche Antwort ist JSON. Je nach Route sollte sie grob enthalten:
+
+- Status- oder Datenfelder wie `ok`, `status`, `source`, `data`, `quote`, `profile`, `rates` oder `items`.
+- Keine geheimen Werte aus Vercel Environment Variables.
+- Bei Open-Data-Routen einen normalisierten Datenteil und Quellen-/Statushinweise.
+
+Typische Fehlercodes:
+
+- `missing_env`: Die passende Environment Variable fehlt oder ist im falschen Vercel Environment gesetzt.
+- `rate_limit`: Der externe Anbieter hat das aktuelle Limit erreicht.
+- `provider_error`: Der Anbieter antwortet mit einem Fehler oder unerwartetem Status.
+- `network_error`: Die serverseitige Function konnte den Anbieter nicht erreichen.
+- `invalid_response`: Die Antwort war nicht wie erwartet lesbar oder normalisierbar.
+
+Wenn eine Environment Variable fehlt, antwortet die jeweilige Function strukturiert mit `missing_env`. Danach Variable setzen, speichern und neu deployen.
 
 ## Wenn Live-Daten nicht laden
 
